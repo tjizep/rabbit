@@ -1,0 +1,4 @@
+Rabbit
+------
+
+Rabbit is a very fast simple hash table implementation
