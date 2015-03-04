@@ -196,17 +196,19 @@ namespace rabbit{
 	
 				///printf("rehash scan time %.4g secs\n",(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count())/(1000000.0));
 			}catch(std::bad_alloc &e){
-				printf("rehash failed in temp phase\n");
-				exit(-1);
+				//printf("rehash failed in temp phase\n");
+				//exit(-1);
+				throw e;
 			}
 			try{
 				resize_clear(new_extent);
 				
 			}catch(std::bad_alloc &e){
 				
-				printf("rehash failed in resize phase\n");
+				//printf("rehash failed in resize phase\n");
 			
-				exit(-1);
+				//exit(-1);
+				throw e;
 			}
 			
 			try{
@@ -215,9 +217,10 @@ namespace rabbit{
 				}
 					
 			}catch(std::bad_alloc &e){
-				printf("rehash failed in hash phase\n");
+				//printf("rehash failed in hash phase\n");
 			
-				exit(-1);
+				//exit(-1);
+				throw e;
 			}
 			
 		}

@@ -102,7 +102,7 @@ public:
 };
 int main(int argc, char **argv)
 {
-	typedef std::unordered_map<int,int> _Map;
+	typedef rabbit::unordered_map<int,int> _Map;
 	tester<_Map>::_Script script;
 	tester<_Map> t;
 	t.gen_random_ll(10000000, script);
