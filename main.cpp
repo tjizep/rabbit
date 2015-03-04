@@ -1,11 +1,14 @@
-#include <stdio.h>
 #include <stdlib.h>
-
+#include <stdio.h>
 #include <random>
 #include <unordered_map>
 #include <map>
-
+#include <string>
+#include <sstream>
 #include "rabbit.h"
+#ifdef _MSC_VER
+#define _CRT_SECURE_NO_WARNINGS
+#endif
 template< typename _MapT>
 class tester{
 public:
@@ -55,12 +58,12 @@ public:
 			script.push_back(dis(gen));
 		}
 	}
-	void to_t(int in, std::string& out){
-		out.clear();
-		out.reserve(20);
-		char outbuf[20];
-		::ltoa(in, outbuf, 10);
-		out = outbuf;
+	void to_t(int inp, std::string& out){
+		#ifdef _MSC_VER
+		out = std::to_string(inp);
+		#else
+		out = dynamic_cast< std::ostringstream & >( ( std::ostringstream() << std::dec << inp ) ).str();
+		#endif
 		
 	}
 	
@@ -98,7 +101,7 @@ public:
 	void gen_random(size_t count, _Script& script){
 		std::minstd_rand rd;
 		std::mt19937 gen(rd());
-		std::uniform_int_distribution<> dis(1<<24, 1<<31);
+		std::uniform_int_distribution<> dis(1<<24, 1l<<30);
 		/// script creation is not benched
 		_InputField v;
 		for(size_t r = 0; r < count;++r){
@@ -107,6 +110,7 @@ public:
 		}
 	}
 	void erase_test(_MapT &h,const _Script& script){
+		size_t count = script.size();
 		for(size_t k = 0; k < count/2; ++k){
 			if(h.count(script[k]) != 0){
 				if(!h.erase(script[k])){
@@ -131,7 +135,7 @@ public:
 		_MapT h;
 		size_t s = count/30;
 		for(size_t j = 0; j < count; ++j){
-			h[script[j]] = j+1;
+			h[script[j]] = (typename _MapT::mapped_type)j+1;
 			if(j % s == 0){
 				std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 	
@@ -149,7 +153,7 @@ public:
 		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 	
 		printf("bench total %.4g secs read %.4g secs\n",(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count())/(1000000.0),(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start_read).count())/(1000000.0));
-		int r = h.size();
+		size_t r = h.size();
 		std::cin >> r;
 		//printf("the hash size is %ld \n",h.size());
 		
@@ -160,7 +164,7 @@ int main(int argc, char **argv)
 	typedef rabbit::unordered_map<std::string,long> _Map;
 	tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random(10000000, script);
+	t.gen_random(1000000, script);
 	t.bench_hash(script);
 	
 	return 0;

@@ -5,15 +5,15 @@
 ## Release
 ProjectName            :=rabbit
 ConfigurationName      :=Release
-WorkspacePath          := "C:\dev\rabbit"
-ProjectPath            := "C:\dev\rabbit"
+WorkspacePath          := "C:\dev\cpp_all\rabbit"
+ProjectPath            := "C:\dev\cpp_all\rabbit"
 IntermediateDirectory  :=./Release
 OutDir                 := $(IntermediateDirectory)
 CurrentFileName        :=
 CurrentFilePath        :=
 CurrentFileFullPath    :=
 User                   :=christiaan
-Date                   :=03/03/15
+Date                   :=03/04/15
 CodeLitePath           :="C:\Program Files\CodeLite"
 LinkerName             :=C:/dev/CodeBlocks/MinGW/bin/g++.exe 
 SharedObjectLinkerName :=C:/dev/CodeBlocks/MinGW/bin/g++.exe -shared -fPIC
@@ -90,7 +90,7 @@ PreBuild:
 ## Objects
 ##
 $(IntermediateDirectory)/main.cpp$(ObjectSuffix): main.cpp $(IntermediateDirectory)/main.cpp$(DependSuffix)
-	$(CXX) $(IncludePCH) $(SourceSwitch) "C:/dev/rabbit/main.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IncludePath)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "C:/dev/cpp_all/rabbit/main.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IncludePath)
 $(IntermediateDirectory)/main.cpp$(DependSuffix): main.cpp
 	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/main.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/main.cpp$(DependSuffix) -MM "main.cpp"
 
