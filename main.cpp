@@ -1,6 +1,10 @@
+#include <stdio.h>
+#include <stdlib.h>
+
 #include <random>
 #include <unordered_map>
 #include <map>
+
 #include "rabbit.h"
 template< typename _MapT>
 class tester{
@@ -49,6 +53,57 @@ public:
 		/// script creation is not benched
 		for(size_t r = 0; r < count;++r){
 			script.push_back(dis(gen));
+		}
+	}
+	void to_t(int in, std::string& out){
+		out.clear();
+		out.reserve(20);
+		char outbuf[20];
+		::ltoa(in, outbuf, 10);
+		out = outbuf;
+		
+	}
+	
+	void to_t(int in, long long& out){
+		out = in;
+	}
+	
+	void to_t(int in, long& out){
+		out = in;
+	}
+	
+	void to_t(int in, int& out){
+		out = in;
+	}
+	
+	void to_t(int in, unsigned long long& out){
+		out = in;
+	}
+	
+	void to_t(int in, unsigned long& out){
+		out = in;
+	}
+	
+	void to_t(int in, unsigned int& out){
+		out = in;
+	}
+	
+	void to_t(int in, double& out){
+		out = in;
+	}
+	void to_t(int in, float& out){
+		out = in;
+	}
+
+	void gen_random(size_t count, _Script& script){
+		std::minstd_rand rd;
+		std::mt19937 gen(rd());
+		std::uniform_int_distribution<> dis(1<<24, 1<<31);
+		/// script creation is not benched
+		_InputField v;
+		for(size_t r = 0; r < count;++r){
+			to_t(dis(gen),v);
+			script.push_back(v);
 		}
 	}
 	void erase_test(_MapT &h,const _Script& script){
@@ -102,10 +157,10 @@ public:
 };
 int main(int argc, char **argv)
 {
-	typedef rabbit::unordered_map<int,int> _Map;
+	typedef rabbit::unordered_map<std::string,long> _Map;
 	tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random_ll(10000000, script);
+	t.gen_random(10000000, script);
 	t.bench_hash(script);
 	
 	return 0;

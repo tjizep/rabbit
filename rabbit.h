@@ -1,22 +1,24 @@
 #ifndef _RABBIT_H_CEP_20150303_
 #define  _RABBIT_H_CEP_20150303_
-
+#include <string>
 #include <stdio.h>
 #include <iostream>
 #include <vector>
 #include <chrono>
+#include <functional>
+
 
 /// the rab-bit hash
 /// probably the worlds simplest working hashtable - only kiddingk
 /// it uses linear probing for the first level of fallback
 
 namespace rabbit{
-	template <typename _K, typename _V>
+	template <typename _K, typename _V, typename _H = std::hash<_K> >
 	class unordered_map{
 	public:
 		typedef _K key_type;
 		typedef _V value_type;
-
+		typedef _H hash_function;
 		typedef unsigned int _Bt; /// exists ebucket type
 		
 		typedef std::pair<_K,_V> _ElPair;
@@ -73,7 +75,7 @@ namespace rabbit{
 		static const size_t MIN_EXTENT = 17;
 		static const _Bt BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
 		double get_min_backoff() const {
-			return 2;
+			return 1.8;
 		}
 		double get_max_backoff() const {
 			return 8;
@@ -94,9 +96,10 @@ namespace rabbit{
 
 		size_t elements;
 		double backoff;
+		_H hf;
 		size_t key2pos(const _K& k) const {
 			size_t r = 0;
-			size_t h = (size_t)(k);
+			size_t h = hf(k);
 			
 			r = h % extent;						
 			
@@ -175,7 +178,7 @@ namespace rabbit{
 		double recalc_growth_factor(size_t ext)  {
 			double factor = backoff;
 			/// a very slow backoff seems very important
-			backoff = get_min_backoff() + (( backoff - get_min_backoff() ) * 0.97);
+			backoff = get_min_backoff() + (( backoff - get_min_backoff() ) * 0.96);
 			
 			return factor ;
 		}
