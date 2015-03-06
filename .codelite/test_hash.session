@@ -1,8 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Session Name="C:\dev\rabbit\test_hash.workspace">
-  <int Value="0" Name="m_selectedTab"/>
-  <wxString Value="C:\dev\rabbit\test_hash.workspace" Name="m_workspaceName"/>
-  <TabInfoArray Name="TabInfoArray"/>
+<Session Name="C:\dev\cpp_all\rabbit\test_hash.workspace">
+  <int Value="1" Name="m_selectedTab"/>
+  <wxString Value="C:\dev\cpp_all\rabbit\test_hash.workspace" Name="m_workspaceName"/>
+  <TabInfoArray Name="TabInfoArray">
+    <TabInfo>
+      <wxString Value="C:\dev\cpp_all\rabbit\main.cpp" Name="FileName"/>
+      <int Value="162" Name="FirstVisibleLine"/>
+      <int Value="163" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="C:\dev\cpp_all\rabbit\rabbit.h" Name="FileName"/>
+      <int Value="83" Name="FirstVisibleLine"/>
+      <int Value="375" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+  </TabInfoArray>
   <SerializedObject Name="m_breakpoints">
     <long Value="1" Name="Count"/>
     <SerializedObject Name="Breakpoint0">

@@ -153,15 +153,15 @@ public:
 		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 	
 		printf("bench total %.4g secs read %.4g secs\n",(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count())/(1000000.0),(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start_read).count())/(1000000.0));
-		size_t r = h.size();
-		std::cin >> r;
+		//size_t r = h.size();
+		//std::cin >> r;
 		//printf("the hash size is %ld \n",h.size());
 		
 	}
 };
 int main(int argc, char **argv)
 {
-	typedef rabbit::unordered_map<std::string,long> _Map;
+	typedef std::unordered_map<std::string,long> _Map;
 	tester<_Map>::_Script script;
 	tester<_Map> t;
 	t.gen_random(1000000, script);
