@@ -26,10 +26,10 @@ namespace rabbit{
 
 	protected:
 		static const _Bt CHAR_BITS = 8;
-		static const _Bt EXTRA = 32;
+		static const _Bt PROBES = 64;
 		/// inverse of factor used to determine overflow list
 		/// when overflow list is full rehash starts
-		static const size_t R_OVERFLOW = 16384; 
+		static const size_t R_OVERFLOW = 128; 
 		
 		static const size_t MIN_EXTENT = 17;
 		static const _Bt BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
@@ -42,7 +42,7 @@ namespace rabbit{
 		struct hash_state{
 			/// the existence bit set is a factor of BITS_SIZE less than the extent
 			_Exists exists;
-			
+			const _Bt* _exists;
 			/// data being used
 			_Data data;
 			size_t extent;
@@ -60,7 +60,7 @@ namespace rabbit{
 			}
 			
 			size_t get_data_size() const {
-				return extent+extent/R_OVERFLOW;
+				return extent+R_OVERFLOW;
 			}
 			
 			void set_exists(size_t pos, bool f){
@@ -103,9 +103,9 @@ namespace rabbit{
 			size_t count_bucket(size_t b) const {
 				return count_bits<_Bt>(exists[b]);
 			}
-			bool exists_(size_t pos) const {
-				size_t bucket = pos / BITS_SIZE;
-				size_t bit = pos % BITS_SIZE;
+			inline bool exists_(size_t pos) const {
+				size_t bucket = (pos / BITS_SIZE);
+				size_t bit = pos & (BITS_SIZE-1);
 				_Bt v = exists[bucket];
 				return ((v >> bit) & 1) != 0;
 			}
@@ -119,6 +119,7 @@ namespace rabbit{
 				data.clear();
 				
 				exists.resize(esize);
+				_exists = &exists[0];
 				data.resize(get_data_size());
 			};
 			void clear(){				
@@ -142,6 +143,7 @@ namespace rabbit{
 			hash_state& operator=(const hash_state& right){
 				extent = right.extent;
 				exists = right.exists;
+				_exists = &exists[0];
 				data = right.data;
 				elements = right.elements;				
 				return *this;
@@ -153,7 +155,7 @@ namespace rabbit{
 				
 				/// eventualy an out of memory exception will occur
 				pos = key2pos(k);
-				size_t m = std::min<size_t>(extent, pos + EXTRA);
+				size_t m = std::min<size_t>(extent, pos + PROBES);
 				for(; pos < m;++pos){
 					if(!exists_(pos)){
 						set_exists(pos, true);
@@ -188,7 +190,7 @@ namespace rabbit{
 			}
 			bool erase(const _K& k){
 				size_t pos = key2pos(k);			
-				size_t m = std::min<size_t>(extent, pos + EXTRA);
+				size_t m = std::min<size_t>(extent, pos + PROBES);
 				for(; pos < m;++pos){
 					if(!exists_(pos)){
 						return false;
@@ -231,7 +233,7 @@ namespace rabbit{
 			}
 			size_t count(const _K& k) const {
 				size_t pos = key2pos(k);
-				size_t m = std::min<size_t>(extent, pos + EXTRA);
+				size_t m = std::min<size_t>(extent, pos + PROBES);
 				for(; pos < m;++pos){
 					if(!exists_(pos)) 
 						return 0;
@@ -254,7 +256,7 @@ namespace rabbit{
 			size_t find(const _K& k) const {
 				
 				size_t pos = key2pos(k);
-				size_t m = std::min<size_t>(extent, pos + EXTRA);
+				size_t m = std::min<size_t>(extent, pos + PROBES);
 				for(; pos < m;++pos){
 					if(!exists_(pos)){
 						return end();
@@ -348,18 +350,34 @@ namespace rabbit{
 			return 8;
 		}
 		
-		/// Truncated Exponential Backoff in Rehasing after collisions	
+		/// Truncated Linear Backoff in Rehasing after collisions	
 		/// growth factor is calculated as a binary exponential 
 		/// backoff (yes, analogous to the one used in network congestion control)
 		/// in evidence of hash collisions the the growth factor is exponentialy 
 		/// decreased as memory becomes a scarce resource.
 		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
-		double recalc_growth_factor()  {
-			double factor = backoff;
-			/// a very slow backoff seems very important
-			backoff = get_min_backoff() + (( backoff - get_min_backoff() ) * 0.97);
+		double recalc_growth_factor(size_t elements)  {
 			
-			return factor ;
+			if(elements > 14000000){
+				return 2.1;
+			}
+			if(elements > 5000000){
+				return 2.05;
+			}
+			double growth_factor = backoff;
+			bool linear = true;
+			if(linear){
+				double d = 0.53;				
+				if(backoff - d > get_min_backoff()){
+					backoff -= d ;					
+				}								
+			}else{								
+				double backof_factor = 0.76;
+				backoff = get_min_backoff() + (( backoff - get_min_backoff() ) * backof_factor);
+				
+			}
+			
+			return growth_factor ;
 		}
 		
 		void rehash(){
@@ -368,7 +386,7 @@ namespace rabbit{
 			/// size_t old_extent = extent;
 			typename hash_state::ptr rehashed = std::make_shared<hash_state>();
 			size_t extent = current->get_extent();
-			size_t new_extent = (size_t)(extent * recalc_growth_factor()) + 1;
+			size_t new_extent = (size_t)(extent * recalc_growth_factor(current->elements)) + 1;
 			try{
 				rehashed->resize_clear(new_extent);		
 				while(true){
@@ -378,7 +396,7 @@ namespace rabbit{
 							*v = (*i).second;/// rehash recursion can happen here	
 						}else{							
 							rehashed = std::make_shared<hash_state>();
-							new_extent = (size_t)(new_extent * recalc_growth_factor()) + 1;
+							new_extent = (size_t)(new_extent * recalc_growth_factor(rehashed->elements)) + 1;
 							rehashed->resize_clear(new_extent);				
 							continue;
 						}
