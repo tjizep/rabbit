@@ -48,6 +48,7 @@ namespace rabbit{
 			size_t extent;
 
 			size_t elements;
+			size_t overflow;
 			_H hf;
 			
 			size_t key2pos(const _K& k) const {
@@ -60,7 +61,7 @@ namespace rabbit{
 			}
 			
 			size_t get_data_size() const {
-				return extent+R_OVERFLOW;
+				return extent+overflow;
 			}
 			
 			void set_exists(size_t pos, bool f){
@@ -112,7 +113,9 @@ namespace rabbit{
 			
 			void resize_clear(size_t new_extent){
 				extent = new_extent;
+				overflow = std::max<size_t>(extent/1024,R_OVERFLOW);
 				elements = 0;
+
 				size_t esize = (get_data_size()/BITS_SIZE)+1;
 				
 				exists.clear();
@@ -358,21 +361,21 @@ namespace rabbit{
 		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
 		double recalc_growth_factor(size_t elements)  {
 			
-			if(elements > 14000000){
-				return 2.1;
-			}
-			if(elements > 5000000){
-				return 2.05;
-			}
+			///if(elements > 14000000){
+			///	return 2.1;
+			///}
+			///if(elements > 5000000){
+			///	return 2.05;
+			///}
 			double growth_factor = backoff;
-			bool linear = true;
+			bool linear = false;
 			if(linear){
-				double d = 0.53;				
+				double d = 0.37;				
 				if(backoff - d > get_min_backoff()){
 					backoff -= d ;					
 				}								
 			}else{								
-				double backof_factor = 0.76;
+				double backof_factor = 0.58;
 				backoff = get_min_backoff() + (( backoff - get_min_backoff() ) * backof_factor);
 				
 			}
@@ -390,7 +393,8 @@ namespace rabbit{
 			try{
 				rehashed->resize_clear(new_extent);		
 				while(true){
-					for(iterator i = begin();i != end();++i){
+					iterator e = end();
+					for(iterator i = begin();i != e;++i){
 						_V *v = rehashed->subscript((*i).first);
 						if(v != nullptr){
 							*v = (*i).second;/// rehash recursion can happen here	

@@ -233,7 +233,7 @@ void test_std_hash(size_t ts){
 }
 int main(int argc, char **argv)
 {
-	size_t ts = 20000000;
+	size_t ts = 30000000;
 	//typedef std::string _K;
 	typedef unsigned long _K;
 	test_dense_hash_long(ts);
