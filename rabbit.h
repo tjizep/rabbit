@@ -360,22 +360,16 @@ namespace rabbit{
 		/// decreased as memory becomes a scarce resource.
 		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
 		double recalc_growth_factor(size_t elements)  {
-			
-			///if(elements > 14000000){
-			///	return 2.1;
-			///}
-			///if(elements > 5000000){
-			///	return 2.05;
-			///}
+					
 			double growth_factor = backoff;
-			bool linear = false;
+			bool linear = true;
 			if(linear){
-				double d = 0.37;				
+				double d = 0.65;				
 				if(backoff - d > get_min_backoff()){
 					backoff -= d ;					
 				}								
 			}else{								
-				double backof_factor = 0.58;
+				double backof_factor = 0.502;
 				backoff = get_min_backoff() + (( backoff - get_min_backoff() ) * backof_factor);
 				
 			}
