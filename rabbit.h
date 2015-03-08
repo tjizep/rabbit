@@ -158,7 +158,18 @@ namespace rabbit{
 				
 				/// eventualy an out of memory exception will occur
 				pos = key2pos(k);
+				/// this hoist provides performance improvement for rehashes specifically
+				/// probably also for new hash tables
+				if(!exists_(pos)){
+					set_exists(pos, true);
+					data[pos].first = k;
+					data[pos].second = _V();
+					++elements;
+					return &(data[pos].second);
+				}
+
 				size_t m = std::min<size_t>(extent, pos + PROBES);
+				++pos;
 				for(; pos < m;++pos){
 					if(!exists_(pos)){
 						set_exists(pos, true);
@@ -236,7 +247,13 @@ namespace rabbit{
 			}
 			size_t count(const _K& k) const {
 				size_t pos = key2pos(k);
+				if(!exists_(pos)) 
+					return 0;
+				else if(data[pos].first == k){
+					return 1;
+				}
 				size_t m = std::min<size_t>(extent, pos + PROBES);
+				++pos;
 				for(; pos < m;++pos){
 					if(!exists_(pos)) 
 						return 0;
