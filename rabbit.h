@@ -12,6 +12,7 @@
 /// it uses linear probing for the first level of fallback
 
 namespace rabbit{
+
 	template <typename _K, typename _V, typename _H = std::hash<_K>>
 	class unordered_map{
 	public:
@@ -21,6 +22,8 @@ namespace rabbit{
 
 		typedef unsigned int _Bt; /// exists ebucket type
 		
+		typedef size_t size_type;
+
 		typedef std::pair<_K,_V> _ElPair;
 		typedef _ElPair value_type;
 
@@ -29,9 +32,9 @@ namespace rabbit{
 		static const _Bt PROBES = 64;
 		/// inverse of factor used to determine overflow list
 		/// when overflow list is full rehash starts
-		static const size_t R_OVERFLOW = 128; 
+		static const size_type R_OVERFLOW = 128; 
 		
-		static const size_t MIN_EXTENT = 17;
+		static const size_type MIN_EXTENT = 17;
 		static const _Bt BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
 		/// the existence bit set type
 		typedef std::vector<_Bt> _Exists;
@@ -45,27 +48,58 @@ namespace rabbit{
 			const _Bt* _exists;
 			/// data being used
 			_Data data;
-			size_t extent;
+			size_type extent;
 
-			size_t elements;
-			size_t overflow;
+			size_type elements;
+			size_type overflow;
 			_H hf;
+			float mf;
+			size_type buckets;
+			float load_factor() const{
+				return (float)((double)elements/(double)bucket_count());
+			}
+			size_type bucket_count() const {
+				return get_data_size();
+			}
+			size_type bucket_size ( size_type n ) const{
+				size_t pos = n;
+				size_type m = std::min<size_t>(extent, pos + PROBES);
+				size_type r = 0;
+				
+				for(; pos < m;++pos){
+					if(!exists_(pos)){
+						break;
+					}else if(key2pos(data[pos].first) != n){
+						/// indicates we left the bucket
+						break;
+					}
+					++r;
+				}
+				return r;
+			}
+			float max_load_factor() const {
+				return mf;
+			}
+	
+			void max_load_factor ( float z ){
+				mf = z;
+			}
 			
-			size_t key2pos(const _K& k) const {
-				size_t r = 0;
-				size_t h = hf(k);
+			size_type key2pos(const _K& k) const {
+				size_type r = 0;
+				size_type h = hf(k);
 				
 				r = h % extent;						
 				
 				return r;
 			}
 			
-			size_t get_data_size() const {
+			size_type get_data_size() const {
 				return extent+overflow;
 			}
 			
-			void set_exists(size_t pos, bool f){
-				size_t bucket = pos / BITS_SIZE;
+			void set_exists(size_type pos, bool f){
+				size_type bucket = pos / BITS_SIZE;
 				
 				/// lifted directly from Bit Twiddling Hacks
 				/// https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetTable
@@ -101,22 +135,23 @@ namespace rabbit{
 			}
 			/// count on bits in the given bucket
 			/// each bucket 
-			size_t count_bucket(size_t b) const {
+			size_type count_bucket(size_type b) const {
 				return count_bits<_Bt>(exists[b]);
 			}
-			inline bool exists_(size_t pos) const {
-				size_t bucket = (pos / BITS_SIZE);
-				size_t bit = pos & (BITS_SIZE-1);
+			inline bool exists_(size_type pos) const {
+				size_type bucket = (pos / BITS_SIZE);
+				size_type bit = pos & (BITS_SIZE-1);
 				_Bt v = exists[bucket];
 				return ((v >> bit) & 1) != 0;
 			}
 			
-			void resize_clear(size_t new_extent){
+			void resize_clear(size_type new_extent){
 				extent = new_extent;
+				mf = 1.0;
 				overflow = std::max<size_t>(extent/1024,R_OVERFLOW);
 				elements = 0;
 
-				size_t esize = (get_data_size()/BITS_SIZE)+1;
+				size_type esize = (get_data_size()/BITS_SIZE)+1;
 				
 				exists.clear();
 				data.clear();
@@ -124,28 +159,31 @@ namespace rabbit{
 				exists.resize(esize);
 				_exists = &exists[0];
 				data.resize(get_data_size());
+				buckets = 0;
+
 			};
 			void clear(){				
 				resize_clear(MIN_EXTENT);
 			}
 			
-			hash_state() {
+			hash_state() : mf(1.0f){
 				clear();
 			}
 			
-			hash_state(const hash_state& right) {
+			hash_state(const hash_state& right) : mf(1.0f) {
 				*this = right;
 			}
 			
 			~hash_state(){
 				
 			}
-			size_t get_extent() const {
+			size_type get_extent() const {
 				return extent;
 			}
 			hash_state& operator=(const hash_state& right){
 				extent = right.extent;
 				exists = right.exists;
+				buckets = right.buckets;
 				_exists = &exists[0];
 				data = right.data;
 				elements = right.elements;				
@@ -154,22 +192,13 @@ namespace rabbit{
 			
 			
 			_V* subscript(const _K& k){
-				size_t pos = 0;
 				
+				size_type pos = 0;
+				size_type f = 0;
 				/// eventualy an out of memory exception will occur
 				pos = key2pos(k);
-				/// this hoist provides performance improvement for rehashes specifically
-				/// probably also for new hash tables
-				if(!exists_(pos)){
-					set_exists(pos, true);
-					data[pos].first = k;
-					data[pos].second = _V();
-					++elements;
-					return &(data[pos].second);
-				}
-
-				size_t m = std::min<size_t>(extent, pos + PROBES);
-				++pos;
+				f = pos;
+				size_type m = std::min<size_t>(extent, pos + PROBES);
 				for(; pos < m;++pos){
 					if(!exists_(pos)){
 						set_exists(pos, true);
@@ -181,7 +210,10 @@ namespace rabbit{
 						return &(data[pos].second);
 					}
 				}
-					
+				/// this is quite slow so only calc when reaching overflow
+				if(load_factor() > max_load_factor()){				
+					return nullptr;
+				}	
 				for(pos = extent; pos < get_data_size();++pos){
 					if(!exists_(pos)){
 						break;
@@ -203,15 +235,15 @@ namespace rabbit{
 				return nullptr;
 			}
 			bool erase(const _K& k){
-				size_t pos = key2pos(k);			
-				size_t m = std::min<size_t>(extent, pos + PROBES);
+				size_type pos = key2pos(k);			
+				size_type m = std::min<size_t>(extent, pos + PROBES);
 				for(; pos < m;++pos){
 					if(!exists_(pos)){
 						return false;
 					}else if(data[pos].first == k){
 						set_exists(pos, false);
 						--elements;
-						size_t j = pos+1;
+						size_type j = pos+1;
 						for(; j < m-1;++j){
 							if(!exists_(j)){
 								break;
@@ -229,7 +261,7 @@ namespace rabbit{
 						break;
 					}
 					if(data[pos].first == k){
-						size_t j = pos;
+						size_type j = pos;
 						for(; j < m-1;++j){
 							if(!exists_(j)){
 								break;
@@ -245,15 +277,9 @@ namespace rabbit{
 				};
 				return false;
 			}
-			size_t count(const _K& k) const {
-				size_t pos = key2pos(k);
-				if(!exists_(pos)) 
-					return 0;
-				else if(data[pos].first == k){
-					return 1;
-				}
-				size_t m = std::min<size_t>(extent, pos + PROBES);
-				++pos;
+			size_type count(const _K& k) const {
+				size_type pos = key2pos(k);
+				size_type m = std::min<size_t>(extent, pos + PROBES);
 				for(; pos < m;++pos){
 					if(!exists_(pos)) 
 						return 0;
@@ -273,10 +299,10 @@ namespace rabbit{
 				return 0;
 			}
 			
-			size_t find(const _K& k) const {
+			size_type find(const _K& k) const {
 				
-				size_t pos = key2pos(k);
-				size_t m = std::min<size_t>(extent, pos + PROBES);
+				size_type pos = key2pos(k);
+				size_type m = std::min<size_t>(extent, pos + PROBES);
 				for(; pos < m;++pos){
 					if(!exists_(pos)){
 						return end();
@@ -296,10 +322,10 @@ namespace rabbit{
 				return end();
 			}
 			
-			size_t begin() const {
+			size_type begin() const {
 				if(elements==0)
 					return end();
-				size_t start = 0;
+				size_type start = 0;
 				/// TODO: optimize with bit counting hacks
 				while(start < get_data_size()){
 					if(exists_(start))
@@ -308,10 +334,10 @@ namespace rabbit{
 				}
 				return start;
 			}
-			size_t end() const {
+			size_type end() const {
 				return get_data_size();
 			}
-			size_t size() const {
+			size_type size() const {
 				return elements;
 			}
 			typedef std::shared_ptr<hash_state> ptr;
@@ -319,12 +345,12 @@ namespace rabbit{
 		public:
 		struct iterator{
 			typename hash_state::ptr h;
-			size_t pos;
+			size_type pos;
 			
 			iterator(){
 				
 			}
-			iterator(typename hash_state::ptr h, size_t pos): h(h),pos(pos){
+			iterator(typename hash_state::ptr h, size_type pos): h(h),pos(pos){
 				
 			}
 			iterator(const iterator& r){
@@ -376,7 +402,7 @@ namespace rabbit{
 		/// in evidence of hash collisions the the growth factor is exponentialy 
 		/// decreased as memory becomes a scarce resource.
 		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
-		double recalc_growth_factor(size_t elements)  {
+		double recalc_growth_factor(size_type elements)  {
 					
 			double growth_factor = backoff;
 			bool linear = true;
@@ -395,14 +421,46 @@ namespace rabbit{
 		}
 		
 		void rehash(){
+			size_type to = (size_t)(current->bucket_count() * recalc_growth_factor(current->elements)) + 1;
+			rehash(to);
+		}
+		typename hash_state::ptr current;
+	public:
+		float load_factor() const{
+			return current->load_factor();
+		}
+		size_type bucket_count() const {
+			return current->bucket_count();
+		}
+		size_type bucket_size ( size_type n ) const{
+			return current->bucket_size ( n );
+		}
+		float max_load_factor() const {
+			return current->max_load_factor();
+		}
+	
+		void max_load_factor ( float z ){
+			current->max_load_factor(z);
+		}
+		bool empty() const {
+			return (*this).elements == 0;
+		}
+		void reserve(size_type atleast){
+			rehash(atleast);
+		}
+		void rehash(size_type to){
+			if(to < current->get_data_size()){
+				return;
+			}
 			/// can cause oom e because of recursive rehash'es
 			_Data temp;
-			/// size_t old_extent = extent;
+			
 			typename hash_state::ptr rehashed = std::make_shared<hash_state>();
-			size_t extent = current->get_extent();
-			size_t new_extent = (size_t)(extent * recalc_growth_factor(current->elements)) + 1;
+			size_type extent = current->get_extent();
+			size_type new_extent = to;
 			try{
-				rehashed->resize_clear(new_extent);		
+				rehashed->resize_clear(new_extent);						
+				rehashed->mf = (*this).current->mf;
 				while(true){
 					iterator e = end();
 					for(iterator i = begin();i != e;++i){
@@ -413,6 +471,7 @@ namespace rabbit{
 							rehashed = std::make_shared<hash_state>();
 							new_extent = (size_t)(new_extent * recalc_growth_factor(rehashed->elements)) + 1;
 							rehashed->resize_clear(new_extent);				
+							rehashed->mf = (*this).current->mf;
 							continue;
 						}
 						
@@ -426,9 +485,6 @@ namespace rabbit{
 			}					
 			current = rehashed;	
 		}
-		typename hash_state::ptr current;
-	public:
-		
 		void clear(){
 			backoff = get_max_backoff();
 			current = std::make_shared<hash_state>();
@@ -472,7 +528,7 @@ namespace rabbit{
 			return current->erase(k);
 		}
 		
-		size_t count(const _K& k) const {
+		size_type count(const _K& k) const {
 			return current->count(k);
 		}
 		
@@ -486,10 +542,113 @@ namespace rabbit{
 		iterator end() const {
 			return iterator(current, current->end());
 		}
-		size_t size() const {
+		size_type size() const {
 			return current->size();
 		}
 	};
+	/// the unordered set
+	template <typename _K, typename _H = std::hash<_K>>
+	class unordered_set{
+	protected:
+		typedef unordered_map<_K,char,_H> _Container;
+	public:
+		typedef typename _Container::size_type size_type;
+	private:		 
+		 _Container container;		 
+	public:
+		struct iterator{
+			
+			typename _Container::iterator pos;
+			
+			iterator(){
+				
+			}
+			iterator(typename _Container::iterator pos): pos(pos){
+				
+			}
+			iterator(const iterator& r){
+				(*this) = r;
+			}
+			iterator& operator=(const iterator& r){
+				pos = r.pos;
+				return (*this);
+			}
+			iterator& operator++(){
+				++pos;								
+				return (*this);
+			}
+			iterator operator++(int){
+				return (*this);
+			}
+			_K& operator*() const {
+				return (*pos).first;
+			}
+			const _K& operator*() {
+				return (*pos).first;
+			}
+			bool operator==(const iterator& r) const {
+				return pos == r.pos;
+			}
+			bool operator!=(const iterator& r) const {
+				return (pos != r.pos);
+			}
+		};
+		
+		unordered_set(){
+		}
+
+		~unordered_set(){
+		}
+		void rehash(size_type n){		
+			container.rehash(n);
+		}
+		float load_factor() const{
+			container.load_factor() ;
+		}
+
+		size_type bucket_count() const {
+			container.bucket_count() ;
+		}
+		size_type bucket_size ( size_type n ) const{
+			return container.bucket_size ( n );
+		}
+		float max_load_factor() const {
+			return container.max_load_factor();
+		}
+	
+		void max_load_factor ( float z ){
+			container.max_load_factor(z);
+		}
+		void clear(){
+			container.clear();
+		}
+		
+		unordered_set& operator=(const unordered_set& right){
+			container = right.container;
+			return *this;
+		}
+		
+		void insert(const _K& k){
+			container.insert(k,'0');
+		}
+		
+		void erase(const _K& k){
+			container.erase(k);
+		}
+		
+		size_type size() const {
+			return container.size();
+		}
+
+		bool empty() const {
+			return container.empty();
+		}
+		
+		iterator find(const _K& k) const {
+			return container.find(k);
+		}
+
+	}; /// unordered set
 }; // rab-bit
 
 #endif ///  _RABBIT_H_CEP_20150303_
