@@ -5,7 +5,9 @@
 #include <map>
 #include <string>
 #include <sstream>
+#ifdef _MSC_VER
 #define _HAS_GOOGLE_HASH_
+#endif
 #define _HAS_STD_HASH_
 #ifdef _HAS_GOOGLE_HASH_
 #include <sparsehash/type_traits.h>
@@ -211,7 +213,7 @@ void test_rabbit_hash(size_t ts){
 	typedef rabbit::unordered_map<T,long> _Map;
 	_Map h;
 	
-	tester<_Map>::_Script script;
+	typename tester<_Map>::_Script script;
 	tester<_Map> t;
 	t.gen_random(ts, script);
 	t.bench_hash(h,script);
@@ -225,17 +227,17 @@ void test_std_hash(size_t ts){
 	typedef std::unordered_map<T,long> _Map;
 	_Map h;
 	
-	tester<_Map>::_Script script;
+	typename tester<_Map>::_Script script;
 	tester<_Map> t;
 	t.gen_random(ts, script);
 	t.bench_hash(h,script);
 #endif
 }
-extern int unique_running_insertion();
-extern int unique_scattered_lookup();
+//extern int unique_running_insertion();
+//extern int unique_scattered_lookup();
 int main(int argc, char **argv)
 {
-	unique_scattered_lookup();
+	//unique_scattered_lookup();
 	//unique_running_insertion();
 	size_t ts = 30000000;
 	//typedef std::string _K;

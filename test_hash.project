@@ -29,8 +29,8 @@
   <Description/>
   <Dependencies/>
   <VirtualDirectory Name="src">
-    <File Name="main.cpp"/>
-    <File Name="rabbit.h"/>
+    <File Name="rabbit/rabbit.h"/>
+    <File Name="tests/main.cpp"/>
   </VirtualDirectory>
   <Settings Type="Executable">
     <GlobalSettings>

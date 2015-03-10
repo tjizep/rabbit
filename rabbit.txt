@@ -1,1 +1,1 @@
-./Release/main.cpp.o   
+./Release/tests_main.cpp.o   

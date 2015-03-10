@@ -622,7 +622,7 @@ namespace rabbit{
 			container.rehash(n);
 		}
 		float load_factor() const{
-			container.load_factor() ;
+			return container.load_factor() ;
 		}
 
 		size_type bucket_count() const {
