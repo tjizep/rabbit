@@ -34,11 +34,8 @@ namespace rabbit{
 
 	protected:
 		static const _Bt CHAR_BITS = 8;
-		/// maximum probes per bucket
-		static const _Bt PROBES = 64;
-		/// inverse of factor used to determine overflow list
-		/// when overflow list is full rehash starts
-		static const size_type R_OVERFLOW = 128; 
+		
+		
 		
 		static const size_type MIN_EXTENT = 17;
 		static const _Bt BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
@@ -49,6 +46,9 @@ namespace rabbit{
 		typedef std::vector<_ElPair> _Data;
 		
 		struct hash_state{
+			/// maximum probes per bucket
+			static const _Bt PROBES = 64;
+			
 			/// the existence bit set is a factor of BITS_SIZE less than the extent
 			_Exists exists;
 			const _Bt* _exists;
@@ -71,18 +71,15 @@ namespace rabbit{
 			size_type bucket_size ( size_type n ) const{
 				size_t pos = n;
 				size_type m = std::min<size_t>(extent, pos + PROBES);
-				size_type r = 0;
-				
+				size_type r = 0;				
 				for(; pos < m;++pos){
-					if(!exists_(pos)){
-						break;
-					}else if(key2pos(data[pos].first) != n){
-						/// indicates we left the bucket
-						break;
-					}
-					++r;
+					if(!exists_(pos)){				
+					}else{
+						++r;						
+					}					
 				}
 				return r;
+				
 			}
 			float max_load_factor() const {
 				return mf;
@@ -112,14 +109,15 @@ namespace rabbit{
 				/// https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetTable
 				/// TODO: table wont go over 1<<32
 				_Bt m = ((_Bt)pos) % BITS_SIZE; 
-				m = (_Bt)1 << m;// the bit mask
+				m = (_Bt)1ul << m;// the bit mask
 				_Bt& w = exists[bucket]; // the word to modify:  
-				/// the branching way if (f) w |= m; else w &= ~m; 
+				/// the branching way 		
+				/// if (f) w |= m; else w &= ~m; 
 				// TODO: not superscalar: add to a traits;
-				/// w ^= (-f ^ w) & m;
+				///w ^= (-f ^ w) & m;
 				// TODO: OR, for superscalar CPUs: also to traits;
 				w = (w & ~m) | (-f & m);
-			
+				
 			}
 			
 			/// fast generic bit counting
@@ -147,15 +145,19 @@ namespace rabbit{
 			}
 			inline bool exists_(size_type pos) const {
 				size_type bucket = (pos / BITS_SIZE);
-				size_type bit = pos & (BITS_SIZE-1);
+				_Bt bit = (_Bt)(pos & (BITS_SIZE-1));
 				_Bt v = exists[bucket];
-				return ((v >> bit) & 1) != 0;
+				_Bt r = ((v >> bit) & (_Bt)1ul);
+				return r != 0;
 			}
 			
 			void resize_clear(size_type new_extent){
+				/// inverse of factor used to determine overflow list
+				/// when overflow list is full rehash starts
+				const size_type MAX_OVERFLOW = 128; 
 				extent = new_extent;
 				mf = 1.0;
-				overflow = std::max<size_t>(extent/1024,R_OVERFLOW);
+				overflow = std::max<size_type>(extent/1024,MAX_OVERFLOW);
 				elements = 0;
 
 				size_type esize = (get_data_size()/BITS_SIZE)+1;
@@ -188,6 +190,7 @@ namespace rabbit{
 			size_type get_extent() const {
 				return extent;
 			}
+			
 			hash_state& operator=(const hash_state& right){
 				extent = right.extent;
 				exists = right.exists;
@@ -198,8 +201,22 @@ namespace rabbit{
 				elements = right.elements;				
 				return *this;
 			}
-			
-			
+			/// impolite function only used during rehash
+			_V* presubscript(const _K& k){
+				
+				size_type pos = 0;
+				size_type f = 0;		
+				pos = key2pos(k);
+				if(!exists_(pos)){
+					set_exists(pos, true);
+					data[pos].first = k;
+					data[pos].second = _V();
+					min_element = std::min<size_type>(min_element,pos);
+					++elements;
+					return &(data[pos].second);
+				}
+				return nullptr;
+			}
 			_V* subscript(const _K& k){
 				
 				size_type pos = 0;
@@ -212,6 +229,8 @@ namespace rabbit{
 					data[pos].second = _V();
 					min_element = std::min<size_type>(min_element,pos);
 					++elements;
+					return &(data[pos].second);
+				}else if(data[pos].first == k){
 					return &(data[pos].second);
 				}
 				
@@ -257,21 +276,11 @@ namespace rabbit{
 			bool erase(const _K& k){
 				size_type pos = key2pos(k);			
 				size_type m = std::min<size_t>(extent, pos + PROBES);
+				
 				for(; pos < m;++pos){
-					if(!exists_(pos)){
-						return false;
-					}else if(data[pos].first == k){
+					if(exists_(pos) && data[pos].first == k){
 						set_exists(pos, false);
-						--elements;
-						size_type j = pos+1;
-						for(; j < m-1;++j){
-							if(!exists_(j)){
-								break;
-							}
-							set_exists(j, exists_(j+1));
-							data[j] = data[j+1];						
-						}
-						set_exists(j, false);
+						--elements;						
 						return true;
 					}
 				}
@@ -300,10 +309,10 @@ namespace rabbit{
 			size_type count(const _K& k) const {
 				size_type pos = key2pos(k);
 				size_type m = std::min<size_t>(extent, pos + PROBES);
+				
 				for(; pos < m;++pos){
-					if(!exists_(pos)) 
-						return 0;
-					else if(data[pos].first == k){
+					
+					if(exists_(pos) && data[pos].first == k){
 						return 1;
 					}
 				}
@@ -483,15 +492,19 @@ namespace rabbit{
 				while(true){
 					iterator e = end();
 					for(iterator i = begin();i != e;++i){
-						_V *v = rehashed->subscript((*i).first);
-						if(v != nullptr){
-							*v = (*i).second;/// rehash recursion can happen here	
-						}else{							
-							rehashed = std::make_shared<hash_state>();
-							new_extent = (size_t)(new_extent * recalc_growth_factor(rehashed->elements)) + 1;
-							rehashed->resize_clear(new_extent);				
-							rehashed->mf = (*this).current->mf;
-							continue;
+
+						_V *v = rehashed->presubscript((*i).first);
+						if(v==nullptr){
+							v = rehashed->subscript((*i).first);
+							if(v != nullptr){
+								*v = (*i).second;/// rehash recursion can happen here	
+							}else{							
+								rehashed = std::make_shared<hash_state>();
+								new_extent = (size_t)(new_extent * recalc_growth_factor(rehashed->elements)) + 1;
+								rehashed->resize_clear(new_extent);				
+								rehashed->mf = (*this).current->mf;
+								continue;
+							}
 						}
 						
 					}

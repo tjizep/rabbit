@@ -97,7 +97,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\dev\cpp_all\repo\boost_1_57_0;C:\dev\cpp_all\repo\sparsehash-2.0.2\src;C:\dev\cpp_all\repo\sparsehash-2.0.2\src\windows;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\$(ProjectDir);C:\dev\cpp_all\repo\boost_1_57_0;C:\dev\cpp_all\repo\sparsehash-2.0.2\src;C:\dev\cpp_all\repo\sparsehash-2.0.2\src\windows;C:\dev\cpp_all\rabbit;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
