@@ -76,7 +76,7 @@ public:
 	typedef typename _MapT::key_type _InputField;
 	typedef std::vector<_InputField> _Script;
 	
-	void to_t(int inp, std::string& out){
+	void to_t(long long inp, std::string& out){
 		#ifdef _MSC_VER
 		out = std::to_string(inp);
 		#else
@@ -233,23 +233,31 @@ void test_std_hash(size_t ts){
 	t.bench_hash(h,script);
 #endif
 }
-//extern int unique_running_insertion();
-//extern int unique_scattered_lookup();
+#ifdef _MSC_VER
+extern int unique_running_insertion();
+extern int unique_scattered_lookup();
+void more_tests(){
+	unique_scattered_lookup();
+	unique_running_insertion();
+}
+#else
+ void more_tests(){
+ }
+#endif
 int main(int argc, char **argv)
 {
-	//unique_scattered_lookup();
-	//unique_running_insertion();
-	size_t ts = 30000000;
+	
+	size_t ts = 10000000;
 	//typedef std::string _K;
 	typedef unsigned long _K;
 	test_dense_hash_long(ts);
 	//test_sparse_hash<_K>(ts);
 
 
-	//test_std_hash<_K>(ts);
+	test_std_hash<_K>(ts);
 
 	
 	test_rabbit_hash<_K>(ts);
-
+	more_tests();
 	return 0;
 }
