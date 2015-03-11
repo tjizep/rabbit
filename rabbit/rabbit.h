@@ -37,7 +37,7 @@ namespace rabbit{
 		
 		
 		
-		static const size_type MIN_EXTENT = 17;
+		static const size_type MIN_EXTENT = 32;
 		static const _Bt BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
 		/// the existence bit set type
 		typedef std::vector<_Bt> _Exists;
@@ -47,10 +47,11 @@ namespace rabbit{
 		
 		struct hash_state{
 			/// maximum probes per bucket
-			static const _Bt PROBES = 64;
+			static const _Bt PROBES = 128;
 			
 			/// the existence bit set is a factor of BITS_SIZE less than the extent
 			_Exists exists;
+			_Exists erased;
 			const _Bt* _exists;
 			/// data being used
 			_Data data;
@@ -101,8 +102,7 @@ namespace rabbit{
 			size_type get_data_size() const {
 				return extent+overflow;
 			}
-			
-			void set_exists(size_type pos, bool f){
+			void set_bucket_bit(_Exists & bits, size_type pos, bool f){
 				size_type bucket = pos / BITS_SIZE;
 				
 				/// lifted directly from Bit Twiddling Hacks
@@ -110,14 +110,21 @@ namespace rabbit{
 				/// TODO: table wont go over 1<<32
 				_Bt m = ((_Bt)pos) % BITS_SIZE; 
 				m = (_Bt)1ul << m;// the bit mask
-				_Bt& w = exists[bucket]; // the word to modify:  
+				_Bt& w = bits[bucket]; // the word to modify:  
 				/// the branching way 		
 				/// if (f) w |= m; else w &= ~m; 
 				// TODO: not superscalar: add to a traits;
 				///w ^= (-f ^ w) & m;
 				// TODO: OR, for superscalar CPUs: also to traits;
 				w = (w & ~m) | (-f & m);
-				
+			}
+
+			void set_exists(size_type pos, bool f){
+				set_bucket_bit(exists, pos, f);				
+			}
+
+			void set_erased(size_type pos, bool f){
+				set_bucket_bit(erased, pos, f);
 			}
 			
 			/// fast generic bit counting
@@ -143,12 +150,20 @@ namespace rabbit{
 			size_type count_bucket(size_type b) const {
 				return count_bits<_Bt>(exists[b]);
 			}
-			inline bool exists_(size_type pos) const {
+			inline bool is_bit(const _Exists& bits, size_type pos) const {
 				size_type bucket = (pos / BITS_SIZE);
 				_Bt bit = (_Bt)(pos & (BITS_SIZE-1));
-				_Bt v = exists[bucket];
+				_Bt v = bits[bucket];
 				_Bt r = ((v >> bit) & (_Bt)1ul);
 				return r != 0;
+			}
+			
+			inline bool exists_(size_type pos) const {
+				return is_bit(exists, pos);
+			}
+
+			inline bool erased_(size_type pos) const {
+				return is_bit(erased, pos);
 			}
 			
 			void resize_clear(size_type new_extent){
@@ -163,8 +178,10 @@ namespace rabbit{
 				size_type esize = (get_data_size()/BITS_SIZE)+1;
 				
 				exists.clear();
+				erased.clear();
 				data.clear();
 				
+				erased.resize(esize);
 				exists.resize(esize);
 				_exists = &exists[0];
 				data.resize(get_data_size());
@@ -194,12 +211,16 @@ namespace rabbit{
 			hash_state& operator=(const hash_state& right){
 				extent = right.extent;
 				exists = right.exists;
+				erased = right.erased;
 				buckets = right.buckets;
 				_exists = &exists[0];
 				data = right.data;
 				min_element = right.min_element ;
 				elements = right.elements;				
 				return *this;
+			}
+			bool equal_key(size_type pos,const _K& k) const {
+				return data[pos].first == k && !erased_(pos);
 			}
 			/// impolite function only used during rehash
 			_V* presubscript(const _K& k){
@@ -220,7 +241,7 @@ namespace rabbit{
 			_V* subscript(const _K& k){
 				
 				size_type pos = 0;
-				size_type f = 0;
+				
 				/// eventualy an out of memory (bad_allocation) exception will occur
 				pos = key2pos(k);
 				if(!exists_(pos)){
@@ -230,13 +251,13 @@ namespace rabbit{
 					min_element = std::min<size_type>(min_element,pos);
 					++elements;
 					return &(data[pos].second);
-				}else if(data[pos].first == k){
+				}else if(equal_key(pos,k)){
 					return &(data[pos].second);
 				}
-				
+				size_type f = 0;
 				size_type m = std::min<size_t>(extent, pos + PROBES);
 				++pos;
-				f = pos;
+				
 				for(; pos < m;++pos){
 					if(!exists_(pos)){
 						set_exists(pos, true);
@@ -244,11 +265,12 @@ namespace rabbit{
 						data[pos].second = _V();
 						min_element = std::min<size_type>(min_element,pos);
 						++elements;
-						return &(data[pos].second);
-					}else if(data[pos].first == k){
+						return &(data[pos].second);					
+					}else if(equal_key(pos,k)){
 						return &(data[pos].second);
 					}
 				}
+										
 				/// this is quite slow so only calc when reaching overflow
 				if(load_factor() > max_load_factor()){				
 					return nullptr;
@@ -257,7 +279,7 @@ namespace rabbit{
 					if(!exists_(pos)){
 						break;
 					}
-					if(data[pos].first == k){
+					if(equal_key(pos,k)){
 							
 						return &(data[pos].second);
 					}
@@ -278,8 +300,8 @@ namespace rabbit{
 				size_type m = std::min<size_t>(extent, pos + PROBES);
 				
 				for(; pos < m;++pos){
-					if(exists_(pos) && data[pos].first == k){
-						set_exists(pos, false);
+					if(exists_(pos) && equal_key(pos,k)){
+						set_erased(pos, true);
 						--elements;						
 						return true;
 					}
@@ -289,17 +311,9 @@ namespace rabbit{
 					if(!exists_(pos)){
 						break;
 					}
-					if(data[pos].first == k){
+					if(equal_key(pos,k)){
 						size_type j = pos;
-						for(; j < m-1;++j){
-							if(!exists_(j)){
-								break;
-							}
-							set_exists(j, exists_(j+1));
-							data[j] = data[j+1];
-							
-						}
-						set_exists(j, false);
+						set_erased(j, true);
 						--elements;						
 						return true;
 					}				
@@ -312,7 +326,7 @@ namespace rabbit{
 				
 				for(; pos < m;++pos){
 					
-					if(exists_(pos) && data[pos].first == k){
+					if(exists_(pos) && equal_key(pos,k)){
 						return 1;
 					}
 				}
@@ -321,7 +335,7 @@ namespace rabbit{
 					if(!exists_(pos)){
 						break;
 					}
-					if(data[pos].first == k){
+					if(equal_key(pos,k)){
 						return 1;
 					}
 				};
@@ -331,15 +345,13 @@ namespace rabbit{
 			size_type find(const _K& k) const {
 				
 				size_type pos = key2pos(k);
-				if(exists_(pos) && data[pos].first == k){
+				if(exists_(pos) && equal_key(pos,k)){
 					return pos;
 				}
 				size_type m = std::min<size_t>(extent, pos + PROBES);
 				++pos;
 				for(; pos < m;++pos){
-					if(!exists_(pos)){
-						return end();
-					}else if(data[pos].first == k){
+					if(exists_(pos) && equal_key(pos,k)){
 						return pos;
 					}
 				}
@@ -348,7 +360,7 @@ namespace rabbit{
 					if(!exists_(pos)){
 						break;
 					}
-					if(data[pos].first == k){
+					if(equal_key(pos,k)){
 						return pos;
 					}
 				}
@@ -430,11 +442,11 @@ namespace rabbit{
 		/// decreased as memory becomes a scarce resource.
 		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
 		double recalc_growth_factor(size_type elements)  {
-					
+			
 			double growth_factor = backoff;
 			bool linear = true;
 			if(linear){
-				double d = 0.65;				
+				double d = 0.78;				
 				if(backoff - d > get_min_backoff()){
 					backoff -= d ;					
 				}								

@@ -295,7 +295,7 @@ int main(int argc, char **argv)
 
 	
 	test_rabbit_hash<_K>(ts);
-	test_rabbit_hash_erase<_K>(ts/10);
+	//test_rabbit_hash_erase<_K>(ts/10);
 	//more_tests();
 	return 0;
 }

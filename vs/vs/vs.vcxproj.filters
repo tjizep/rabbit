@@ -29,7 +29,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\rabbit.h">
+    <ClInclude Include="..\..\rabbit\rabbit.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
