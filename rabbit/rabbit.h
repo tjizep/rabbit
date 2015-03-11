@@ -403,7 +403,7 @@ namespace rabbit{
 			iterator& operator++(){
 				++pos;
 				/// todo optimize with 32-bit or 64-bit zero counting
-				while(pos < h->current->get_data_size() && !h->current->exists_(pos)){
+				while(pos < h->current->get_data_size() && !h->current->exists_(pos) && !h->current->erased_(pos)){
 					++pos;
 				}
 				
