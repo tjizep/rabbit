@@ -37,7 +37,7 @@ namespace rabbit{
 		
 		
 		
-		static const size_type MIN_EXTENT = 32;
+		static const size_type MIN_EXTENT = 64;
 		static const _Bt BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
 		/// the existence bit set type
 		typedef std::vector<_Bt> _Exists;
@@ -47,7 +47,7 @@ namespace rabbit{
 		
 		struct hash_state{
 			/// maximum probes per bucket
-			static const _Bt PROBES = 128;
+			static const _Bt PROBES = 16;
 			
 			/// the existence bit set is a factor of BITS_SIZE less than the extent
 			_Exists exists;
@@ -63,6 +63,8 @@ namespace rabbit{
 			float mf;
 			size_type buckets;
 			size_type min_element;
+			size_type removed;
+
 			float load_factor() const{
 				return (float)((double)elements/(double)bucket_count());
 			}
@@ -174,7 +176,7 @@ namespace rabbit{
 				mf = 1.0;
 				overflow = std::max<size_type>(extent/1024,MAX_OVERFLOW);
 				elements = 0;
-
+				removed = 0;
 				size_type esize = (get_data_size()/BITS_SIZE)+1;
 				
 				exists.clear();
@@ -219,8 +221,14 @@ namespace rabbit{
 				elements = right.elements;				
 				return *this;
 			}
+			inline bool raw_equal_key(size_type pos,const _K& k) const {
+				return data[pos].first == k ;
+			}
 			bool equal_key(size_type pos,const _K& k) const {
-				return data[pos].first == k && !erased_(pos);
+				if(removed)
+					return raw_equal_key(pos,k) && !erased_(pos);
+				else
+					return raw_equal_key(pos,k) ;
 			}
 			/// impolite function only used during rehash
 			_V* presubscript(const _K& k){
@@ -303,6 +311,7 @@ namespace rabbit{
 					if(exists_(pos) && equal_key(pos,k)){
 						set_erased(pos, true);
 						--elements;						
+						++removed;
 						return true;
 					}
 				}
@@ -315,6 +324,7 @@ namespace rabbit{
 						size_type j = pos;
 						set_erased(j, true);
 						--elements;						
+						++removed;
 						return true;
 					}				
 				};
@@ -330,6 +340,8 @@ namespace rabbit{
 						return 1;
 					}
 				}
+				
+				
 				
 				for(pos = extent; pos < get_data_size();++pos){
 					if(!exists_(pos)){
