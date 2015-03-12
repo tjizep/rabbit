@@ -194,6 +194,19 @@ public:
 			if(h.count(script[k]) == 0){
 				printf("ERROR: could not find %ld\n",(long int)k);
 			};
+			auto f = h.find(script[k]);
+			
+			if(f==h.end() || (*f).second != (typename _MapT::mapped_type)k+1){
+				if(f==h.end()){					
+					printf("ERROR: counted data does not exist %ld\n",(long int)k);
+				}else{
+					auto n2v = (*f).second-1;
+					f = h.find(script[n2v]);
+					if(f==h.end() || (*f).second != n2v+1){
+						printf("ERROR: could not iterator find %ld\n",(long int)k);
+					}					
+				}
+			}
 		}	
 		
 		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -287,11 +300,11 @@ int main(int argc, char **argv)
 	size_t ts = 30000000;
 	//typedef std::string _K;
 	typedef unsigned long _K;
-	//test_dense_hash_long(ts);
+	test_dense_hash_long(ts);
 	//test_sparse_hash<_K>(ts);
 
 
-	test_std_hash<_K>(ts);
+	///test_std_hash<_K>(ts);
 
 	
 	test_rabbit_hash<_K>(ts);

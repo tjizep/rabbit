@@ -12,9 +12,9 @@
 /// it uses linear probing for the first level of fallback
 
 #ifdef _MSC_VER
-#define CONVERSION_NOINLINE_  _declspec(noinline)
+#define RABBIT_NOINLINE_  _declspec(noinline)
 #else
-#define CONVERSION_NOINLINE_
+#define RABBIT_NOINLINE_
 #endif
 namespace rabbit{
 
@@ -62,7 +62,7 @@ namespace rabbit{
 			_H hf;
 			float mf;
 			size_type buckets;
-			size_type min_element;
+			mutable size_type min_element;
 			size_type removed;
 
 			float load_factor() const{
@@ -215,6 +215,8 @@ namespace rabbit{
 				exists = right.exists;
 				erased = right.erased;
 				buckets = right.buckets;
+				removed = right.removed;
+				mf = right.mf;
 				_exists = &exists[0];
 				data = right.data;
 				min_element = right.min_element ;
@@ -310,6 +312,8 @@ namespace rabbit{
 				for(; pos < m;++pos){
 					if(exists_(pos) && equal_key(pos,k)){
 						set_erased(pos, true);
+						data[pos].first = _K();
+						data[pos].second = _V();						
 						--elements;						
 						++removed;
 						return true;
@@ -321,8 +325,10 @@ namespace rabbit{
 						break;
 					}
 					if(equal_key(pos,k)){
-						size_type j = pos;
-						set_erased(j, true);
+
+						set_erased(pos, true);
+						data[pos].first = _K();
+						data[pos].second = _V();						
 						--elements;						
 						++removed;
 						return true;
@@ -382,7 +388,11 @@ namespace rabbit{
 			size_type begin() const {
 				if(elements==0)
 					return end();
-								
+				size_type pos = min_element;
+				while(!exists_(pos) || erased_(pos)){
+					++pos;
+					min_element = pos;
+				}
 				return min_element ;
 			}
 			size_type end() const {
@@ -415,7 +425,7 @@ namespace rabbit{
 			iterator& operator++(){
 				++pos;
 				/// todo optimize with 32-bit or 64-bit zero counting
-				while(pos < h->current->get_data_size() && !h->current->exists_(pos) && !h->current->erased_(pos)){
+				while(pos < h->current->get_data_size() && (!h->current->exists_(pos) || h->current->erased_(pos))){
 					++pos;
 				}
 				
@@ -521,7 +531,7 @@ namespace rabbit{
 						if(v==nullptr){
 							v = rehashed->subscript((*i).first);
 							if(v != nullptr){
-								*v = (*i).second;/// rehash recursion can happen here	
+								*v = (*i).second;
 							}else{							
 								rehashed = std::make_shared<hash_state>();
 								new_extent = (size_t)(new_extent * recalc_growth_factor(rehashed->elements)) + 1;
@@ -529,6 +539,8 @@ namespace rabbit{
 								rehashed->mf = (*this).current->mf;
 								continue;
 							}
+						}else{
+							*v = (*i).second;
 						}
 						
 					}
