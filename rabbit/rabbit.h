@@ -72,8 +72,8 @@ namespace rabbit{
 				return get_data_size();
 			}
 			size_type bucket_size ( size_type n ) const{
-				size_t pos = n;
-				size_type m = std::min<size_t>(extent, pos + PROBES);
+				size_type pos = n;
+				size_type m = std::min<size_type>(extent, pos + PROBES);
 				size_type r = 0;				
 				for(; pos < m;++pos){
 					if(!exists_(pos)){				
@@ -306,58 +306,33 @@ namespace rabbit{
 				return nullptr;
 			}
 			bool erase(const _K& k){
-				size_type pos = key2pos(k);			
-				size_type m = std::min<size_t>(extent, pos + PROBES);
 				
-				for(; pos < m;++pos){
-					if(exists_(pos) && equal_key(pos,k)){
-						set_erased(pos, true);
-						data[pos].first = _K();
-						data[pos].second = _V();						
-						--elements;						
-						++removed;
-						return true;
-					}
+				size_type pos = (*this).find(k);		
+				if(pos != (*this).end()){
+					set_erased(pos, true);
+					data[pos].first = _K();
+					data[pos].second = _V();						
+					--elements;						
+					++removed;
+					return true;
 				}
-				m = get_data_size();
-				for(pos = extent; pos < m;++pos){
-					if(!exists_(pos)){
-						break;
-					}
-					if(equal_key(pos,k)){
-
-						set_erased(pos, true);
-						data[pos].first = _K();
-						data[pos].second = _V();						
-						--elements;						
-						++removed;
-						return true;
-					}				
-				};
 				return false;
+				
 			}
 			size_type count(const _K& k) const {
-				size_type pos = key2pos(k);
-				size_type m = std::min<size_t>(extent, pos + PROBES);
-				
-				for(; pos < m;++pos){
-					
-					if(exists_(pos) && equal_key(pos,k)){
-						return 1;
-					}
+				size_type pos =(*this).find(k);
+				if(pos == (*this).end()){
+					return 0;
+				}else return 1;
+			}
+
+			bool get(const _K& k, _V& v) const {
+				size_type pos = find(k);			
+				if(pos != (*this).end()){
+					v = data[pos].second;
+					return true;
 				}
-				
-				
-				
-				for(pos = extent; pos < get_data_size();++pos){
-					if(!exists_(pos)){
-						break;
-					}
-					if(equal_key(pos,k)){
-						return 1;
-					}
-				};
-				return 0;
+				return false;
 			}
 			
 			size_type find(const _K& k) const {
@@ -584,6 +559,10 @@ namespace rabbit{
 			(*this)[p.first] = p.second;
 		}
 		
+		bool get(const _K& k, _V& v) const {
+			return (*this).current->get(k,v);
+		}
+
 		_V& operator[](const _K& k){
 			_V *rv = current->subscript(k);
 			while(rv == nullptr){
