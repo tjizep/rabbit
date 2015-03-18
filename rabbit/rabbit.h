@@ -319,6 +319,11 @@ namespace rabbit{
 				return false;
 				
 			}
+
+			bool is_small() const {
+				return (elements < extent/8);
+			}
+
 			size_type count(const _K& k) const {
 				size_type pos =(*this).find(k);
 				if(pos == (*this).end()){
@@ -457,7 +462,7 @@ namespace rabbit{
 		}
 		
 		void rehash(){
-			size_type to = (size_t)(current->bucket_count() * recalc_growth_factor(current->elements)) + 1;
+			size_type to = (size_t)(current->bucket_count() * recalc_growth_factor(current->elements)) + 1;			
 			rehash(to);
 		}
 		typename hash_state::ptr current;
@@ -485,10 +490,8 @@ namespace rabbit{
 		void reserve(size_type atleast){
 			rehash(atleast);
 		}
-		void rehash(size_type to){
-			if(to < current->get_data_size()){
-				return;
-			}
+		void rehash(size_type to_){
+			size_type to = std::max<size_type>(to_, MIN_EXTENT);
 			/// can cause oom e because of recursive rehash'es
 			_Data temp;
 			
@@ -572,6 +575,9 @@ namespace rabbit{
 			return *rv;
 		}
 		bool erase(const _K& k){
+			if(current->is_small()){
+				rehash(current->size());
+			}
 			return current->erase(k);
 		}
 		
