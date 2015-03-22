@@ -257,8 +257,7 @@ namespace rabbit{
 				if(!exists_(pos)){
 					set_exists(pos, true);
 					data[pos].first = k;
-					data[pos].second = _V();
-					min_element = std::min<size_type>(min_element,pos);
+					data[pos].second = _V();					
 					++elements;
 					return &(data[pos].second);
 				}else if(equal_key(pos,k)){
@@ -272,8 +271,7 @@ namespace rabbit{
 					if(!exists_(pos)){
 						set_exists(pos, true);
 						data[pos].first = k;
-						data[pos].second = _V();
-						min_element = std::min<size_type>(min_element,pos);
+						data[pos].second = _V();						
 						++elements;
 						return &(data[pos].second);					
 					}else if(equal_key(pos,k)){
@@ -285,24 +283,28 @@ namespace rabbit{
 				if(load_factor() > max_load_factor()){				
 					return nullptr;
 				}	
+				size_type last_empty = 0;
 				for(pos = extent; pos < get_data_size();++pos){
 					if(!exists_(pos)){
-						break;
-					}
-					if(equal_key(pos,k)){
-							
+						last_empty = pos;
+					}else if(equal_key(pos,k)){							
 						return &(data[pos].second);
 					}
 				};
-				if(pos < get_data_size()){
-					set_exists(pos,true);
-					data[pos].first = k;
-					data[pos].second = _V();
-					++elements;
-					return &(data[pos].second);
+				
+				if(last_empty > 0){
+					pos = last_empty;
+					if(!exists_(pos)){
+						set_exists(pos,true);
+						data[pos].first = k;
+						data[pos].second = _V();
+						++elements;
+						return &(data[pos].second);
 					
+					}else{
+
+					}
 				}
-					
 				return nullptr;
 			}
 			bool erase(const _K& k){
@@ -310,10 +312,10 @@ namespace rabbit{
 				size_type pos = (*this).find(k);		
 				if(pos != (*this).end()){
 					set_erased(pos, true);
+					removed = 1;
 					data[pos].first = _K();
 					data[pos].second = _V();						
-					--elements;						
-					++removed;
+					--elements;									
 					return true;
 				}
 				return false;
@@ -355,9 +357,7 @@ namespace rabbit{
 				}
 				
 				for(pos = extent; pos < get_data_size();++pos){
-					if(!exists_(pos)){
-						break;
-					}
+					
 					if(equal_key(pos,k)){
 						return pos;
 					}
@@ -368,12 +368,12 @@ namespace rabbit{
 			size_type begin() const {
 				if(elements==0)
 					return end();
-				size_type pos = min_element;
-				while(!exists_(pos) || erased_(pos)){
+				size_type pos = 0;
+				while(!exists_(pos) || erased_(pos)){ 
 					++pos;
 					min_element = pos;
 				}
-				return min_element ;
+				return pos ;
 			}
 			size_type end() const {
 				return get_data_size();
@@ -503,26 +503,25 @@ namespace rabbit{
 				rehashed->mf = (*this).current->mf;
 				while(true){
 					iterator e = end();
-					for(iterator i = begin();i != e;++i){
-
-						_V *v = rehashed->presubscript((*i).first);
-						if(v==nullptr){
-							v = rehashed->subscript((*i).first);
-							if(v != nullptr){
-								*v = (*i).second;
-							}else{							
-								rehashed = std::make_shared<hash_state>();
-								new_extent = (size_t)(new_extent * recalc_growth_factor(rehashed->elements)) + 1;
-								rehashed->resize_clear(new_extent);				
-								rehashed->mf = (*this).current->mf;
-								continue;
-							}
-						}else{
+					size_type ctr = 0;
+					for(iterator i = begin();i != e;++i){					
+						_V* v = rehashed->subscript((*i).first);
+						if(v != nullptr){
 							*v = (*i).second;
-						}
-						
+						}else{							
+							rehashed = std::make_shared<hash_state>();
+							new_extent = (size_t)(new_extent * recalc_growth_factor(rehashed->elements)) + 1;
+							rehashed->resize_clear(new_extent);				
+							rehashed->mf = (*this).current->mf;
+							break;
+						}						
 					}
-					break;
+					if(rehashed->elements == current->elements){
+						break;						
+					}else{
+						rehashed->resize_clear(rehashed->extent);		
+					}
+					
 				}
 				
 			}catch(std::bad_alloc &e){
@@ -571,12 +570,12 @@ namespace rabbit{
 			while(rv == nullptr){
 				this->rehash();
 				rv = current->subscript(k);
-			}
+			}			
 			return *rv;
 		}
 		bool erase(const _K& k){
 			if(current->is_small()){
-				rehash(current->size());
+				rehash(1);
 			}
 			return current->erase(k);
 		}
