@@ -40,7 +40,7 @@ THE SOFTWARE.
 #endif
 namespace rabbit{
 
-	template <typename _K, typename _V, typename _H = std::hash<_K>>
+	template <typename _K, typename _V, typename _H = std::hash<_K>, typename _E = std::equal_to<_K>, typename _Allocator = std::allocator<_K> >
 	class unordered_map{
 	public:
 		typedef _K key_type;
@@ -62,14 +62,14 @@ namespace rabbit{
 		static const size_type MIN_EXTENT = 64;
 		static const _Bt BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
 		/// the existence bit set type
-		typedef std::vector<_Bt> _Exists;
+		typedef std::vector<_Bt,_Allocator> _Exists;
 		
 		/// the vector that will contain the mapping pairs
-		typedef std::vector<_ElPair> _Data;
+		typedef std::vector<_ElPair,_Allocator> _Data;
 		
 		struct hash_state{
 			/// maximum probes per bucket
-			static const _Bt PROBES = 16;
+			static const _Bt PROBES = 64;
 			
 			/// the existence bit set is a factor of BITS_SIZE less than the extent
 			_Exists exists;
@@ -82,6 +82,7 @@ namespace rabbit{
 			size_type elements;
 			size_type overflow;
 			_H hf;
+			_E eq_f;
 			float mf;
 			size_type buckets;
 			mutable size_type min_element;
@@ -174,10 +175,9 @@ namespace rabbit{
 			size_type count_bucket(size_type b) const {
 				return count_bits<_Bt>(exists[b]);
 			}
-			inline bool is_bit(const _Exists& bits, size_type pos) const {
-				size_type bucket = (pos / BITS_SIZE);
+			inline bool is_bit(const _Exists& bits, size_type pos) const {				
 				_Bt bit = (_Bt)(pos & (BITS_SIZE-1));
-				_Bt v = bits[bucket];
+				_Bt v = bits[(pos / BITS_SIZE)];
 				_Bt r = ((v >> bit) & (_Bt)1ul);
 				return r != 0;
 			}
@@ -193,10 +193,10 @@ namespace rabbit{
 			void resize_clear(size_type new_extent){
 				/// inverse of factor used to determine overflow list
 				/// when overflow list is full rehash starts
-				const size_type MAX_OVERFLOW = 128; 
+				const size_type MIN_OVERFLOW = 64; 
 				extent = new_extent;
 				mf = 1.0;
-				overflow = std::max<size_type>(extent/1024,MAX_OVERFLOW);
+				overflow = std::min<size_type>(extent/1024,MIN_OVERFLOW);
 				elements = 0;
 				removed = 0;
 				size_type esize = (get_data_size()/BITS_SIZE)+1;
@@ -246,7 +246,7 @@ namespace rabbit{
 				return *this;
 			}
 			inline bool raw_equal_key(size_type pos,const _K& k) const {
-				return data[pos].first == k ;
+				return eq_f(data[pos].first, k) ;
 			}
 			bool equal_key(size_type pos,const _K& k) const {
 				if(removed)
@@ -345,7 +345,7 @@ namespace rabbit{
 			}
 
 			bool is_small() const {
-				return (elements < extent/8);
+				return (extent > (MIN_EXTENT << 3)) && (elements < extent/8);
 			}
 
 			size_type count(const _K& k) const {
@@ -365,7 +365,7 @@ namespace rabbit{
 			}
 			
 			size_type find(const _K& k) const {
-				
+				if(!elements) return end();
 				size_type pos = key2pos(k);
 				if(exists_(pos) && equal_key(pos,k)){
 					return pos;
@@ -377,10 +377,10 @@ namespace rabbit{
 						return pos;
 					}
 				}
-				
-				for(pos = extent; pos < get_data_size();++pos){
+				size_type e = get_data_size();
+				for(pos = extent; pos < e;++pos){
 					
-					if(equal_key(pos,k)){
+					if(exists_(pos) && equal_key(pos,k)){
 						return pos;
 					}
 				}
@@ -442,6 +442,12 @@ namespace rabbit{
 			const _ElPair& operator*() {
 				return h->current->data[pos];
 			}
+			_ElPair* operator->() const {
+				return &(const_cast<unordered_map*>(h)->current->data[pos]);
+			}
+			const _ElPair* operator->() {
+				return &(h->current->data[pos]);
+			}
 			bool operator==(const iterator& r) const {
 				return h==r.h&&pos == r.pos;
 			}
@@ -449,6 +455,7 @@ namespace rabbit{
 				return (h!=r.h)||(pos != r.pos);
 			}
 		};
+		typedef iterator const_iterator;
 	protected:
 		double backoff;
 		
@@ -470,7 +477,7 @@ namespace rabbit{
 			double growth_factor = backoff;
 			bool linear = true;
 			if(linear){
-				double d = 0.78;				
+				double d = 0.81;				
 				if(backoff - d > get_min_backoff()){
 					backoff -= d ;					
 				}								
@@ -528,15 +535,16 @@ namespace rabbit{
 					size_type ctr = 0;
 					for(iterator i = begin();i != e;++i){					
 						_V* v = rehashed->subscript((*i).first);
+						v = rehashed->subscript((*i).first);
 						if(v != nullptr){
 							*v = (*i).second;
 						}else{							
 							rehashed = std::make_shared<hash_state>();
-							new_extent = (size_t)(new_extent * recalc_growth_factor(rehashed->elements)) + 1;
+							new_extent = (size_type)(new_extent * recalc_growth_factor(rehashed->elements)) + 1;
 							rehashed->resize_clear(new_extent);				
 							rehashed->mf = (*this).current->mf;
 							break;
-						}						
+						}												
 					}
 					if(rehashed->elements == current->elements){
 						break;						

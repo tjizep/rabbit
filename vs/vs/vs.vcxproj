@@ -146,6 +146,7 @@
     <ClCompile Include="..\..\tests\main.cpp" />
     <ClCompile Include="..\..\tests\unique_running_insertion.cpp" />
     <ClCompile Include="..\..\tests\unique_scattered_lookup.cpp" />
+    <ClCompile Include="..\..\time_hash_maps.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\rabbit\rabbit.h" />

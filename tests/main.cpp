@@ -211,7 +211,7 @@ public:
 		
 		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 		
-		printf("bench total %.4g secs read %.4g secs. mem used %.4g MB\n",(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count())/(1000000.0),(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start_read).count())/(1000000.0),get_proc_mem_use()-mem_start);
+		printf("time total %.4g secs read %.4g secs. mem used %.4g MB\n",(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count())/(1000000.0),(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start_read).count())/(1000000.0),get_proc_mem_use()-mem_start);
 		
 		
 		
@@ -284,6 +284,7 @@ void test_std_hash(size_t ts){
 #endif
 }
 #ifdef _MSC_VER
+extern int google_times(int iters);
 extern int unique_running_insertion();
 extern int unique_scattered_lookup();
 void more_tests(){
@@ -296,8 +297,8 @@ void more_tests(){
 #endif
 int main(int argc, char **argv)
 {
-	
 	size_t ts = 10000000;
+	///google_times(ts);
 	//typedef std::string _K;
 	typedef unsigned long _K;
 	test_dense_hash_long(ts);

@@ -27,6 +27,9 @@
     <ClCompile Include="..\..\tests\unique_scattered_lookup.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\time_hash_maps.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\rabbit\rabbit.h">
