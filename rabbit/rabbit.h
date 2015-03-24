@@ -69,7 +69,7 @@ namespace rabbit{
 		
 		struct hash_state{
 			/// maximum probes per bucket
-			static const _Bt PROBES = 64;
+			static const _Bt PROBES = 32;
 			
 			/// the existence bit set is a factor of BITS_SIZE less than the extent
 			_Exists exists;
@@ -276,6 +276,17 @@ namespace rabbit{
 				
 				/// eventualy an out of memory (bad_allocation) exception will occur
 				pos = key2pos(k);
+				if((*this).removed){
+					if(erased_(pos)){
+						set_erased(pos,false); /// un erase the element
+						--removed;
+						set_exists(pos, true);
+						data[pos].first = k;
+						data[pos].second = _V();					
+						++elements;
+						return &(data[pos].second);
+					}
+				}
 				if(!exists_(pos)){
 					set_exists(pos, true);
 					data[pos].first = k;
@@ -285,6 +296,7 @@ namespace rabbit{
 				}else if(equal_key(pos,k)){
 					return &(data[pos].second);
 				}
+				
 				size_type f = 0;
 				size_type m = std::min<size_t>(extent, pos + PROBES);
 				++pos;
@@ -334,7 +346,7 @@ namespace rabbit{
 				size_type pos = (*this).find(k);		
 				if(pos != (*this).end()){
 					set_erased(pos, true);
-					removed = 1;
+					++removed;
 					data[pos].first = _K();
 					data[pos].second = _V();						
 					--elements;									
@@ -494,8 +506,12 @@ namespace rabbit{
 			size_type to = (size_t)(current->bucket_count() * recalc_growth_factor(current->elements)) + 1;			
 			rehash(to);
 		}
+		void set_current(typename hash_state::ptr c){
+			current = c;
+			pcurrent = current.get();
+		}
 		typename hash_state::ptr current;
-		
+		hash_state* pcurrent;
 	public:
 		float load_factor() const{
 			return current->load_factor();
@@ -517,7 +533,7 @@ namespace rabbit{
 			return (*this).elements == 0;
 		}
 		void reserve(size_type atleast){
-			rehash(atleast);
+			rehash(atleast*2);
 		}
 		void rehash(size_type to_){
 			size_type to = std::max<size_type>(to_, MIN_EXTENT);
@@ -557,20 +573,20 @@ namespace rabbit{
 			}catch(std::bad_alloc &e){
 				///printf("rehash failed in temp phase\n");
 				throw e;
-			}					
-			current = rehashed;	
+			}			
+			set_current(rehashed);	
+			
 		}
 		void clear(){
 			backoff = get_max_backoff();
-			current = std::make_shared<hash_state>();
+			set_current(std::make_shared<hash_state>());
 		}
 		
 		unordered_map() {
 			clear();
 		}
 		
-		unordered_map(const unordered_map& right) {
-			clear();
+		unordered_map(const unordered_map& right) {			
 			*this = right;
 		}
 		
@@ -579,7 +595,13 @@ namespace rabbit{
 		}
 		
 		unordered_map& operator=(const unordered_map& right){
-			(*current) = (*right.current);
+			(*this).clear();
+			(*this).reserve(right.size());
+			const_iterator e = right.end();
+			for(const_iterator c = right.begin(); c!=e;++c){
+				(*this)[(*c).first] = (*c).second;
+			}
+			
 			return *this;
 		}
 		
@@ -588,26 +610,26 @@ namespace rabbit{
 		}
 		
 		void insert(const std::pair<_K,_V>& p){
-			(*this)[p.first] = p.second;
+			insert(p.first, p.second);
 		}
 		
 		bool get(const _K& k, _V& v) const {
-			return (*this).current->get(k,v);
+			return (*this).pcurrent->get(k,v);
 		}
 
 		_V& operator[](const _K& k){
-			_V *rv = current->subscript(k);
+			_V *rv = pcurrent->subscript(k);
 			while(rv == nullptr){
 				this->rehash();
-				rv = current->subscript(k);
+				rv = pcurrent->subscript(k);
 			}			
 			return *rv;
 		}
 		bool erase(const _K& k){
-			if(current->is_small()){
-				rehash(1);
-			}
-			return current->erase(k);
+			//if(current->is_small()){
+			//	rehash(1);
+			//}
+			return pcurrent->erase(k);
 		}
 		
 		size_type count(const _K& k) const {
@@ -615,14 +637,14 @@ namespace rabbit{
 		}
 		
 		iterator find(const _K& k) const {			
-			return iterator(this, current->find(k));
+			return iterator(this, pcurrent->find(k));
 		}
 		
 		iterator begin() const {
-			return iterator(this, current->begin());
+			return iterator(this, pcurrent->begin());
 		}
 		iterator end() const {
-			return iterator(this, current->end());
+			return iterator(this, pcurrent->end());
 		}
 		size_type size() const {
 			return current->size();
