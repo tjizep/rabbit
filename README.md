@@ -8,7 +8,7 @@ Some timing results with google dense hash compiled with MSVC 2012
 
 (4 byte objects, 10000000 iterations):
 
-| test type             | RABBIT UNORDERED_MAP                           | DENSE_HASH_MAP                                      |
+| TEST TYPE            | RABBIT UNORDERED_MAP                           | DENSE_HASH_MAP                                      |
 | --------------------- | ---------------------------------------------: | --------------------------------------------------: |
 | map_grow              | 156.3 ns  (29464764 hashes, 19732378 copies)   | *151.6 ns  (26777220 hashes, 123886195 copies)      |
 | map_predict/grow      | 156.3 ns  (29464764 hashes, 19732378 copies)   | *114.1 ns  (10000000 hashes, 73554475 copies)       |
