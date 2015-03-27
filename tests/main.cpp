@@ -298,8 +298,8 @@ void more_tests(){
 int main(int argc, char **argv)
 {
 	size_t ts = 10000000;
-	google_times(ts);
-	if(false){
+	
+	if(true){
 		//typedef std::string _K;
 		typedef unsigned long _K;
 		test_dense_hash_long(ts);
@@ -311,6 +311,8 @@ int main(int argc, char **argv)
 	
 		test_rabbit_hash<_K>(ts);
 		test_rabbit_hash_erase<_K>(ts/10);
+	}else{
+		google_times(ts);
 	}
 	//more_tests();
 	return 0;

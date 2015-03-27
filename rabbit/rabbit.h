@@ -69,7 +69,7 @@ namespace rabbit{
 		
 		struct hash_state{
 			/// maximum probes per bucket
-			static const _Bt PROBES = 32;
+			static const _Bt PROBES = 16;
 			
 			/// the existence bit set is a factor of BITS_SIZE less than the extent
 			_Exists exists;
@@ -254,39 +254,13 @@ namespace rabbit{
 				else
 					return raw_equal_key(pos,k) ;
 			}
-			/// impolite function only used during rehash
-			_V* presubscript(const _K& k){
-				
-				size_type pos = 0;
-				size_type f = 0;		
-				pos = key2pos(k);
-				if(!exists_(pos)){
-					set_exists(pos, true);
-					data[pos].first = k;
-					data[pos].second = _V();
-					min_element = std::min<size_type>(min_element,pos);
-					++elements;
-					return &(data[pos].second);
-				}
-				return nullptr;
-			}
 			_V* subscript(const _K& k){
 				
 				size_type pos = 0;
-				
+				size_type epos = 0;
 				/// eventualy an out of memory (bad_allocation) exception will occur
 				pos = key2pos(k);
-				if((*this).removed){
-					if(erased_(pos)){
-						set_erased(pos,false); /// un erase the element
-						--removed;
-						set_exists(pos, true);
-						data[pos].first = k;
-						data[pos].second = _V();					
-						++elements;
-						return &(data[pos].second);
-					}
-				}
+				epos = pos;
 				if(!exists_(pos)){
 					set_exists(pos, true);
 					data[pos].first = k;
@@ -325,7 +299,19 @@ namespace rabbit{
 						return &(data[pos].second);
 					}
 				};
-				
+				/// the key was not found now opurtunistically unerase it
+				if((*this).removed){
+					pos = epos;
+					if(erased_(pos)){
+						set_erased(pos,false); /// un erase the element
+						--removed;
+						set_exists(pos, true);
+						data[pos].first = k;
+						data[pos].second = _V();					
+						++elements;
+						return &(data[pos].second);
+					}
+				}
 				if(last_empty > 0){
 					pos = last_empty;
 					if(!exists_(pos)){
