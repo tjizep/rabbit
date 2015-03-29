@@ -47,7 +47,7 @@ namespace rabbit{
 		
 		typedef _V mapped_type;
 
-		typedef unsigned int _Bt; /// exists ebucket type
+		typedef unsigned char _Bt; /// exists ebucket type
 		
 		typedef unsigned int size_type;
 
@@ -55,12 +55,10 @@ namespace rabbit{
 		typedef _ElPair value_type;
 
 	protected:
-		static const _Bt CHAR_BITS = 8;
-		
-		
-		
+		static const _Bt CHAR_BITS = 8;		
 		static const size_type MIN_EXTENT = 64;
 		static const _Bt BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
+		static const _Bt BITS_LOG2_SIZE = 3;
 		/// the existence bit set type
 		typedef std::vector<_Bt,_Allocator> _Exists;
 		
@@ -69,7 +67,7 @@ namespace rabbit{
 		
 		struct hash_state{
 			/// maximum probes per bucket
-			static const _Bt PROBES = 16;
+			static const _Bt PROBES = 32;
 			
 			/// the existence bit set is a factor of BITS_SIZE less than the extent
 			_Exists exists;
@@ -117,10 +115,10 @@ namespace rabbit{
 			
 			size_type key2pos(const _K& k) const {
 				size_type r = 0;
-				size_type h = hf(k);
+				size_type h = (size_type)hf(k);
 				
-				r = h % extent;						
-				
+				r = h % extent;
+				//r = h & (extent-1);
 				return r;
 			}
 			
@@ -129,7 +127,9 @@ namespace rabbit{
 			}
 			void set_bucket_bit(_Exists & bits, size_type pos, bool f){
 				size_type bucket = pos / BITS_SIZE;
-				
+#ifdef _MSC_VER
+#pragma warning(disable:4804)
+#endif				
 				/// lifted directly from Bit Twiddling Hacks
 				/// https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetTable
 				/// TODO: table wont go over 1<<32
@@ -177,7 +177,7 @@ namespace rabbit{
 			}
 			inline bool is_bit(const _Exists& bits, size_type pos) const {				
 				_Bt bit = (_Bt)(pos & (BITS_SIZE-1));
-				_Bt v = bits[(pos / BITS_SIZE)];
+				_Bt v = bits[(pos >> BITS_LOG2_SIZE)];
 				_Bt r = ((v >> bit) & (_Bt)1ul);
 				return r != 0;
 			}
@@ -189,12 +189,21 @@ namespace rabbit{
 			inline bool erased_(size_type pos) const {
 				return is_bit(erased, pos);
 			}
-			
+			size_type log2(size_type n){
+				
+				size_type r = 0; 
+
+				while (n >>= 1) 
+				{
+				  r++;
+				}
+				return r;
+			}
 			void resize_clear(size_type new_extent){
 				/// inverse of factor used to determine overflow list
 				/// when overflow list is full rehash starts
 				const size_type MIN_OVERFLOW = 64; 
-				extent = new_extent;
+				extent = new_extent; ///1<<log2(new_extent);
 				mf = 1.0;
 				overflow = std::min<size_type>(extent/1024,MIN_OVERFLOW);
 				elements = 0;
@@ -261,7 +270,7 @@ namespace rabbit{
 				/// eventualy an out of memory (bad_allocation) exception will occur
 				pos = key2pos(k);
 				epos = pos;
-				if(!exists_(pos)){
+				if(exists[pos>>BITS_LOG2_SIZE]==0 || !exists_(pos)){
 					set_exists(pos, true);
 					data[pos].first = k;
 					data[pos].second = _V();					
@@ -272,20 +281,46 @@ namespace rabbit{
 				}
 				
 				size_type f = 0;
-				size_type m = std::min<size_t>(extent, pos + PROBES);
+				size_type m = std::min<size_type>(extent, pos + PROBES);
+				size_type m1 = std::min<size_type>(extent, pos + BITS_SIZE - (pos & (BITS_SIZE-1)));
 				++pos;
 				
-				for(; pos < m;++pos){
+				for(; pos < m1;++pos){
+					if(erased[pos>>BITS_LOG2_SIZE]==0xFF){
+						pos = m1;
+						break;
+					}
 					if(!exists_(pos)){
 						set_exists(pos, true);
 						data[pos].first = k;
 						data[pos].second = _V();						
 						++elements;
 						return &(data[pos].second);					
-					}else if(equal_key(pos,k)){
-						return &(data[pos].second);
+					}else if(!erased_(pos)){
+						if (raw_equal_key(pos,k)){
+							return &(data[pos].second);
+						}
 					}
 				}
+				for(; pos < m;++pos){
+					if(erased[pos>>BITS_LOG2_SIZE]==0xFF){
+						pos += BITS_SIZE;						
+					}else{
+						if(exists[pos>>BITS_LOG2_SIZE]==0 || !exists_(pos)){
+							set_exists(pos, true);
+							data[pos].first = k;
+							data[pos].second = _V();						
+							++elements;
+							return &(data[pos].second);					
+						}else if(!erased_(pos)){
+							if (raw_equal_key(pos,k)){
+								return &(data[pos].second);
+							}
+						}
+					}
+				}
+
+				
 										
 				/// this is quite slow so only calc when reaching overflow
 				if(load_factor() > max_load_factor()){				
@@ -368,7 +403,7 @@ namespace rabbit{
 				if(exists_(pos) && equal_key(pos,k)){
 					return pos;
 				}
-				size_type m = std::min<size_t>(extent, pos + PROBES);
+				size_type m = std::min<size_type>(extent, pos + PROBES);
 				++pos;
 				for(; pos < m;++pos){
 					if(exists_(pos) && equal_key(pos,k)){
@@ -489,7 +524,7 @@ namespace rabbit{
 		}
 		
 		void rehash(){
-			size_type to = (size_t)(current->bucket_count() * recalc_growth_factor(current->elements)) + 1;			
+			size_type to = (size_type)(current->bucket_count() * recalc_growth_factor(current->elements)) + 1;			
 			rehash(to);
 		}
 		void set_current(typename hash_state::ptr c){
@@ -519,6 +554,9 @@ namespace rabbit{
 			return (*this).elements == 0;
 		}
 		void reserve(size_type atleast){
+			rehash(atleast*2);
+		}
+		void resize(size_type atleast){
 			rehash(atleast*2);
 		}
 		void rehash(size_type to_){

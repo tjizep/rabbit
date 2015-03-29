@@ -85,35 +85,35 @@ public:
 		
 	}
 	
-	void to_t(int in, long long& out){
+	void to_t(long long in, long long& out){
 		out = in;
 	}
 	
-	void to_t(int in, long& out){
-		out = in;
+	void to_t(long long in, long& out){
+		out = (long)in;
 	}
 	
-	void to_t(int in, int& out){
-		out = in;
+	void to_t(long long in, int& out){
+		out = (int)in;
 	}
 	
-	void to_t(int in, unsigned long long& out){
-		out = in;
+	void to_t(long long in, unsigned long long& out){
+		out = (unsigned long long)in;
 	}
 	
-	void to_t(int in, unsigned long& out){
-		out = in;
+	void to_t(long long in, unsigned long& out){
+		out = (unsigned long)in;
 	}
 	
-	void to_t(int in, unsigned int& out){
-		out = in;
+	void to_t(long long in, unsigned int& out){
+		out = (unsigned int)in;
 	}
 	
-	void to_t(int in, double& out){
-		out = in;
+	void to_t(long long in, double& out){
+		out = (double)in;
 	}
-	void to_t(int in, float& out){
-		out = in;
+	void to_t(long long in, float& out){
+		out = (float)in;
 	}
 
 	void gen_random(size_t count, _Script& script){
@@ -285,11 +285,11 @@ void test_std_hash(size_t ts){
 }
 #ifdef _MSC_VER
 extern int google_times(int iters);
-extern int unique_running_insertion();
-extern int unique_scattered_lookup();
+//extern int unique_running_insertion();
+//extern int unique_scattered_lookup();
 void more_tests(){
-	unique_scattered_lookup();
-	unique_running_insertion();
+	//unique_scattered_lookup();
+	//unique_running_insertion();
 }
 #else
  void more_tests(){
@@ -297,9 +297,10 @@ void more_tests(){
 #endif
 int main(int argc, char **argv)
 {
-	size_t ts = 10000000;
+	::Sleep(1000);
+	int ts = 10000000;
 	
-	if(true){
+	if(false){
 		//typedef std::string _K;
 		typedef unsigned long _K;
 		test_dense_hash_long(ts);

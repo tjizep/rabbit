@@ -126,7 +126,7 @@
       <WarningLevel>Level3</WarningLevel>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <Optimization>Full</Optimization>
+      <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -144,8 +144,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\tests\main.cpp" />
-    <ClCompile Include="..\..\tests\unique_running_insertion.cpp" />
-    <ClCompile Include="..\..\tests\unique_scattered_lookup.cpp" />
     <ClCompile Include="..\..\time_hash_maps.cpp" />
   </ItemGroup>
   <ItemGroup>

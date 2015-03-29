@@ -121,12 +121,12 @@ using GOOGLE_NAMESPACE::dense_hash_map;
 using GOOGLE_NAMESPACE::sparse_hash_map;
 
 static bool FLAGS_test_sparse_hash_map = false;
-static bool FLAGS_test_dense_hash_map = true;
+static bool FLAGS_test_dense_hash_map = false;
 static bool FLAGS_test_hash_map = true;
 static bool FLAGS_test_map = false;
 
 static bool FLAGS_test_4_bytes = true;
-static bool FLAGS_test_8_bytes = true;
+static bool FLAGS_test_8_bytes = false;
 static bool FLAGS_test_16_bytes = false;
 static bool FLAGS_test_256_bytes = false;
 
@@ -189,7 +189,7 @@ class EasyUseHashMap : public unordered_map<K,V,H> {
 template<typename K, typename V, typename H>
 class EasyUseHashMap : public rabbit::unordered_map<K,V,H> {
  public:
-  void resize(size_t r) { }
+  
 };
 #elif defined(HAVE_HASH_MAP)
 template<typename K, typename V, typename H>
@@ -536,7 +536,7 @@ static void time_map_fetch_sequential(int iters) {
 // Apply a pseudorandom permutation to the given vector.
 static void shuffle(vector<int>* v) {
   srand(9);
-  for (int n = v->size(); n >= 2; n--) {
+  for (int n = (int) v->size(); n >= 2; n--) {
     swap((*v)[n - 1], (*v)[static_cast<unsigned>(rand()) % n]);
   }
 }

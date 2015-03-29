@@ -83,7 +83,7 @@ struct running_insertion
       Container s;
       rand_seq  rnd(n);
       while(n--)s.insert(rnd());
-      res=s.size();
+      res=( unsigned int)s.size();
       pause_timing();
     }
     resume_timing();
@@ -104,7 +104,7 @@ struct norehash_running_insertion
       rand_seq  rnd(n);
       reserve(s,n);
       while(n--)s.insert(rnd());
-      res=s.size();
+      res=( unsigned int)s.size();
       pause_timing();
     }
     resume_timing();
