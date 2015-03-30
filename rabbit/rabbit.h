@@ -67,7 +67,7 @@ namespace rabbit{
 		
 		struct hash_state{
 			/// maximum probes per bucket
-			static const _Bt PROBES = 32;
+			static const _Bt PROBES = 64;
 			
 			/// the existence bit set is a factor of BITS_SIZE less than the extent
 			_Exists exists;
@@ -187,7 +187,9 @@ namespace rabbit{
 			}
 
 			inline bool erased_(size_type pos) const {
-				return is_bit(erased, pos);
+				/// works because the likelyhood of a lot of erased elements are low
+				return erased[pos >> BITS_LOG2_SIZE] && 
+					is_bit(erased, pos);
 			}
 			size_type log2(size_type n){
 				

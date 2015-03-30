@@ -120,13 +120,13 @@ using std::vector;
 using GOOGLE_NAMESPACE::dense_hash_map;
 using GOOGLE_NAMESPACE::sparse_hash_map;
 
-static bool FLAGS_test_sparse_hash_map = false;
-static bool FLAGS_test_dense_hash_map = false;
+static bool FLAGS_test_sparse_hash_map = true;
+static bool FLAGS_test_dense_hash_map = true;
 static bool FLAGS_test_hash_map = true;
 static bool FLAGS_test_map = false;
 
 static bool FLAGS_test_4_bytes = true;
-static bool FLAGS_test_8_bytes = false;
+static bool FLAGS_test_8_bytes = true;
 static bool FLAGS_test_16_bytes = false;
 static bool FLAGS_test_256_bytes = false;
 
@@ -430,7 +430,23 @@ static size_t CurrentMemoryUsage() {
 }
 
 #else  /* not HAVE_GOOGLE_MALLOC_EXTENSION_H */
-static size_t CurrentMemoryUsage() { return 0; }
+#ifdef _MSC_VER
+#define _CRT_SECURE_NO_WARNINGS
+#include <Windows.h>
+#include <Psapi.h>
+#endif
+static size_t CurrentMemoryUsage() { 
+#ifdef _MSC_VER	
+	PROCESS_MEMORY_COUNTERS memCounter;
+	bool result = (GetProcessMemoryInfo(GetCurrentProcess(),
+                                   &memCounter,
+                                   sizeof( memCounter )) != 0);
+	if(result){
+		return memCounter.WorkingSetSize;
+	}
+#endif
+	return 0; 
+}
 
 #endif
 
