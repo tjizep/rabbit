@@ -59,6 +59,7 @@ namespace rabbit{
 		static const size_type MIN_EXTENT = 64;
 		static const _Bt BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
 		static const _Bt BITS_LOG2_SIZE = 3;
+		static const bool secondary_hash = false;
 		/// the existence bit set type
 		typedef std::vector<_Bt,_Allocator> _Exists;
 		
@@ -76,6 +77,7 @@ namespace rabbit{
 			/// data being used
 			_Data data;
 			size_type extent;
+			size_type extent2;
 
 			size_type elements;
 			size_type overflow;
@@ -118,7 +120,14 @@ namespace rabbit{
 				size_type h = (size_type)hf(k);
 				
 				r = h % extent;
-				//r = h & (extent-1);
+				
+				return r;
+			}
+			size_type fkey2pos(const _K& k) const {
+				size_type r = 0;
+				size_type h = (size_type)hf(k);
+				
+				r = h & (extent2-1);
 				return r;
 			}
 			
@@ -152,7 +161,7 @@ namespace rabbit{
 				set_bucket_bit(erased, pos, f);
 			}
 			
-			/// fast generic bit counting
+			/// fast generic bit counting - NOT currently used but might be
 			/// lifted (again) directly from Bit Twiddling Hacks
 			/// https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetTable
 			template<typename IntT>
@@ -187,6 +196,7 @@ namespace rabbit{
 			}
 
 			inline bool erased_(size_type pos) const {
+				if(!removed) return false;
 				/// works because the likelyhood of a lot of erased elements are low
 				return erased[pos >> BITS_LOG2_SIZE] && 
 					is_bit(erased, pos);
@@ -206,6 +216,10 @@ namespace rabbit{
 				/// when overflow list is full rehash starts
 				const size_type MIN_OVERFLOW = 64; 
 				extent = new_extent; ///1<<log2(new_extent);
+				extent2 = 1<<log2(new_extent);
+				while(extent < extent2){
+					extent2 >>= 1;
+				}
 				mf = 1.0;
 				overflow = std::min<size_type>(extent/1024,MIN_OVERFLOW);
 				elements = 0;
@@ -281,35 +295,32 @@ namespace rabbit{
 				}else if(equal_key(pos,k)){
 					return &(data[pos].second);
 				}
+				if(secondary_hash){
+					pos = fkey2pos(k);
+					epos = pos;
+					if(exists[pos>>BITS_LOG2_SIZE]==0 || !exists_(pos)){
+						set_exists(pos, true);
+						data[pos].first = k;
+						data[pos].second = _V();					
+						++elements;
+						return &(data[pos].second);
+					}else if(equal_key(pos,k)){
+						return &(data[pos].second);
+					}
+				}
 				
 				size_type f = 0;
 				size_type m = std::min<size_type>(extent, pos + PROBES);
-				size_type m1 = std::min<size_type>(extent, pos + BITS_SIZE - (pos & (BITS_SIZE-1)));
+				
 				++pos;
 				
-				for(; pos < m1;++pos){
-					if(erased[pos>>BITS_LOG2_SIZE]==0xFF){
-						pos = m1;
-						break;
-					}
-					if(!exists_(pos)){
-						set_exists(pos, true);
-						data[pos].first = k;
-						data[pos].second = _V();						
-						++elements;
-						return &(data[pos].second);					
-					}else if(!erased_(pos)){
-						if (raw_equal_key(pos,k)){
-							return &(data[pos].second);
-						}
-					}
-				}
-				for(; pos < m;++pos){
-					if(erased[pos>>BITS_LOG2_SIZE]==0xFF){
-						pos += BITS_SIZE;						
+				for(; pos < m;){
+					if(erased[pos>>BITS_LOG2_SIZE]==0xFF){						
+						pos += (BITS_SIZE - (pos & (BITS_SIZE-1)));
 					}else{
 						if(exists[pos>>BITS_LOG2_SIZE]==0 || !exists_(pos)){
 							set_exists(pos, true);
+							set_erased(pos, false);
 							data[pos].first = k;
 							data[pos].second = _V();						
 							++elements;
@@ -319,6 +330,7 @@ namespace rabbit{
 								return &(data[pos].second);
 							}
 						}
+						++pos;
 					}
 				}
 
@@ -353,6 +365,7 @@ namespace rabbit{
 					pos = last_empty;
 					if(!exists_(pos)){
 						set_exists(pos,true);
+						set_erased(pos,false);
 						data[pos].first = k;
 						data[pos].second = _V();
 						++elements;
@@ -401,22 +414,34 @@ namespace rabbit{
 			
 			size_type find(const _K& k) const {
 				if(!elements) return end();
-				size_type pos = key2pos(k);
-				if(exists_(pos) && equal_key(pos,k)){
-					return pos;
+				size_type pos = 0;
+				pos = key2pos(k);
+				if(exists_(pos)){ ///exists[pos >> BITS_LOG2_SIZE] == 0xFF || 
+					if(equal_key(pos,k))
+						return pos;
 				}
-				size_type m = std::min<size_type>(extent, pos + PROBES);
-				++pos;
-				for(; pos < m;++pos){
+				if(secondary_hash){
+					pos = fkey2pos(k);
 					if(exists_(pos) && equal_key(pos,k)){
 						return pos;
 					}
 				}
-				size_type e = get_data_size();
-				for(pos = extent; pos < e;++pos){
-					
-					if(exists_(pos) && equal_key(pos,k)){
+
+				size_type m = std::min<size_type>(extent, pos + PROBES);
+				++pos;
+				for(; pos < m;){
+					if(exists[pos >> BITS_LOG2_SIZE] == 0){
+						pos += (BITS_SIZE - (pos & (BITS_SIZE-1)));
+					}else if(exists_(pos) && equal_key(pos,k)){
 						return pos;
+					}else{
+						++pos;
+					}
+				}
+				size_type e = get_data_size();
+				for(pos = extent; pos < e;++pos){					
+					if(exists_(pos) && equal_key(pos,k)){
+						return pos;						
 					}
 				}
 				return end();
@@ -530,11 +555,10 @@ namespace rabbit{
 			rehash(to);
 		}
 		void set_current(typename hash_state::ptr c){
-			current = c;
-			pcurrent = current.get();
+			current = c;			
 		}
+		
 		typename hash_state::ptr current;
-		hash_state* pcurrent;
 	public:
 		float load_factor() const{
 			return current->load_factor();
@@ -556,10 +580,10 @@ namespace rabbit{
 			return (*this).elements == 0;
 		}
 		void reserve(size_type atleast){
-			rehash(atleast*2);
+			rehash((size_type)((double)atleast*1.3));
 		}
 		void resize(size_type atleast){
-			rehash(atleast*2);
+			rehash((size_type)((double)atleast*1.3));
 		}
 		void rehash(size_type to_){
 			size_type to = std::max<size_type>(to_, MIN_EXTENT);
@@ -638,16 +662,17 @@ namespace rabbit{
 		void insert(const std::pair<_K,_V>& p){
 			insert(p.first, p.second);
 		}
-		
+
+		/// fast getter that doesnt use iterators
 		bool get(const _K& k, _V& v) const {
-			return (*this).pcurrent->get(k,v);
+			return (*this).current->get(k,v);
 		}
 
 		_V& operator[](const _K& k){
-			_V *rv = pcurrent->subscript(k);
+			_V *rv = current->subscript(k);
 			while(rv == nullptr){
 				this->rehash();
-				rv = pcurrent->subscript(k);
+				rv = current->subscript(k);
 			}			
 			return *rv;
 		}
@@ -655,7 +680,7 @@ namespace rabbit{
 			//if(current->is_small()){
 			//	rehash(1);
 			//}
-			return pcurrent->erase(k);
+			return current->erase(k);
 		}
 		
 		size_type count(const _K& k) const {
@@ -663,14 +688,14 @@ namespace rabbit{
 		}
 		
 		iterator find(const _K& k) const {			
-			return iterator(this, pcurrent->find(k));
+			return iterator(this, current->find(k));
 		}
 		
 		iterator begin() const {
-			return iterator(this, pcurrent->begin());
+			return iterator(this, current->begin());
 		}
 		iterator end() const {
-			return iterator(this, pcurrent->end());
+			return iterator(this, current->end());
 		}
 		size_type size() const {
 			return current->size();

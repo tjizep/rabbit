@@ -120,13 +120,13 @@ using std::vector;
 using GOOGLE_NAMESPACE::dense_hash_map;
 using GOOGLE_NAMESPACE::sparse_hash_map;
 
-static bool FLAGS_test_sparse_hash_map = true;
-static bool FLAGS_test_dense_hash_map = true;
+static bool FLAGS_test_sparse_hash_map = false;
+static bool FLAGS_test_dense_hash_map = false;
 static bool FLAGS_test_hash_map = true;
 static bool FLAGS_test_map = false;
 
 static bool FLAGS_test_4_bytes = true;
-static bool FLAGS_test_8_bytes = true;
+static bool FLAGS_test_8_bytes = false;
 static bool FLAGS_test_16_bytes = false;
 static bool FLAGS_test_256_bytes = false;
 
@@ -524,7 +524,8 @@ static void time_map_fetch(int iters, const vector<int>& indices,
   Rusage t;
   int r;
   int i;
-
+  const size_t start = CurrentMemoryUsage();
+  //set.resize(iters);
   for (i = 0; i < iters; i++) {
     set[i] = i+1;
   }
@@ -535,9 +536,9 @@ static void time_map_fetch(int iters, const vector<int>& indices,
     r ^= static_cast<int>(set.find(indices[i]) != set.end());
   }
   double ut = t.UserTime();
-
+  const size_t finish = CurrentMemoryUsage();
   srand(r);   // keep compiler from optimizing away r (we never call rand())
-  report(title, ut, iters, 0, 0);
+  report(title, ut, iters, start, finish);
 }
 
 template<class MapType>
@@ -699,15 +700,15 @@ template<class MapType, class StressMapType>
 static void measure_map(const char* label, int obj_size, int iters,
                         bool stress_hash_function) {
   printf("\n%s (%d byte objects, %d iterations):\n", label, obj_size, iters);
-  if (1) time_map_grow<MapType>(iters);
-  if (1) time_map_grow_predicted<MapType>(iters);
-  if (1) time_map_replace<MapType>(iters);
+  if (0) time_map_grow<MapType>(iters);
+  if (0) time_map_grow_predicted<MapType>(iters);
+  if (0) time_map_replace<MapType>(iters);
   if (1) time_map_fetch_random<MapType>(iters);
-  if (1) time_map_fetch_sequential<MapType>(iters);
-  if (1) time_map_fetch_empty<MapType>(iters);
-  if (1) time_map_remove<MapType>(iters);
-  if (1) time_map_toggle<MapType>(iters);
-  if (1) time_map_iterate<MapType>(iters);
+  if (0) time_map_fetch_sequential<MapType>(iters);
+  if (0) time_map_fetch_empty<MapType>(iters);
+  if (0) time_map_remove<MapType>(iters);
+  if (0) time_map_toggle<MapType>(iters);
+  if (0) time_map_iterate<MapType>(iters);
   // This last test is useful only if the map type uses hashing.
   // And it's slow, so use fewer iterations.
   if (stress_hash_function) {
@@ -735,7 +736,7 @@ static void test_all_maps(int obj_size, int iters) {
   if (FLAGS_test_hash_map)
     measure_map< EasyUseHashMap<ObjType, int, HashFn>,
                  EasyUseHashMap<ObjType*, int, HashFn> >(
-        "STANDARD HASH_MAP", obj_size, iters, stress_hash_function);
+        "RABBIT UNORDERED_MAP", obj_size, iters, stress_hash_function);
 
   if (FLAGS_test_map)
     measure_map< EasyUseMap<ObjType, int>,

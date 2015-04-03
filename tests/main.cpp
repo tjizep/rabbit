@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <random>
+#include <algorithm>
 #include <unordered_map>
 #include <map>
 #include <string>
@@ -116,7 +117,9 @@ public:
 		out = (float)in;
 	}
 
+
 	void gen_random(size_t count, _Script& script){
+		double start = get_proc_mem_use();
 		std::minstd_rand rd;
 		std::mt19937 gen(rd());
 		std::uniform_int_distribution<long long> dis(1<<24, 1ll<<32);
@@ -126,8 +129,22 @@ public:
 			to_t(dis(gen),v);
 			script.push_back(v);
 		}
-		printf("memory used by script: %.4g MB\n", get_proc_mem_use());
+		printf("memory used by script: %.4g MB\n", get_proc_mem_use()-start);
 	}
+
+	void gen_random_narrow(size_t count, _Script& script){
+		double start = get_proc_mem_use();
+		/// script creation is not benched
+		_InputField v;
+		
+		for(size_t r = 0; r < count;++r){
+			to_t(r,v);
+			script.push_back(v);
+		}
+		std::random_shuffle(script.begin(), script.end());
+		printf("memory used by script: %.4g MB\n", get_proc_mem_use()-start);
+	}
+
 	void erase_test(_MapT &h,const _Script& script){
 		double mem_start = get_proc_mem_use();
 		std::chrono::steady_clock::time_point start_erase = std::chrono::steady_clock::now();
@@ -216,6 +233,50 @@ public:
 		
 		
 	}
+	void bench_hash_simple(_MapT& h,const _Script& script){
+		/// create a list of random numbers and add to test script
+		double mem_start = get_proc_mem_use();
+		std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+		size_t count = script.size();
+	
+		size_t s = count/10;
+		for(size_t j = 0; j < count; ++j){
+			
+			h[script[j]] = (typename _MapT::mapped_type)j+1;
+			if(j % s == 0){
+				std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+	
+				printf("%ld: %ld in hash, bench total %.4g secs\n",(long)j,(long)h.size(),(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count())/(1000000.0));
+			}
+		}
+		std::chrono::steady_clock::time_point start_read = std::chrono::steady_clock::now();
+		/// check what is
+		for(size_t k = 0; k < count; ++k){
+			if(h.count(script[k]) == 0){
+				printf("ERROR: could not find %ld\n",(long int)k);
+			};
+			auto f = h.find(script[k]);
+			
+			if(f==h.end() || (*f).second != (typename _MapT::mapped_type)k+1){
+				if(f==h.end()){					
+					printf("ERROR: counted data does not exist %ld\n",(long int)k);
+				}else{
+					auto n2v = (*f).second-1;
+					f = h.find(script[n2v]);
+					if(f==h.end() || (*f).second != n2v+1){
+						printf("ERROR: could not iterator find %ld\n",(long int)k);
+					}					
+				}
+			}
+		}	
+		
+		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+		
+		printf("time total %.4g secs read %.4g secs. mem used %.4g MB\n",(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count())/(1000000.0),(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start_read).count())/(1000000.0),get_proc_mem_use()-mem_start);
+		
+		
+		
+	}
 };
 
 void test_dense_hash_long(size_t ts){
@@ -227,8 +288,8 @@ void test_dense_hash_long(size_t ts){
 	h.set_empty_key(1l);
 	tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random(ts, script);
-	t.bench_hash(h,script);	
+	t.gen_random_narrow(ts, script);
+	t.bench_hash_simple(h,script);	
 #endif
 }
 template<typename T>
@@ -239,8 +300,8 @@ void test_sparse_hash(size_t ts){
 	_Map h;
 	tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random(ts, script);
-	t.bench_hash(h,script);	
+	t.gen_random_narrow(ts, script);
+	t.bench_hash_simple(h,script);	
 #endif
 }
 
@@ -252,8 +313,8 @@ void test_rabbit_hash(size_t ts){
 	
 	typename tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random(ts, script);
-	t.bench_hash(h,script);
+	t.gen_random_narrow(ts, script);
+	t.bench_hash_simple(h,script);
 	
 }
 template<typename T>
@@ -279,7 +340,7 @@ void test_std_hash(size_t ts){
 	
 	typename tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random(ts, script);
+	t.gen_random_narrow(ts, script);
 	t.bench_hash(h,script);
 #endif
 }
@@ -300,18 +361,18 @@ int main(int argc, char **argv)
 	::Sleep(1000);
 	int ts = 10000000;
 	
-	if(false){
+	if(true){
 		//typedef std::string _K;
 		typedef unsigned long _K;
 		test_dense_hash_long(ts);
 		//test_sparse_hash<_K>(ts);
 
 
-		///test_std_hash<_K>(ts);
+		//test_std_hash<_K>(ts);
 
 	
 		test_rabbit_hash<_K>(ts);
-		test_rabbit_hash_erase<_K>(ts/10);
+		//test_rabbit_hash_erase<_K>(ts/10);
 	}else{
 		google_times(ts);
 	}
