@@ -31,7 +31,7 @@ THE SOFTWARE.
 #include <memory>
 /// the rab-bit hash
 /// probably the worlds simplest working hashtable - only kiddingk
-/// it uses linear probing for the first level of fallback
+/// it uses linear probing for the first level of fallback and then a overflow area or secondary hash
 
 #ifdef _MSC_VER
 #define RABBIT_NOINLINE_  _declspec(noinline)
@@ -47,7 +47,7 @@ namespace rabbit{
 		
 		typedef _V mapped_type;
 
-		typedef unsigned char _Bt; /// exists ebucket type
+		typedef unsigned char _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		
 		typedef unsigned int size_type;
 
@@ -68,9 +68,9 @@ namespace rabbit{
 		
 		struct hash_state{
 			/// maximum probes per bucket
-			static const _Bt PROBES = 64;
+			static const _Bt PROBES = 64; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
 			
-			/// the existence bit set is a factor of BITS_SIZE less than the extent
+			/// the existence and erased bit sets are a factor of BITS_SIZE+1 less than the extent
 			_Exists exists;
 			_Exists erased;
 			const _Bt* _exists;
@@ -88,25 +88,34 @@ namespace rabbit{
 			mutable size_type min_element;
 			size_type removed;
 
+			/// the minimum load factor
 			float load_factor() const{
 				return (float)((double)elements/(double)bucket_count());
 			}
+
+			/// there are a variable ammount of buckets there are at most this much
+			///
 			size_type bucket_count() const {
+				
 				return get_data_size();
 			}
+			/// the size of a bucket can be calculated based on the 
+			/// hash value of its first occupant
+			/// mainly to satisfy stl conventions
 			size_type bucket_size ( size_type n ) const{
 				size_type pos = n;
 				size_type m = std::min<size_type>(extent, pos + PROBES);
 				size_type r = 0;				
 				for(; pos < m;++pos){
 					if(!exists_(pos)){				
-					}else{
+					}else if(key2pos(data[pos].first) == n){
 						++r;						
 					}					
 				}
 				return r;
 				
 			}
+
 			float max_load_factor() const {
 				return mf;
 			}
@@ -123,6 +132,7 @@ namespace rabbit{
 				
 				return r;
 			}
+			/// secondary hash might be used instead of overflow vbucket
 			size_type fkey2pos(const _K& k) const {
 				size_type r = 0;
 				size_type h = (size_type)hf(k);
@@ -130,10 +140,12 @@ namespace rabbit{
 				r = h & (extent2-1);
 				return r;
 			}
-			
+			/// total data size, never less than than size()
 			size_type get_data_size() const {
 				return extent+overflow;
 			}
+
+			/// sets a bit in a bucket vector of type _Bt
 			void set_bucket_bit(_Exists & bits, size_type pos, bool f){
 				size_type bucket = pos / BITS_SIZE;
 #ifdef _MSC_VER
@@ -211,11 +223,16 @@ namespace rabbit{
 				}
 				return r;
 			}
+			/// clears all data and resize the new data vector to the parameter
 			void resize_clear(size_type new_extent){
 				/// inverse of factor used to determine overflow list
 				/// when overflow list is full rehash starts
 				const size_type MIN_OVERFLOW = 64; 
 				extent = new_extent; ///1<<log2(new_extent);
+
+				/// extent for currently unused secondary hash
+				/// secondary hashes causes cash misses so
+				/// the extent should be fairly small
 				extent2 = 1<<log2(new_extent);
 				while(extent < extent2){
 					extent2 >>= 1;
@@ -238,6 +255,7 @@ namespace rabbit{
 				buckets = 0;
 
 			};
+		
 			void clear(){				
 				resize_clear(MIN_EXTENT);
 			}
@@ -278,6 +296,63 @@ namespace rabbit{
 					return raw_equal_key(pos,k) && !erased_(pos);
 				else
 					return raw_equal_key(pos,k) ;
+			}
+
+			/// when all inputs to this function is unique relative to current hash map(i.e. they dont exist in the hashmap)
+			/// and there where no erasures. for maximum fillrate in rehash
+			_V* unique_unerased_subscript(const _K& k){
+				if(removed) return nullptr;
+
+				size_type pos = 0;
+				size_type epos = 0;
+				/// eventualy an out of memory (bad_allocation) exception will occur
+				pos = key2pos(k);
+				epos = pos;
+				if(exists[pos>>BITS_LOG2_SIZE]==0 || !exists_(pos)){
+					set_exists(pos, true);
+					data[pos].first = k;
+					data[pos].second = _V();					
+					++elements;
+					return &(data[pos].second);
+				}
+				if(secondary_hash){
+					pos = fkey2pos(k);
+					epos = pos;
+					if(exists[pos>>BITS_LOG2_SIZE]==0 || !exists_(pos)){
+						set_exists(pos, true);
+						data[pos].first = k;
+						data[pos].second = _V();					
+						++elements;
+						return &(data[pos].second);
+					}
+				}
+				
+				size_type f = 0;
+				size_type m = std::min<size_type>(extent, pos + PROBES);
+				
+				++pos;
+				
+				for(; pos < m;){
+					if(exists[pos>>BITS_LOG2_SIZE]==0 || !exists_(pos)){
+						set_exists(pos, true);
+						set_erased(pos, false);
+						data[pos].first = k;
+						data[pos].second = _V();						
+						++elements;
+						return &(data[pos].second);					
+					}
+					++pos;
+					
+				}
+
+				size_type last_empty = 0;
+				for(pos = extent; pos < get_data_size();++pos){
+					if(!exists_(pos)){
+						return &(data[pos].second);
+					}
+				};
+				
+				return nullptr;
 			}
 			_V* subscript(const _K& k){
 				
@@ -348,7 +423,10 @@ namespace rabbit{
 						return &(data[pos].second);
 					}
 				};
+				
 				/// the key was not found now opurtunistically unerase it
+				/// this could be more aggressive to avoid potential rehashes
+
 				if((*this).removed){
 					pos = epos;
 					if(erased_(pos)){
@@ -391,7 +469,7 @@ namespace rabbit{
 				return false;
 				
 			}
-
+			/// not used (could be used where hash table must actually shrink too)
 			bool is_small() const {
 				return (extent > (MIN_EXTENT << 3)) && (elements < extent/8);
 			}
@@ -600,8 +678,7 @@ namespace rabbit{
 					iterator e = end();
 					size_type ctr = 0;
 					for(iterator i = begin();i != e;++i){					
-						_V* v = rehashed->subscript((*i).first);
-						v = rehashed->subscript((*i).first);
+						_V* v = rehashed->unique_unerased_subscript((*i).first);						
 						if(v != nullptr){
 							*v = (*i).second;
 						}else{							
