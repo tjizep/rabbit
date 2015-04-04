@@ -300,8 +300,8 @@ namespace rabbit{
 
 			/// when all inputs to this function is unique relative to current hash map(i.e. they dont exist in the hashmap)
 			/// and there where no erasures. for maximum fillrate in rehash
-			_V* unique_unerased_subscript(const _K& k){
-				if(removed) return nullptr;
+			_V* unique_subscript(const _K& k){
+				if(removed) return subscript(k);
 
 				size_type pos = 0;
 				size_type epos = 0;
@@ -310,44 +310,28 @@ namespace rabbit{
 				epos = pos;
 				if(exists[pos>>BITS_LOG2_SIZE]==0 || !exists_(pos)){
 					set_exists(pos, true);
-					data[pos].first = k;
-					data[pos].second = _V();					
+					data[pos].first = k;					
 					++elements;
 					return &(data[pos].second);
 				}
-				if(secondary_hash){
-					pos = fkey2pos(k);
-					epos = pos;
-					if(exists[pos>>BITS_LOG2_SIZE]==0 || !exists_(pos)){
-						set_exists(pos, true);
-						data[pos].first = k;
-						data[pos].second = _V();					
-						++elements;
-						return &(data[pos].second);
-					}
-				}
-				
-				size_type f = 0;
-				size_type m = std::min<size_type>(extent, pos + PROBES);
-				
-				++pos;
-				
-				for(; pos < m;){
-					if(exists[pos>>BITS_LOG2_SIZE]==0 || !exists_(pos)){
-						set_exists(pos, true);
-						set_erased(pos, false);
-						data[pos].first = k;
-						data[pos].second = _V();						
+					
+				size_type m = std::min<size_type>(extent, pos + PROBES);				
+				++pos;				
+				for(; pos < m;++pos){
+					if(!exists_(pos)){
+						set_exists(pos, true);						
+						data[pos].first = k;						
 						++elements;
 						return &(data[pos].second);					
 					}
-					++pos;
-					
+										
 				}
 
-				size_type last_empty = 0;
 				for(pos = extent; pos < get_data_size();++pos){
 					if(!exists_(pos)){
+						set_exists(pos, true);						
+						data[pos].first = k;						
+						++elements;
 						return &(data[pos].second);
 					}
 				};
@@ -370,19 +354,7 @@ namespace rabbit{
 				}else if(equal_key(pos,k)){
 					return &(data[pos].second);
 				}
-				if(secondary_hash){
-					pos = fkey2pos(k);
-					epos = pos;
-					if(exists[pos>>BITS_LOG2_SIZE]==0 || !exists_(pos)){
-						set_exists(pos, true);
-						data[pos].first = k;
-						data[pos].second = _V();					
-						++elements;
-						return &(data[pos].second);
-					}else if(equal_key(pos,k)){
-						return &(data[pos].second);
-					}
-				}
+				
 				
 				size_type f = 0;
 				size_type m = std::min<size_type>(extent, pos + PROBES);
@@ -497,14 +469,7 @@ namespace rabbit{
 				if(exists_(pos)){ ///exists[pos >> BITS_LOG2_SIZE] == 0xFF || 
 					if(equal_key(pos,k))
 						return pos;
-				}
-				if(secondary_hash){
-					pos = fkey2pos(k);
-					if(exists_(pos) && equal_key(pos,k)){
-						return pos;
-					}
-				}
-
+				}				
 				size_type m = std::min<size_type>(extent, pos + PROBES);
 				++pos;
 				for(; pos < m;){
@@ -604,11 +569,7 @@ namespace rabbit{
 			return 8;
 		}
 		
-		/// Truncated Linear Backoff in Rehasing after collisions	
-		/// growth factor is calculated as a binary exponential 
-		/// backoff (yes, analogous to the one used in network congestion control)
-		/// in evidence of hash collisions the the growth factor is exponentialy 
-		/// decreased as memory becomes a scarce resource.
+		/// Truncated Linear Backoff in Rehasing after collisions			
 		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
 		double recalc_growth_factor(size_type elements)  {
 			
@@ -678,7 +639,7 @@ namespace rabbit{
 					iterator e = end();
 					size_type ctr = 0;
 					for(iterator i = begin();i != e;++i){					
-						_V* v = rehashed->unique_unerased_subscript((*i).first);						
+						_V* v = rehashed->unique_subscript((*i).first);						
 						if(v != nullptr){
 							*v = (*i).second;
 						}else{							
