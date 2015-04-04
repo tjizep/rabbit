@@ -66,7 +66,7 @@ namespace rabbit{
 		/// the vector that will contain the mapping pairs
 		typedef std::vector<_ElPair,_Allocator> _Data;
 		
-		struct hash_state{
+		struct hash_kernel{
 			/// maximum probes per bucket
 			static const _Bt PROBES = 64; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
 			
@@ -260,22 +260,22 @@ namespace rabbit{
 				resize_clear(MIN_EXTENT);
 			}
 			
-			hash_state() : mf(1.0f){
+			hash_kernel() : mf(1.0f){
 				clear();
 			}
 			
-			hash_state(const hash_state& right) : mf(1.0f) {
+			hash_kernel(const hash_kernel& right) : mf(1.0f) {
 				*this = right;
 			}
 			
-			~hash_state(){
+			~hash_kernel(){
 				
 			}
 			size_type get_extent() const {
 				return extent;
 			}
 			
-			hash_state& operator=(const hash_state& right){
+			hash_kernel& operator=(const hash_kernel& right){
 				extent = right.extent;
 				exists = right.exists;
 				erased = right.erased;
@@ -317,12 +317,17 @@ namespace rabbit{
 					
 				size_type m = std::min<size_type>(extent, pos + PROBES);				
 				++pos;				
-				for(; pos < m;++pos){
-					if(!exists_(pos)){
-						set_exists(pos, true);						
-						data[pos].first = k;						
-						++elements;
-						return &(data[pos].second);					
+				for(; pos < m;){
+					if(exists[pos>>BITS_LOG2_SIZE]==0xFF){						
+						pos += (BITS_SIZE - (pos & (BITS_SIZE-1)));
+					}else{
+						if(!exists_(pos)){
+							set_exists(pos, true);						
+							data[pos].first = k;						
+							++elements;
+							return &(data[pos].second);					
+						}
+						++pos;
 					}
 										
 				}
@@ -506,8 +511,8 @@ namespace rabbit{
 			size_type size() const {
 				return elements;
 			}
-			typedef std::shared_ptr<hash_state> ptr;
-		}; /// hash_state
+			typedef std::shared_ptr<hash_kernel> ptr;
+		}; /// hash_kernel
 		public:
 		struct iterator{
 			const unordered_map* h;
@@ -593,11 +598,11 @@ namespace rabbit{
 			size_type to = (size_type)(current->bucket_count() * recalc_growth_factor(current->elements)) + 1;			
 			rehash(to);
 		}
-		void set_current(typename hash_state::ptr c){
+		void set_current(typename hash_kernel::ptr c){
 			current = c;			
 		}
 		
-		typename hash_state::ptr current;
+		typename hash_kernel::ptr current;
 	public:
 		float load_factor() const{
 			return current->load_factor();
@@ -629,7 +634,7 @@ namespace rabbit{
 			/// can cause oom e because of recursive rehash'es
 			_Data temp;
 			
-			typename hash_state::ptr rehashed = std::make_shared<hash_state>();
+			typename hash_kernel::ptr rehashed = std::make_shared<hash_kernel>();
 			size_type extent = current->get_extent();
 			size_type new_extent = to;
 			try{
@@ -643,7 +648,7 @@ namespace rabbit{
 						if(v != nullptr){
 							*v = (*i).second;
 						}else{							
-							rehashed = std::make_shared<hash_state>();
+							rehashed = std::make_shared<hash_kernel>();
 							new_extent = (size_type)(new_extent * recalc_growth_factor(rehashed->elements)) + 1;
 							rehashed->resize_clear(new_extent);				
 							rehashed->mf = (*this).current->mf;
@@ -667,7 +672,7 @@ namespace rabbit{
 		}
 		void clear(){
 			backoff = get_max_backoff();
-			set_current(std::make_shared<hash_state>());
+			set_current(std::make_shared<hash_kernel>());
 		}
 		
 		unordered_map() {
