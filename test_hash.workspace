@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CodeLite_Workspace Name="test_hash" Database="">
-  <Project Name="rabbit" Path="test_hash.project" Active="Yes"/>
+  <Project Name="rabbit" Path="test_hash.project" Active="No"/>
+  <Project Name="cache_test" Path="cache_test/cache_test.project" Active="Yes"/>
   <BuildMatrix>
     <WorkspaceConfiguration Name="Debug" Selected="no">
       <Project Name="rabbit" ConfigName="Debug"/>
+      <Project Name="cache_test" ConfigName="Debug"/>
     </WorkspaceConfiguration>
     <WorkspaceConfiguration Name="Release" Selected="yes">
       <Project Name="rabbit" ConfigName="Release"/>
+      <Project Name="cache_test" ConfigName="Release"/>
     </WorkspaceConfiguration>
   </BuildMatrix>
 </CodeLite_Workspace>

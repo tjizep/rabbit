@@ -563,7 +563,52 @@ namespace rabbit{
 				return (h!=r.h)||(pos != r.pos);
 			}
 		};
-		typedef iterator const_iterator;
+		
+		struct const_iterator{
+			const unordered_map* h;
+			size_type pos;
+			
+			const_iterator(){
+				
+			}
+			const_iterator(const unordered_map* h, size_type pos): h(h),pos(pos){
+				
+			}
+			const_iterator(const iterator& r){
+				(*this) = r;
+			}
+			const_iterator& operator=(const iterator& r){
+				h = r.h;
+				pos = r.pos;
+				return (*this);
+			}
+			const_iterator& operator++(){
+				++pos;
+				/// todo optimize with 32-bit or 64-bit zero counting
+				while(pos < h->current->get_data_size() && (!h->current->exists_(pos) || h->current->erased_(pos))){
+					++pos;
+				}
+				
+				return (*this);
+			}
+			const_iterator operator++(int){
+				return (*this);
+			}
+			_ElPair& operator*() const {
+				return const_cast<unordered_map*>(h)->current->data[pos];
+			}
+			_ElPair* operator->() const {
+				return &(const_cast<unordered_map*>(h)->current->data[pos]);
+			}
+			
+			bool operator==(const const_iterator& r) const {
+				return h==r.h&&pos == r.pos;
+			}
+			bool operator!=(const const_iterator& r) const {
+				return (h!=r.h)||(pos != r.pos);
+			}
+		};
+		
 	protected:
 		double backoff;
 		
@@ -726,6 +771,14 @@ namespace rabbit{
 			return current->erase(k);
 		}
 		
+		bool erase(iterator i){
+			return erase((*i).first);
+		}
+		
+		bool erase(const_iterator i){
+			return erase((*i).first);
+		}
+		
 		size_type count(const _K& k) const {
 			return current->count(k);
 		}
@@ -791,6 +844,41 @@ namespace rabbit{
 				return (pos != r.pos);
 			}
 		};
+		struct const_iterator{
+			
+			typename _Container::iterator pos;
+			
+			const_iterator(){
+				
+			}
+			const_iterator(typename _Container::iterator pos): pos(pos){
+				
+			}
+			const_iterator(const const_iterator& r){
+				(*this) = r;
+			}
+			const_iterator& operator=(const const_iterator& r){
+				pos = r.pos;
+				return (*this);
+			}
+			const_iterator& operator++(){
+				++pos;								
+				return (*this);
+			}
+			const_iterator operator++(int){
+				return (*this);
+			}
+			const _K& operator*() const {
+				return (*pos).first;
+			}
+			bool operator==(const const_iterator& r) const {
+				return pos == r.pos;
+			}
+			bool operator!=(const const_iterator& r) const {
+				return (pos != r.pos);
+			}
+		};
+		
 		
 		unordered_set(){
 		}
@@ -834,6 +922,14 @@ namespace rabbit{
 			container.erase(k);
 		}
 		
+		void erase(iterator i){
+			container.erase((*i).first);
+		}
+		
+		void erase(const_iterator i){
+			container.erase((*i).first);
+		}
+		
 		size_type size() const {
 			return container.size();
 		}
@@ -850,7 +946,10 @@ namespace rabbit{
 		iterator find(const _K& k) const {
 			return container.find(k);
 		}
-
+		
+		size_type count(const _K& k) const{
+			return container.count(k);
+		}
 	}; /// unordered set
 }; // rab-bit
 
