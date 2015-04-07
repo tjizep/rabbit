@@ -577,11 +577,19 @@ namespace rabbit{
 			const_iterator(const iterator& r){
 				(*this) = r;
 			}
+
 			const_iterator& operator=(const iterator& r){
 				h = r.h;
 				pos = r.pos;
 				return (*this);
 			}
+
+			const_iterator& operator=(const const_iterator& r){
+				h = r.h;
+				pos = r.pos;
+				return (*this);
+			}
+
 			const_iterator& operator++(){
 				++pos;
 				/// todo optimize with 32-bit or 64-bit zero counting
@@ -594,10 +602,10 @@ namespace rabbit{
 			const_iterator operator++(int){
 				return (*this);
 			}
-			_ElPair& operator*() const {
+			const _ElPair& operator*() const {
 				return const_cast<unordered_map*>(h)->current->data[pos];
 			}
-			_ElPair* operator->() const {
+			const _ElPair* operator->() const {
 				return &(const_cast<unordered_map*>(h)->current->data[pos]);
 			}
 			
@@ -608,7 +616,7 @@ namespace rabbit{
 				return (h!=r.h)||(pos != r.pos);
 			}
 		};
-		
+
 	protected:
 		double backoff;
 		
@@ -844,9 +852,10 @@ namespace rabbit{
 				return (pos != r.pos);
 			}
 		};
+
 		struct const_iterator{
 			
-			typename _Container::iterator pos;
+			typename _Container::const_iterator pos;
 			
 			const_iterator(){
 				
@@ -856,6 +865,13 @@ namespace rabbit{
 			}
 			const_iterator(const const_iterator& r){
 				(*this) = r;
+			}
+			const_iterator(const iterator& r){
+				(*this) = r;
+			}
+			const_iterator& operator=(const iterator& r){
+				pos = r.pos;
+				return (*this);
 			}
 			const_iterator& operator=(const const_iterator& r){
 				pos = r.pos;
