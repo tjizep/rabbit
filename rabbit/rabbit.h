@@ -59,6 +59,7 @@ namespace rabbit{
 		static const size_type MIN_EXTENT = 64;
 		static const _Bt BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
 		static const _Bt BITS_LOG2_SIZE = 3;
+		static const _Bt ALL_BITS_SET = ~(_Bt)0;
 		static const bool secondary_hash = false;
 		/// the existence bit set type
 		typedef std::vector<_Bt,_Allocator> _Exists;
@@ -68,7 +69,7 @@ namespace rabbit{
 		
 		struct hash_kernel{
 			/// maximum probes per bucket
-			static const _Bt PROBES = 64; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
+			static const _Bt PROBES = 128; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
 			
 			/// the existence and erased bit sets are a factor of BITS_SIZE+1 less than the extent
 			_Exists exists;
@@ -318,7 +319,7 @@ namespace rabbit{
 				size_type m = std::min<size_type>(extent, pos + PROBES);				
 				++pos;				
 				for(; pos < m;){
-					if(exists[pos>>BITS_LOG2_SIZE]==0xFF){						
+					if(exists[pos>>BITS_LOG2_SIZE]==ALL_BITS_SET){						
 						pos += (BITS_SIZE - (pos & (BITS_SIZE-1)));
 					}else{
 						if(!exists_(pos)){
@@ -367,7 +368,7 @@ namespace rabbit{
 				++pos;
 				
 				for(; pos < m;){
-					if(erased[pos>>BITS_LOG2_SIZE]==0xFF){						
+					if(erased[pos>>BITS_LOG2_SIZE]==ALL_BITS_SET){						
 						pos += (BITS_SIZE - (pos & (BITS_SIZE-1)));
 					}else{
 						if(exists[pos>>BITS_LOG2_SIZE]==0 || !exists_(pos)){
@@ -471,7 +472,7 @@ namespace rabbit{
 				if(!elements) return end();
 				size_type pos = 0;
 				pos = key2pos(k);
-				if(exists_(pos)){ ///exists[pos >> BITS_LOG2_SIZE] == 0xFF || 
+				if(exists_(pos)){ ///exists[pos >> BITS_LOG2_SIZE] == ALL_BITS_SET || 
 					if(equal_key(pos,k))
 						return pos;
 				}				
@@ -634,7 +635,7 @@ namespace rabbit{
 			double growth_factor = backoff;
 			bool linear = true;
 			if(linear){
-				double d = 0.81;				
+				double d = 0.85;				
 				if(backoff - d > get_min_backoff()){
 					backoff -= d ;					
 				}								
@@ -677,10 +678,10 @@ namespace rabbit{
 			return (*this).elements == 0;
 		}
 		void reserve(size_type atleast){
-			rehash((size_type)((double)atleast*1.3));
+			rehash((size_type)((double)atleast*1.6));
 		}
 		void resize(size_type atleast){
-			rehash((size_type)((double)atleast*1.3));
+			rehash((size_type)((double)atleast*1.6));
 		}
 		void rehash(size_type to_){
 			size_type to = std::max<size_type>(to_, MIN_EXTENT);

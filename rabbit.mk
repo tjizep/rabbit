@@ -13,7 +13,7 @@ CurrentFileName        :=
 CurrentFilePath        :=
 CurrentFileFullPath    :=
 User                   :=christiaan
-Date                   :=03/23/15
+Date                   :=04/10/15
 CodeLitePath           :="C:\Program Files\CodeLite"
 LinkerName             :=C:/dev/CodeBlocks/MinGW/bin/g++.exe 
 SharedObjectLinkerName :=C:/dev/CodeBlocks/MinGW/bin/g++.exe -shared -fPIC
@@ -38,11 +38,11 @@ MakeDirCommand         :=makedir
 RcCmpOptions           := 
 RcCompilerName         :=C:/dev/CodeBlocks/MinGW/bin/windres.exe 
 LinkOptions            :=  
-IncludePath            :=  $(IncludeSwitch). $(IncludeSwitch). 
+IncludePath            :=  $(IncludeSwitch). $(IncludeSwitch). $(IncludeSwitch)C:/dev/cpp_all/repo/sparsehash-2.0.2/src/windows $(IncludeSwitch)C:/dev/cpp_all/repo/sparsehash-2.0.2/src 
 IncludePCH             := 
 RcIncludePath          := 
-Libs                   := 
-ArLibs                 :=  
+Libs                   := $(LibrarySwitch)psapi 
+ArLibs                 :=  "psapi" 
 LibPath                := $(LibraryPathSwitch). 
 
 ##
@@ -62,7 +62,7 @@ AS       := C:/dev/CodeBlocks/MinGW/bin/as.exe
 ## User defined environment variables
 ##
 CodeLiteDir:=C:\Program Files\CodeLite
-Objects0=$(IntermediateDirectory)/tests_main.cpp$(ObjectSuffix) 
+Objects0=$(IntermediateDirectory)/tests_main.cpp$(ObjectSuffix) $(IntermediateDirectory)/time_hash_maps.cpp$(ObjectSuffix) 
 
 
 
@@ -96,6 +96,14 @@ $(IntermediateDirectory)/tests_main.cpp$(DependSuffix): tests/main.cpp
 
 $(IntermediateDirectory)/tests_main.cpp$(PreprocessSuffix): tests/main.cpp
 	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/tests_main.cpp$(PreprocessSuffix) "tests/main.cpp"
+
+$(IntermediateDirectory)/time_hash_maps.cpp$(ObjectSuffix): time_hash_maps.cpp $(IntermediateDirectory)/time_hash_maps.cpp$(DependSuffix)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "C:/dev/cpp_all/rabbit/time_hash_maps.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/time_hash_maps.cpp$(ObjectSuffix) $(IncludePath)
+$(IntermediateDirectory)/time_hash_maps.cpp$(DependSuffix): time_hash_maps.cpp
+	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/time_hash_maps.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/time_hash_maps.cpp$(DependSuffix) -MM "time_hash_maps.cpp"
+
+$(IntermediateDirectory)/time_hash_maps.cpp$(PreprocessSuffix): time_hash_maps.cpp
+	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/time_hash_maps.cpp$(PreprocessSuffix) "time_hash_maps.cpp"
 
 
 -include $(IntermediateDirectory)/*$(DependSuffix)

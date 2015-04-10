@@ -53,7 +53,9 @@
 //    binaries.
 //
 // See PERFORMANCE for the output of one example run.
+#include <functional>
 #include <rabbit/unordered_map>
+#include <unordered_map>
 #include <sparsehash/internal/sparseconfig.h>
 #include <config.h>
 #ifdef HAVE_INTTYPES_H
@@ -133,7 +135,7 @@ static bool FLAGS_test_256_bytes = false;
 #if defined(HAVE_UNORDERED_MAP)
 using HASH_NAMESPACE::unordered_map;
 #elif defined(HAVE_HASH_MAP) || defined(_MSC_VER)
-using HASH_NAMESPACE::hash_map;
+using HASH_NAMESPACE::unordered_map;
 #endif
 
 static const int kDefaultIters = 10000000;
@@ -178,26 +180,33 @@ class EasyUseDenseHashMap<K*, V, H> : public dense_hash_map<K*,V,H> {
   }
 };
 
+
+template<typename K, typename V, typename H>
+class EasyUseHashMap : public rabbit::unordered_map<K,V,H> {
+public:  
+};
+
 #if defined(HAVE_UNORDERED_MAP)
 template<typename K, typename V, typename H>
-class EasyUseHashMap : public unordered_map<K,V,H> {
+class EasyUseStdHashMap : public std::unordered_map<K,V,H> {
  public:
   // resize() is called rehash() in tr1
   void resize(size_t r) { this->rehash(r); }
 };
 #elif defined(_MSC_VER)
 template<typename K, typename V, typename H>
-class EasyUseHashMap : public rabbit::unordered_map<K,V,H> {
+class EasyUseStdHashMap : public std::unordered_map<K,V,H> {
  public:
-  
+
 };
 #elif defined(HAVE_HASH_MAP)
 template<typename K, typename V, typename H>
-class EasyUseHashMap : public hash_map<K,V,H> {
+class EasyUseStdHashMap : public std::unordered_map<K,V,H> {
  public:
   // Don't need to do anything: hash_map is already easy to use!
 };
 #endif
+
 
 template<typename K, typename V>
 class EasyUseMap : public map<K,V> {
@@ -352,7 +361,7 @@ class Rusage {
 #if defined HAVE_SYS_RESOURCE_H
   struct rusage start;
 #elif defined HAVE_WINDOWS_H
-  long long int start;
+  std::chrono::steady_clock::time_point start;
 #else
   time_t start_time_t;
 #endif
@@ -362,7 +371,8 @@ inline void Rusage::Reset() {
 #if defined HAVE_SYS_RESOURCE_H
   getrusage(RUSAGE_SELF, &start);
 #elif defined HAVE_WINDOWS_H
-  start = GetTickCount();
+	//std::chrono::steady_clock::time_point start_chrono = std::chrono::steady_clock::now();
+	start =std::chrono::steady_clock::now();
 #else
   time(&start_time_t);
 #endif
@@ -380,7 +390,9 @@ inline double Rusage::UserTime() {
 
   return double(result.tv_sec) + double(result.tv_usec) / 1000000.0;
 #elif defined HAVE_WINDOWS_H
-  return double(GetTickCount() - start) / 1000.0;
+	std::chrono::steady_clock::time_point end_chrono = std::chrono::steady_clock::now();
+
+  return double(std::chrono::duration_cast<std::chrono::milliseconds>(end_chrono - start).count()) / 1000.0;
 #else
   time_t now;
   time(&now);
@@ -430,13 +442,13 @@ static size_t CurrentMemoryUsage() {
 }
 
 #else  /* not HAVE_GOOGLE_MALLOC_EXTENSION_H */
-#ifdef _MSC_VER
+#if defined HAVE_WINDOWS_H
 #define _CRT_SECURE_NO_WARNINGS
 #include <Windows.h>
 #include <Psapi.h>
 #endif
-static size_t CurrentMemoryUsage() { 
-#ifdef _MSC_VER	
+static size_t CurrentMemoryUsage() {
+#if defined HAVE_WINDOWS_H
 	PROCESS_MEMORY_COUNTERS memCounter;
 	bool result = (GetProcessMemoryInfo(GetCurrentProcess(),
                                    &memCounter,
@@ -445,7 +457,7 @@ static size_t CurrentMemoryUsage() {
 		return memCounter.WorkingSetSize;
 	}
 #endif
-	return 0; 
+	return 0;
 }
 
 #endif
@@ -747,7 +759,7 @@ static void test_all_maps(int obj_size, int iters) {
 int google_times(int iters) {
 
   if(!iters) iters = kDefaultIters;
-  
+
   stamp_run(iters);
 
 #ifndef HAVE_SYS_RESOURCE_H

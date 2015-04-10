@@ -1,0 +1,116 @@
+# depslib dependency file v1.0
+1428688331 source:c:\dev\cpp_all\rabbit\rabbit_tests\main.cpp
+	<stdlib.h>
+	<stdio.h>
+	<random>
+	<algorithm>
+	<unordered_map>
+	<map>
+	<string>
+	<sstream>
+	<functional>
+	<sparsehash/internal/sparseconfig.h>
+	<rabbit/unordered_map>
+	<sparsehash/type_traits.h>
+	<sparsehash/dense_hash_map>
+	<sparsehash/sparse_hash_map>
+	<rabbit/unordered_map>
+	<Windows.h>
+	<Psapi.h>
+
+1428685413 c:\dev\cpp_all\repo\sparsehash-2.0.2\src\windows\sparsehash\internal\sparseconfig.h
+
+1425932106 c:\dev\cpp_all\rabbit\rabbit\unordered_map
+	<rabbit/rabbit.h>
+
+1428419119 c:\dev\cpp_all\rabbit\rabbit\rabbit.h
+	<stdio.h>
+	<stdlib.h>
+	<iostream>
+	<vector>
+	<chrono>
+	<memory>
+
+1329936582 c:\dev\cpp_all\repo\sparsehash-2.0.2\src\sparsehash\type_traits.h
+	<sparsehash/internal/sparseconfig.h>
+	<utility>
+	<sparsehash/template_util.h>
+
+1329936582 c:\dev\cpp_all\repo\sparsehash-2.0.2\src\sparsehash\template_util.h
+	<sparsehash/internal/sparseconfig.h>
+
+1329936582 c:\dev\cpp_all\repo\sparsehash-2.0.2\src\sparsehash\dense_hash_map
+	<sparsehash/internal/sparseconfig.h>
+	<algorithm>
+	<functional>
+	<memory>
+	<utility>
+	<sparsehash/internal/densehashtable.h>
+	<sparsehash/internal/libc_allocator_with_realloc.h>
+
+1329936582 c:\dev\cpp_all\repo\sparsehash-2.0.2\src\sparsehash\internal\densehashtable.h
+	<sparsehash/internal/sparseconfig.h>
+	<assert.h>
+	<stdio.h>
+	<algorithm>
+	<iterator>
+	<limits>
+	<memory>
+	<utility>
+	<sparsehash/internal/hashtable-common.h>
+	<sparsehash/internal/libc_allocator_with_realloc.h>
+	<sparsehash/type_traits.h>
+	<stdexcept>
+
+1329936582 c:\dev\cpp_all\repo\sparsehash-2.0.2\src\sparsehash\internal\hashtable-common.h
+	<sparsehash/internal/sparseconfig.h>
+	<assert.h>
+	<stdio.h>
+	<stddef.h>
+	<iosfwd>
+	<stdexcept>
+
+1329936582 c:\dev\cpp_all\repo\sparsehash-2.0.2\src\sparsehash\internal\libc_allocator_with_realloc.h
+	<sparsehash/internal/sparseconfig.h>
+	<stdlib.h>
+	<stddef.h>
+	<new>
+
+1329936582 c:\dev\cpp_all\repo\sparsehash-2.0.2\src\sparsehash\sparse_hash_map
+	<sparsehash/internal/sparseconfig.h>
+	<algorithm>
+	<functional>
+	<memory>
+	<utility>
+	<sparsehash/internal/libc_allocator_with_realloc.h>
+	<sparsehash/internal/sparsehashtable.h>
+
+1329936582 c:\dev\cpp_all\repo\sparsehash-2.0.2\src\sparsehash\internal\sparsehashtable.h
+	<sparsehash/internal/sparseconfig.h>
+	<assert.h>
+	<algorithm>
+	<iterator>
+	<limits>
+	<utility>
+	<sparsehash/type_traits.h>
+	<sparsehash/internal/hashtable-common.h>
+	<sparsehash/sparsetable>
+	<stdexcept>
+
+1329936582 c:\dev\cpp_all\repo\sparsehash-2.0.2\src\sparsehash\sparsetable
+	<sparsehash/internal/sparseconfig.h>
+	<stdlib.h>
+	<stdio.h>
+	<string.h>
+	<stdint.h>
+	<sys/types.h>
+	<inttypes.h>
+	<assert.h>
+	<iterator>
+	<algorithm>
+	<memory>
+	<vector>
+	<sparsehash/type_traits.h>
+	<sparsehash/internal/hashtable-common.h>
+	<sparsehash/internal/libc_allocator_with_realloc.h>
+

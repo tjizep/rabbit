@@ -6,9 +6,15 @@
 #include <map>
 #include <string>
 #include <sstream>
-#ifdef _MSC_VER
+
 #define _HAS_GOOGLE_HASH_
+#ifdef _MSC_VER
 #endif
+#include <functional>
+#include <sparsehash/internal/sparseconfig.h>
+
+#include <rabbit/unordered_map>
+
 #define _HAS_STD_HASH_
 #ifdef _HAS_GOOGLE_HASH_
 #include <sparsehash/type_traits.h>
@@ -16,7 +22,7 @@
 #include <sparsehash/sparse_hash_map>
 #endif
 #include <rabbit/unordered_map>
-#ifdef _MSC_VER
+#ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
 #include <Windows.h>
 #include <Psapi.h>
@@ -31,6 +37,7 @@ double get_proc_mem_use(const double MB = 1024.0*1024.0){
 	}
 	return 0.0;
 }
+
 #else
 double get_proc_mem_use(const double MB = 1024.0*1024.0){
 	return 0.0;
@@ -298,7 +305,7 @@ void test_sparse_hash(size_t ts){
 	printf("google sparse hash test\n");
 	typedef ::google::sparse_hash_map<T,long> _Map;
 	_Map h;
-	tester<_Map>::_Script script;
+	typename tester<_Map>::_Script script;
 	tester<_Map> t;
 	t.gen_random_narrow(ts, script);
 	t.bench_hash_simple(h,script);	
@@ -344,7 +351,7 @@ void test_std_hash(size_t ts){
 	t.bench_hash(h,script);
 #endif
 }
-#ifdef _MSC_VER
+
 extern int google_times(int iters);
 //extern int unique_running_insertion();
 //extern int unique_scattered_lookup();
@@ -352,13 +359,9 @@ void more_tests(){
 	//unique_scattered_lookup();
 	//unique_running_insertion();
 }
-#else
- void more_tests(){
- }
-#endif
 int main(int argc, char **argv)
 {
-	::Sleep(1000);
+	///::Sleep(1000);
 	int ts = 10000000;
 	
 	if(false){
