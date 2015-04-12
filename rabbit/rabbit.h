@@ -39,28 +39,77 @@ THE SOFTWARE.
 #define RABBIT_NOINLINE_
 #endif
 namespace rabbit{
-
+	
 	template <typename _K, typename _V, typename _H = std::hash<_K>, typename _E = std::equal_to<_K>, typename _Allocator = std::allocator<_K> >
-	class unordered_map{
+	class unordered_map {
 	public:
 		typedef _K key_type;
 		
 		typedef _V mapped_type;
 
-		typedef unsigned char _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
-		
-		typedef unsigned int size_type;
-
 		typedef std::pair<_K,_V> _ElPair;
 		typedef _ElPair value_type;
-
+		typedef unsigned char _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
+		typedef unsigned int size_type;
+		
 	protected:
-		static const _Bt CHAR_BITS = 8;		
-		static const size_type MIN_EXTENT = 64;
-		static const _Bt BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
-		static const _Bt BITS_LOG2_SIZE = 3;
-		static const _Bt ALL_BITS_SET = ~(_Bt)0;
-		static const bool secondary_hash = false;
+		struct rabbit_config{
+			
+			size_type log2(size_type n){
+				
+				size_type r = 0; 
+
+				while (n >>= 1) 
+				{
+				  r++;
+				}
+				return r;
+			}
+			
+			_Bt CHAR_BITS ;		
+			
+			_Bt BITS_SIZE ;
+			_Bt BITS_LOG2_SIZE;
+			_Bt ALL_BITS_SET ;
+			/// maximum probes per bucket
+			_Bt PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
+			/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
+			///	hash randomizer available 
+			size_type PRIMARY_BITS ;
+			size_type MIN_EXTENT;
+			size_type MIN_OVERFLOW ; 
+			
+			rabbit_config(const rabbit_config& right){
+				*this = right;
+			}
+			
+			rabbit_config& operator=(const rabbit_config& right){
+				CHAR_BITS = right.CHAR_BITS;						
+				BITS_SIZE = right.BITS_SIZE;
+				BITS_LOG2_SIZE = right.BITS_LOG2_SIZE;
+				ALL_BITS_SET = right.ALL_BITS_SET;
+				PROBES = right.PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
+				
+				PRIMARY_BITS = right.PRIMARY_BITS;
+				MIN_EXTENT = right.MIN_EXTENT;
+				MIN_OVERFLOW = right.MIN_OVERFLOW; 
+			}
+			
+			rabbit_config(){
+				CHAR_BITS = 8;						
+				BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
+				BITS_LOG2_SIZE = log2(BITS_SIZE);
+				ALL_BITS_SET = ~(_Bt)0;
+				PROBES = 32; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
+				
+				PRIMARY_BITS = 4;
+				MIN_EXTENT = 64;
+				MIN_OVERFLOW = 64; 
+			}
+		};
+		/// use fast modulo
+		static const bool fast_mod = true;
+
 		/// the existence bit set type
 		typedef std::vector<_Bt,_Allocator> _Exists;
 		
@@ -68,17 +117,18 @@ namespace rabbit{
 		typedef std::vector<_ElPair,_Allocator> _Data;
 		
 		struct hash_kernel{
-			/// maximum probes per bucket
-			static const _Bt PROBES = 128; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
+			rabbit_config config;
+			
 			
 			/// the existence and erased bit sets are a factor of BITS_SIZE+1 less than the extent
 			_Exists exists;
 			_Exists erased;
-			const _Bt* _exists;
+			
 			/// data being used
 			_Data data;
 			size_type extent;
 			size_type extent2;
+			size_type extent1;
 
 			size_type elements;
 			size_type overflow;
@@ -105,7 +155,7 @@ namespace rabbit{
 			/// mainly to satisfy stl conventions
 			size_type bucket_size ( size_type n ) const{
 				size_type pos = n;
-				size_type m = std::min<size_type>(extent, pos + PROBES);
+				size_type m = std::min<size_type>(extent, pos + config.PROBES);
 				size_type r = 0;				
 				for(; pos < m;++pos){
 					if(!exists_(pos)){				
@@ -113,8 +163,7 @@ namespace rabbit{
 						++r;						
 					}					
 				}
-				return r;
-				
+				return r;				
 			}
 
 			float max_load_factor() const {
@@ -129,18 +178,13 @@ namespace rabbit{
 				size_type r = 0;
 				size_type h = (size_type)hf(k);
 				
-				r = h % extent;
+				
+				h += (h >> (size_type)config.PRIMARY_BITS); 
+				r = h & extent1;
 				
 				return r;
 			}
-			/// secondary hash might be used instead of overflow vbucket
-			size_type fkey2pos(const _K& k) const {
-				size_type r = 0;
-				size_type h = (size_type)hf(k);
-				
-				r = h & (extent2-1);
-				return r;
-			}
+			
 			/// total data size, never less than than size()
 			size_type get_data_size() const {
 				return extent+overflow;
@@ -148,14 +192,14 @@ namespace rabbit{
 
 			/// sets a bit in a bucket vector of type _Bt
 			void set_bucket_bit(_Exists & bits, size_type pos, bool f){
-				size_type bucket = pos / BITS_SIZE;
+				size_type bucket = pos / config.BITS_SIZE;
 #ifdef _MSC_VER
 #pragma warning(disable:4804)
 #endif				
 				/// lifted directly from Bit Twiddling Hacks
 				/// https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetTable
 				/// TODO: table wont go over 1<<32
-				_Bt m = ((_Bt)pos) % BITS_SIZE; 
+				_Bt m = ((_Bt)pos) & (config.BITS_SIZE-1); /// because its power of 2
 				m = (_Bt)1ul << m;// the bit mask
 				_Bt& w = bits[bucket]; // the word to modify:  
 				/// the branching way 		
@@ -189,7 +233,7 @@ namespace rabbit{
 				
 				v = (v & (IntT)~(IntT)0/15*3) + ((v >> 2) & (IntT)~(IntT)0/15*3);     	// temp
 				v = (v + (v >> 4)) & (IntT)~(IntT)0/255*15;                      		// temp MIN 8 BITS
-				c = (IntT)(v * ((IntT)~(IntT)0/255)) >> (sizeof(IntT) - 1) * CHAR_BITS; // count
+				c = (IntT)(v * ((IntT)~(IntT)0/255)) >> (sizeof(IntT) - 1) * config.CHAR_BITS; // count
 				return c;
 			}
 			/// count on bits in the given bucket
@@ -198,8 +242,8 @@ namespace rabbit{
 				return count_bits<_Bt>(exists[b]);
 			}
 			inline bool is_bit(const _Exists& bits, size_type pos) const {				
-				_Bt bit = (_Bt)(pos & (BITS_SIZE-1));
-				_Bt v = bits[(pos >> BITS_LOG2_SIZE)];
+				_Bt bit = (_Bt)(pos & (config.BITS_SIZE-1));
+				_Bt v = bits[(pos >> config.BITS_LOG2_SIZE)];
 				_Bt r = ((v >> bit) & (_Bt)1ul);
 				return r != 0;
 			}
@@ -211,38 +255,23 @@ namespace rabbit{
 			inline bool erased_(size_type pos) const {
 				if(!removed) return false;
 				/// works because the likelyhood of a lot of erased elements are low
-				return erased[pos >> BITS_LOG2_SIZE] && 
+				return erased[pos >> config.BITS_LOG2_SIZE] && 
 					is_bit(erased, pos);
 			}
-			size_type log2(size_type n){
-				
-				size_type r = 0; 
-
-				while (n >>= 1) 
-				{
-				  r++;
-				}
-				return r;
-			}
+			
 			/// clears all data and resize the new data vector to the parameter
 			void resize_clear(size_type new_extent){
 				/// inverse of factor used to determine overflow list
 				/// when overflow list is full rehash starts
-				const size_type MIN_OVERFLOW = 64; 
-				extent = new_extent; ///1<<log2(new_extent);
-
-				/// extent for currently unused secondary hash
-				/// secondary hashes causes cash misses so
-				/// the extent should be fairly small
-				extent2 = 1<<log2(new_extent);
-				while(extent < extent2){
-					extent2 >>= 1;
-				}
+				
+				extent = 1<<config.log2(new_extent);				
+				extent2 = config.log2(new_extent);				
+				extent1 = extent-1;
 				mf = 1.0;
-				overflow = std::min<size_type>(extent/1024,MIN_OVERFLOW);
+				overflow = std::min<size_type>(extent/1024,config.MIN_OVERFLOW);
 				elements = 0;
 				removed = 0;
-				size_type esize = (get_data_size()/BITS_SIZE)+1;
+				size_type esize = (get_data_size()/config.BITS_SIZE)+1;
 				
 				exists.clear();
 				erased.clear();
@@ -250,7 +279,7 @@ namespace rabbit{
 				
 				erased.resize(esize);
 				exists.resize(esize);
-				_exists = &exists[0];
+				
 				data.resize(get_data_size());
 				min_element = get_data_size();
 				buckets = 0;
@@ -258,7 +287,7 @@ namespace rabbit{
 			};
 		
 			void clear(){				
-				resize_clear(MIN_EXTENT);
+				resize_clear(config.MIN_EXTENT);
 			}
 			
 			hash_kernel() : mf(1.0f){
@@ -282,8 +311,7 @@ namespace rabbit{
 				erased = right.erased;
 				buckets = right.buckets;
 				removed = right.removed;
-				mf = right.mf;
-				_exists = &exists[0];
+				mf = right.mf;				
 				data = right.data;
 				min_element = right.min_element ;
 				elements = right.elements;				
@@ -306,21 +334,22 @@ namespace rabbit{
 
 				size_type pos = 0;
 				size_type epos = 0;
+				
 				/// eventualy an out of memory (bad_allocation) exception will occur
 				pos = key2pos(k);
 				epos = pos;
-				if(exists[pos>>BITS_LOG2_SIZE]==0 || !exists_(pos)){
+				if(exists[(pos>>config.BITS_LOG2_SIZE)]==0 || !exists_(pos)){
 					set_exists(pos, true);
 					data[pos].first = k;					
 					++elements;
 					return &(data[pos].second);
 				}
 					
-				size_type m = std::min<size_type>(extent, pos + PROBES);				
+				size_type m = std::min<size_type>(extent, pos + config.PROBES);				
 				++pos;				
 				for(; pos < m;){
-					if(exists[pos>>BITS_LOG2_SIZE]==ALL_BITS_SET){						
-						pos += (BITS_SIZE - (pos & (BITS_SIZE-1)));
+					if(exists[(pos>>config.BITS_LOG2_SIZE)]==config.ALL_BITS_SET){						
+						pos += (config.BITS_SIZE - (pos & (config.BITS_SIZE-1)));
 					}else{
 						if(!exists_(pos)){
 							set_exists(pos, true);						
@@ -351,7 +380,7 @@ namespace rabbit{
 				/// eventualy an out of memory (bad_allocation) exception will occur
 				pos = key2pos(k);
 				epos = pos;
-				if(exists[pos>>BITS_LOG2_SIZE]==0 || !exists_(pos)){
+				if(exists[(pos>>config.BITS_LOG2_SIZE)]==0 || !exists_(pos)){
 					set_exists(pos, true);
 					data[pos].first = k;
 					data[pos].second = _V();					
@@ -363,15 +392,15 @@ namespace rabbit{
 				
 				
 				size_type f = 0;
-				size_type m = std::min<size_type>(extent, pos + PROBES);
+				size_type m = std::min<size_type>(extent, pos + config.PROBES);
 				
 				++pos;
 				
 				for(; pos < m;){
-					if(erased[pos>>BITS_LOG2_SIZE]==ALL_BITS_SET){						
-						pos += (BITS_SIZE - (pos & (BITS_SIZE-1)));
+					if(erased[pos>>config.BITS_LOG2_SIZE]==config.ALL_BITS_SET){						
+						pos += (config.BITS_SIZE - (pos & (config.BITS_SIZE-1)));
 					}else{
-						if(exists[pos>>BITS_LOG2_SIZE]==0 || !exists_(pos)){
+						if(exists[pos>>config.BITS_LOG2_SIZE]==0 || !exists_(pos)){
 							set_exists(pos, true);
 							set_erased(pos, false);
 							data[pos].first = k;
@@ -449,7 +478,7 @@ namespace rabbit{
 			}
 			/// not used (could be used where hash table must actually shrink too)
 			bool is_small() const {
-				return (extent > (MIN_EXTENT << 3)) && (elements < extent/8);
+				return (extent > (config.MIN_EXTENT << 3)) && (elements < extent/8);
 			}
 
 			size_type count(const _K& k) const {
@@ -476,11 +505,11 @@ namespace rabbit{
 					if(equal_key(pos,k))
 						return pos;
 				}				
-				size_type m = std::min<size_type>(extent, pos + PROBES);
+				size_type m = std::min<size_type>(extent, pos + config.PROBES);
 				++pos;
 				for(; pos < m;){
-					if(exists[pos >> BITS_LOG2_SIZE] == 0){
-						pos += (BITS_SIZE - (pos & (BITS_SIZE-1)));
+					if(exists[pos >> config.BITS_LOG2_SIZE] == 0){
+						pos += (config.BITS_SIZE - (pos & (config.BITS_SIZE-1)));
 					}else if(exists_(pos) && equal_key(pos,k)){
 						return pos;
 					}else{
@@ -635,7 +664,7 @@ namespace rabbit{
 			double growth_factor = backoff;
 			bool linear = true;
 			if(linear){
-				double d = 0.85;				
+				double d = 0.81;				
 				if(backoff - d > get_min_backoff()){
 					backoff -= d ;					
 				}								
@@ -678,14 +707,18 @@ namespace rabbit{
 			return (*this).elements == 0;
 		}
 		void reserve(size_type atleast){
-			rehash((size_type)((double)atleast*1.6));
+			backoff = 2.1;
+			rehash((size_type)((double)atleast*2));
 		}
 		void resize(size_type atleast){
-			rehash((size_type)((double)atleast*1.6));
+			backoff = 2.1;
+			rehash((size_type)((double)atleast*2));
 		}
 		void rehash(size_type to_){
-			size_type to = std::max<size_type>(to_, MIN_EXTENT);
+			rabbit_config config;
+			size_type to = std::max<size_type>(to_, config.MIN_EXTENT);
 			/// can cause oom e because of recursive rehash'es
+			
 			_Data temp;
 			
 			typename hash_kernel::ptr rehashed = std::make_shared<hash_kernel>();
@@ -694,31 +727,42 @@ namespace rabbit{
 			try{
 				rehashed->resize_clear(new_extent);						
 				rehashed->mf = (*this).current->mf;
+				using namespace std;
 				while(true){
 					iterator e = end();
 					size_type ctr = 0;
-					for(iterator i = begin();i != e;++i){					
-						_V* v = rehashed->unique_subscript((*i).first);						
+					for(iterator i = begin();i != e;++i){						
+						_V* v = rehashed->unique_subscript((*i).first);	
 						if(v != nullptr){
 							*v = (*i).second;
+							/// a cheap check to illuminate subtle bugs during development
+							if(++ctr != rehashed->elements){
+								cout << "iterations " << ctr << " elements " << rehashed->elements << " extent " << rehashed->extent << endl;
+								cout << "inside rehash " << rehashed->extent << endl;
+								cout << "new " << rehashed->elements << " current size:"  << current->elements << endl;		
+								throw bad_alloc();
+							}
 						}else{							
-							rehashed = std::make_shared<hash_kernel>();
+							
+							rehashed = make_shared<hash_kernel>();
 							new_extent = (size_type)(new_extent * recalc_growth_factor(rehashed->elements)) + 1;
 							rehashed->resize_clear(new_extent);				
 							rehashed->mf = (*this).current->mf;
 							break;
-						}												
+						}																		
 					}
 					if(rehashed->elements == current->elements){
 						break;						
-					}else{
+					}else{						
 						rehashed->resize_clear(rehashed->extent);		
 					}
 					
 				}
 				
 			}catch(std::bad_alloc &e){
-				///printf("rehash failed in temp phase\n");
+				std::cout << "rehash failed in temp phase :" << new_extent << std::endl;
+				size_t t = 0;
+				std::cin >> t;
 				throw e;
 			}			
 			set_current(rehashed);	

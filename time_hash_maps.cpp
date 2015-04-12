@@ -392,7 +392,7 @@ inline double Rusage::UserTime() {
 #elif defined HAVE_WINDOWS_H
 	std::chrono::steady_clock::time_point end_chrono = std::chrono::steady_clock::now();
 
-  return double(std::chrono::duration_cast<std::chrono::milliseconds>(end_chrono - start).count()) / 1000.0;
+  return double(std::chrono::duration_cast<std::chrono::microseconds>(end_chrono - start).count()) / 1000000.0;
 #else
   time_t now;
   time(&now);

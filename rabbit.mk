@@ -13,7 +13,7 @@ CurrentFileName        :=
 CurrentFilePath        :=
 CurrentFileFullPath    :=
 User                   :=christiaan
-Date                   :=04/10/15
+Date                   :=04/12/15
 CodeLitePath           :="C:\Program Files\CodeLite"
 LinkerName             :=C:/dev/CodeBlocks/MinGW/bin/g++.exe 
 SharedObjectLinkerName :=C:/dev/CodeBlocks/MinGW/bin/g++.exe -shared -fPIC
@@ -52,7 +52,7 @@ LibPath                := $(LibraryPathSwitch).
 AR       := C:/dev/CodeBlocks/MinGW/bin/ar.exe rcu
 CXX      := C:/dev/CodeBlocks/MinGW/bin/g++.exe 
 CC       := C:/dev/CodeBlocks/MinGW/bin/gcc.exe 
-CXXFLAGS :=  -O -O3 -fexpensive-optimizations -std=c++11 -Wall $(Preprocessors)
+CXXFLAGS :=  -O2 -std=c++11 -Wall $(Preprocessors)
 CFLAGS   :=  -O2 -Wall $(Preprocessors)
 ASFLAGS  := 
 AS       := C:/dev/CodeBlocks/MinGW/bin/as.exe 
