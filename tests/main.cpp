@@ -291,8 +291,8 @@ void test_dense_hash_long(size_t ts){
 	printf("google dense hash test\n");
 	typedef ::google::dense_hash_map<long,long> _Map;
 	_Map h;
-	h.set_deleted_key(0l);
-	h.set_empty_key(1l);
+	h.set_deleted_key(-1l);
+	h.set_empty_key(-2l);
 	tester<_Map>::_Script script;
 	tester<_Map> t;
 	t.gen_random_narrow(ts, script);
@@ -375,7 +375,7 @@ int main(int argc, char **argv)
 
 	
 		test_rabbit_hash<_K>(ts);
-		//test_rabbit_hash_erase<_K>(ts/10);
+		test_rabbit_hash_erase<_K>(ts/10);
 	}else{
 		google_times(ts);
 	}

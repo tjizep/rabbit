@@ -50,7 +50,7 @@ namespace rabbit{
 		typedef std::pair<_K,_V> _ElPair;
 		typedef _ElPair value_type;
 		typedef unsigned char _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
-		typedef unsigned int size_type;
+		typedef unsigned long size_type;
 		
 	protected:
 		struct rabbit_config{
@@ -66,13 +66,13 @@ namespace rabbit{
 				return r;
 			}
 			
-			_Bt CHAR_BITS ;		
-			
+			_Bt CHAR_BITS ;					
 			_Bt BITS_SIZE ;
-			_Bt BITS_LOG2_SIZE;
+			_Bt BITS_SIZE1 ;			
 			_Bt ALL_BITS_SET ;
 			/// maximum probes per bucket
 			_Bt PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
+			size_type BITS_LOG2_SIZE;
 			/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
 			///	hash randomizer available 
 			size_type PRIMARY_BITS ;
@@ -86,6 +86,7 @@ namespace rabbit{
 			rabbit_config& operator=(const rabbit_config& right){
 				CHAR_BITS = right.CHAR_BITS;						
 				BITS_SIZE = right.BITS_SIZE;
+				BITS_SIZE1 = right.BITS_SIZE1;
 				BITS_LOG2_SIZE = right.BITS_LOG2_SIZE;
 				ALL_BITS_SET = right.ALL_BITS_SET;
 				PROBES = right.PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
@@ -98,13 +99,14 @@ namespace rabbit{
 			rabbit_config(){
 				CHAR_BITS = 8;						
 				BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
+				BITS_SIZE1 = BITS_SIZE-1;
 				BITS_LOG2_SIZE = log2(BITS_SIZE);
 				ALL_BITS_SET = ~(_Bt)0;
-				PROBES = 32; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
+				PROBES = 64; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
 				
-				PRIMARY_BITS = 4;
-				MIN_EXTENT = 64;
-				MIN_OVERFLOW = 64; 
+				PRIMARY_BITS = 8;
+				MIN_EXTENT = 32;
+				MIN_OVERFLOW = 128; 
 			}
 		};
 		/// use fast modulo
@@ -115,8 +117,10 @@ namespace rabbit{
 		
 		/// the vector that will contain the mapping pairs
 		typedef std::vector<_ElPair,_Allocator> _Data;
+		typedef std::vector<_K,_Allocator> _Keys;
 		
 		struct hash_kernel{
+			/// settings configuration
 			rabbit_config config;
 			
 			
@@ -125,6 +129,7 @@ namespace rabbit{
 			_Exists erased;
 			
 			/// data being used
+			_Keys keys;
 			_Data data;
 			size_type extent;
 			size_type extent2;
@@ -159,7 +164,7 @@ namespace rabbit{
 				size_type r = 0;				
 				for(; pos < m;++pos){
 					if(!exists_(pos)){				
-					}else if(key2pos(data[pos].first) == n){
+					}else if(key2pos(keys[pos]) == n){
 						++r;						
 					}					
 				}
@@ -174,15 +179,11 @@ namespace rabbit{
 				mf = z;
 			}
 			
-			size_type key2pos(const _K& k) const {
-				size_type r = 0;
-				size_type h = (size_type)hf(k);
+			inline size_type key2pos(const _K& k) const {
 				
+				size_type h = (size_type)_H()(k);
 				
-				h += (h >> (size_type)config.PRIMARY_BITS); 
-				r = h & extent1;
-				
-				return r;
+				return (h + (h >> config.PRIMARY_BITS)) & extent1;///
 			}
 			
 			/// total data size, never less than than size()
@@ -192,14 +193,14 @@ namespace rabbit{
 
 			/// sets a bit in a bucket vector of type _Bt
 			void set_bucket_bit(_Exists & bits, size_type pos, bool f){
-				size_type bucket = pos / config.BITS_SIZE;
+				size_type bucket = (pos >> config.BITS_LOG2_SIZE);
 #ifdef _MSC_VER
 #pragma warning(disable:4804)
 #endif				
 				/// lifted directly from Bit Twiddling Hacks
 				/// https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetTable
 				/// TODO: table wont go over 1<<32
-				_Bt m = ((_Bt)pos) & (config.BITS_SIZE-1); /// because its power of 2
+				_Bt m = ((_Bt)pos) & (config.BITS_SIZE1); /// because its power of 2
 				m = (_Bt)1ul << m;// the bit mask
 				_Bt& w = bits[bucket]; // the word to modify:  
 				/// the branching way 		
@@ -242,7 +243,7 @@ namespace rabbit{
 				return count_bits<_Bt>(exists[b]);
 			}
 			inline bool is_bit(const _Exists& bits, size_type pos) const {				
-				_Bt bit = (_Bt)(pos & (config.BITS_SIZE-1));
+				_Bt bit = (_Bt)(pos & (config.BITS_SIZE1));
 				_Bt v = bits[(pos >> config.BITS_LOG2_SIZE)];
 				_Bt r = ((v >> bit) & (_Bt)1ul);
 				return r != 0;
@@ -264,9 +265,10 @@ namespace rabbit{
 				/// inverse of factor used to determine overflow list
 				/// when overflow list is full rehash starts
 				
-				extent = 1<<config.log2(new_extent);				
+				extent = (size_type)1<<config.log2(new_extent);				
 				extent2 = config.log2(new_extent);				
 				extent1 = extent-1;
+				config.PRIMARY_BITS = extent2;
 				mf = 1.0;
 				overflow = std::min<size_type>(extent/1024,config.MIN_OVERFLOW);
 				elements = 0;
@@ -276,11 +278,13 @@ namespace rabbit{
 				exists.clear();
 				erased.clear();
 				data.clear();
+				keys.clear();
 				
 				erased.resize(esize);
 				exists.resize(esize);
 				
 				data.resize(get_data_size());
+				keys.resize(get_data_size());
 				min_element = get_data_size();
 				buckets = 0;
 
@@ -306,6 +310,7 @@ namespace rabbit{
 			}
 			
 			hash_kernel& operator=(const hash_kernel& right){
+				config = right.config;
 				extent = right.extent;
 				exists = right.exists;
 				erased = right.erased;
@@ -318,7 +323,8 @@ namespace rabbit{
 				return *this;
 			}
 			inline bool raw_equal_key(size_type pos,const _K& k) const {
-				return eq_f(data[pos].first, k) ;
+				const _K& l = keys[pos];
+				return eq_f(l, k) ;
 			}
 			bool equal_key(size_type pos,const _K& k) const {
 				if(removed)
@@ -329,31 +335,18 @@ namespace rabbit{
 
 			/// when all inputs to this function is unique relative to current hash map(i.e. they dont exist in the hashmap)
 			/// and there where no erasures. for maximum fillrate in rehash
-			_V* unique_subscript(const _K& k){
-				if(removed) return subscript(k);
-
-				size_type pos = 0;
-				size_type epos = 0;
-				
-				/// eventualy an out of memory (bad_allocation) exception will occur
-				pos = key2pos(k);
-				epos = pos;
-				if(exists[(pos>>config.BITS_LOG2_SIZE)]==0 || !exists_(pos)){
-					set_exists(pos, true);
-					data[pos].first = k;					
-					++elements;
-					return &(data[pos].second);
-				}
-					
+			_V* unique_subscript_rest(const _K& k, size_type pos){
+				size_type epos = pos;	
 				size_type m = std::min<size_type>(extent, pos + config.PROBES);				
 				++pos;				
 				for(; pos < m;){
 					if(exists[(pos>>config.BITS_LOG2_SIZE)]==config.ALL_BITS_SET){						
-						pos += (config.BITS_SIZE - (pos & (config.BITS_SIZE-1)));
+						pos += (config.BITS_SIZE - (pos & (config.BITS_SIZE1)));
 					}else{
 						if(!exists_(pos)){
 							set_exists(pos, true);						
 							data[pos].first = k;						
+							keys[pos] = k;
 							++elements;
 							return &(data[pos].second);					
 						}
@@ -366,6 +359,7 @@ namespace rabbit{
 					if(!exists_(pos)){
 						set_exists(pos, true);						
 						data[pos].first = k;						
+						keys[pos] = k;
 						++elements;
 						return &(data[pos].second);
 					}
@@ -373,23 +367,24 @@ namespace rabbit{
 				
 				return nullptr;
 			}
-			_V* subscript(const _K& k){
-				
-				size_type pos = 0;
-				size_type epos = 0;
+			_V* unique_subscript(const _K& k){
+				//if(removed) return subscript(k);
+
 				/// eventualy an out of memory (bad_allocation) exception will occur
-				pos = key2pos(k);
-				epos = pos;
+				size_type pos = key2pos(k);
+				
 				if(exists[(pos>>config.BITS_LOG2_SIZE)]==0 || !exists_(pos)){
 					set_exists(pos, true);
-					data[pos].first = k;
-					data[pos].second = _V();					
+					data[pos].first = k;					
+					keys[pos] = k;
 					++elements;
 					return &(data[pos].second);
-				}else if(equal_key(pos,k)){
-					return &(data[pos].second);
 				}
-				
+				return unique_subscript_rest(k, pos);
+			}
+			_V* subscript_rest(const _K& k, size_type pos){
+				size_type epos = 0;
+				epos = pos;
 				
 				size_type f = 0;
 				size_type m = std::min<size_type>(extent, pos + config.PROBES);
@@ -404,6 +399,8 @@ namespace rabbit{
 							set_exists(pos, true);
 							set_erased(pos, false);
 							data[pos].first = k;
+							keys[pos] = k;
+							
 							data[pos].second = _V();						
 							++elements;
 							return &(data[pos].second);					
@@ -441,6 +438,7 @@ namespace rabbit{
 						--removed;
 						set_exists(pos, true);
 						data[pos].first = k;
+						keys[pos] = k;
 						data[pos].second = _V();					
 						++elements;
 						return &(data[pos].second);
@@ -452,6 +450,7 @@ namespace rabbit{
 						set_exists(pos,true);
 						set_erased(pos,false);
 						data[pos].first = k;
+						keys[pos] = k;
 						data[pos].second = _V();
 						++elements;
 						return &(data[pos].second);
@@ -462,6 +461,22 @@ namespace rabbit{
 				}
 				return nullptr;
 			}
+			_V* subscript(const _K& k){
+				/// eventualy an out of memory (bad_allocation) exception will occur
+				size_type pos = key2pos(k);
+				
+				if(!exists_(pos)){
+					set_exists(pos, true);
+					data[pos].first = k;
+					keys[pos] = k;
+					data[pos].second = _V();					
+					++elements;
+					return &(data[pos].second);
+				}else if(raw_equal_key(pos,k)){
+					return &(data[pos].second);
+				}
+				return subscript_rest(k, pos);
+			}
 			bool erase(const _K& k){
 				
 				size_type pos = (*this).find(k);		
@@ -469,6 +484,7 @@ namespace rabbit{
 					set_erased(pos, true);
 					++removed;
 					data[pos].first = _K();
+					keys[pos] = _K();
 					data[pos].second = _V();						
 					--elements;									
 					return true;
@@ -496,15 +512,8 @@ namespace rabbit{
 				}
 				return false;
 			}
-			
-			size_type find(const _K& k) const {
-				if(!elements) return end();
-				size_type pos = 0;
-				pos = key2pos(k);
-				if(exists_(pos)){ ///exists[pos >> BITS_LOG2_SIZE] == ALL_BITS_SET || 
-					if(equal_key(pos,k))
-						return pos;
-				}				
+			size_type find_rest(const _K& k, size_type pos) const {
+				
 				size_type m = std::min<size_type>(extent, pos + config.PROBES);
 				++pos;
 				for(; pos < m;){
@@ -523,6 +532,16 @@ namespace rabbit{
 					}
 				}
 				return end();
+			}
+			size_type find(const _K& k) const {				
+				if(!elements) return end();
+				size_type pos = key2pos(k);
+				if(!removed && raw_equal_key(pos,k) && exists_(pos)) return pos;				
+				if(exists_(pos)){ ///exists[pos >> BITS_LOG2_SIZE] == ALL_BITS_SET || 
+					if(equal_key(pos,k))
+						return pos;
+				}				
+				return find_rest(k,pos);
 			}
 			
 			size_type begin() const {
@@ -546,13 +565,14 @@ namespace rabbit{
 		public:
 		struct iterator{
 			const unordered_map* h;
+			const hash_kernel * hc;
 			size_type pos;
 			
 			iterator(){
 				
 			}
 			iterator(const unordered_map* h, size_type pos): h(h),pos(pos){
-				
+				 hc = h->current.get();
 			}
 			iterator(const iterator& r){
 				(*this) = r;
@@ -560,12 +580,14 @@ namespace rabbit{
 			iterator& operator=(const iterator& r){
 				h = r.h;
 				pos = r.pos;
+				hc = r.hc;
 				return (*this);
 			}
 			iterator& operator++(){
 				++pos;
 				/// todo optimize with 32-bit or 64-bit zero counting
-				while(pos < h->current->get_data_size() && (!h->current->exists_(pos) || h->current->erased_(pos))){
+				
+				while(pos < hc->get_data_size() && (!hc->exists_(pos) || hc->erased_(pos))){
 					++pos;
 				}
 				
@@ -575,16 +597,16 @@ namespace rabbit{
 				return (*this);
 			}
 			_ElPair& operator*() const {
-				return const_cast<unordered_map*>(h)->current->data[pos];
+				return const_cast<hash_kernel *>(hc)->data[pos];
 			}
 			const _ElPair& operator*() {
-				return h->current->data[pos];
+				return hc->data[(*this).pos];
 			}
 			_ElPair* operator->() const {
-				return &(const_cast<unordered_map*>(h)->current->data[pos]);
+				return &(const_cast<hash_kernel *>(hc)->data[pos]);
 			}
 			const _ElPair* operator->() {
-				return &(h->current->data[pos]);
+				return &(hc->data[pos]);
 			}
 			bool operator==(const iterator& r) const {
 				return h==r.h&&pos == r.pos;
@@ -648,33 +670,12 @@ namespace rabbit{
 		};
 
 	protected:
-		double backoff;
+		/// the default config for each hash instance
+		rabbit_config default_config;
+
 		
-		double get_min_backoff() const {
-			return 2;
-		}
-		double get_max_backoff() const {
-			return 8;
-		}
-		
-		/// Truncated Linear Backoff in Rehasing after collisions			
-		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
 		double recalc_growth_factor(size_type elements)  {
-			
-			double growth_factor = backoff;
-			bool linear = true;
-			if(linear){
-				double d = 0.81;				
-				if(backoff - d > get_min_backoff()){
-					backoff -= d ;					
-				}								
-			}else{								
-				double backof_factor = 0.502;
-				backoff = get_min_backoff() + (( backoff - get_min_backoff() ) * backof_factor);
-				
-			}
-			
-			return growth_factor ;
+			return 2;			
 		}
 		
 		void rehash(){
@@ -707,11 +708,11 @@ namespace rabbit{
 			return (*this).elements == 0;
 		}
 		void reserve(size_type atleast){
-			backoff = 2.1;
+			
 			rehash((size_type)((double)atleast*2));
 		}
 		void resize(size_type atleast){
-			backoff = 2.1;
+			
 			rehash((size_type)((double)atleast*2));
 		}
 		void rehash(size_type to_){
@@ -769,7 +770,7 @@ namespace rabbit{
 			
 		}
 		void clear(){
-			backoff = get_max_backoff();
+			
 			set_current(std::make_shared<hash_kernel>());
 		}
 		

@@ -129,7 +129,7 @@ static bool FLAGS_test_map = false;
 
 static bool FLAGS_test_4_bytes = true;
 static bool FLAGS_test_8_bytes = true;
-static bool FLAGS_test_16_bytes = false;
+static bool FLAGS_test_16_bytes = true;
 static bool FLAGS_test_256_bytes = false;
 
 #if defined(HAVE_UNORDERED_MAP)
@@ -290,7 +290,7 @@ template<> class HashObject<sizeof(int), sizeof(int)> {
 
   size_t Hash() const {
     g_num_hashes++;
-    return SPARSEHASH_HASH<int>()(i_);
+    return i_; //SPARSEHASH_HASH<int>()(i_);
   }
 
   bool operator==(const class_type& that) const { return this->i_ == that.i_; }
@@ -544,6 +544,7 @@ static void time_map_fetch(int iters, const vector<int>& indices,
 
   r = 1;
   t.Reset();
+  NumHashesSinceLastCall();
   for (i = 0; i < iters; i++) {
     r ^= static_cast<int>(set.find(indices[i]) != set.end());
   }

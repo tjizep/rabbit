@@ -13,10 +13,10 @@ CurrentFileName        :=
 CurrentFilePath        :=
 CurrentFileFullPath    :=
 User                   :=christiaan
-Date                   :=04/12/15
+Date                   :=04/13/15
 CodeLitePath           :="C:\Program Files\CodeLite"
-LinkerName             :=C:/dev/CodeBlocks/MinGW/bin/g++.exe 
-SharedObjectLinkerName :=C:/dev/CodeBlocks/MinGW/bin/g++.exe -shared -fPIC
+LinkerName             :=C:/TDM-GCC-64/bin/g++.exe 
+SharedObjectLinkerName :=C:/TDM-GCC-64/bin/g++.exe -shared -fPIC
 ObjectSuffix           :=.o
 DependSuffix           :=.o.d
 PreprocessSuffix       :=.i
@@ -36,7 +36,7 @@ ObjectsFileList        :="rabbit.txt"
 PCHCompileFlags        :=
 MakeDirCommand         :=makedir
 RcCmpOptions           := 
-RcCompilerName         :=C:/dev/CodeBlocks/MinGW/bin/windres.exe 
+RcCompilerName         :=C:/TDM-GCC-64/bin/windres.exe 
 LinkOptions            :=  
 IncludePath            :=  $(IncludeSwitch). $(IncludeSwitch). $(IncludeSwitch)C:/dev/cpp_all/repo/sparsehash-2.0.2/src/windows $(IncludeSwitch)C:/dev/cpp_all/repo/sparsehash-2.0.2/src 
 IncludePCH             := 
@@ -49,13 +49,13 @@ LibPath                := $(LibraryPathSwitch).
 ## Common variables
 ## AR, CXX, CC, AS, CXXFLAGS and CFLAGS can be overriden using an environment variables
 ##
-AR       := C:/dev/CodeBlocks/MinGW/bin/ar.exe rcu
-CXX      := C:/dev/CodeBlocks/MinGW/bin/g++.exe 
-CC       := C:/dev/CodeBlocks/MinGW/bin/gcc.exe 
+AR       := C:/TDM-GCC-64/bin/ar.exe rcu
+CXX      := C:/TDM-GCC-64/bin/g++.exe 
+CC       := C:/TDM-GCC-64/bin/gcc.exe 
 CXXFLAGS :=  -O2 -std=c++11 -Wall $(Preprocessors)
 CFLAGS   :=  -O2 -Wall $(Preprocessors)
 ASFLAGS  := 
-AS       := C:/dev/CodeBlocks/MinGW/bin/as.exe 
+AS       := C:/TDM-GCC-64/bin/as.exe 
 
 
 ##
