@@ -49,7 +49,7 @@ namespace rabbit{
 
 		typedef std::pair<_K,_V> _ElPair;
 		typedef _ElPair value_type;
-		typedef unsigned char _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
+		typedef unsigned short _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		typedef unsigned long size_type;
 		
 	protected:
@@ -106,31 +106,95 @@ namespace rabbit{
 				
 				PRIMARY_BITS = 8;
 				MIN_EXTENT = 32;
-				MIN_OVERFLOW = 128; 
+				MIN_OVERFLOW = 64; 
 			}
 		};
-		/// use fast modulo
-		static const bool fast_mod = true;
-
-		/// the existence bit set type
-		typedef std::vector<_Bt,_Allocator> _Exists;
 		
-		/// the vector that will contain the mapping pairs
-		typedef std::vector<_ElPair,_Allocator> _Data;
-		typedef std::vector<_K,_Allocator> _Keys;
+		struct _Segment{
+		private:
+			_ElPair data[sizeof(_Bt)*8];								
+		public:
+			_Bt exists;
+			_Bt erased;		
+
+			const _ElPair pair(_Bt ix) const {
+				return data[ix];				
+			}
+			
+			_ElPair& pair(_Bt ix) {
+				return data[ix];
+			}
+			
+			const _K &key(_Bt ix) const {
+				return data[ix].first;
+			}
+			
+			_K &key(_Bt ix) {
+				return data[ix].first;
+			}
+			
+			const _V &value(_Bt ix) const {
+				return data[ix].second;
+			}
+			
+			_V &value(_Bt ix) {
+				return data[ix].second;
+			}
+			
+			inline bool is_erased(_Bt bit) const {								
+				_Bt r = ((erased >> bit) & (_Bt)1ul);
+				return r!=0;
+			}
+			
+			inline bool is_exists(_Bt bit) const {								
+				_Bt r = ((exists >> bit) & (_Bt)1ul);
+				return r!=0;
+			}
+			
+			void set_bit(_Bt& w, _Bt index, bool f){
+				
+				#ifdef _MSC_VER
+				#pragma warning(disable:4804)
+				#endif				
+				/// lifted directly from Bit Twiddling Hacks
+				/// https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetTable
+				/// TODO: table wont go over 1<<32
+				_Bt m = index;
+				m = (_Bt)1ul << m;// the bit mask
+				
+				/// the branching way 		
+				/// if (f) w |= m; else w &= ~m; 
+				// TODO: not superscalar: add to a traits;
+				///w ^= (-f ^ w) & m;
+				// TODO: OR, for superscalar CPUs: also to traits;
+				w = (w & ~m) | (-f & m);
+			}
+			
+			void set_exists(_Bt index, bool f){				
+				set_bit(exists,index,f);
+			}
+			
+			void set_erased(_Bt index, bool f){				
+				set_bit(erased,index,f);
+			}
+			
+			_Segment(){
+				exists = 0;
+				erased = 0;
+			}
+			
+		} ;
+		
+		/// the vector that will contain the segmented mapping pairs and flags
+		typedef std::vector<_Segment, _Allocator> _Segments;
 		
 		struct hash_kernel{
 			/// settings configuration
 			rabbit_config config;
-			
-			
 			/// the existence and erased bit sets are a factor of BITS_SIZE+1 less than the extent
-			_Exists exists;
-			_Exists erased;
+			_Segments segments;
+						
 			
-			/// data being used
-			_Keys keys;
-			_Data data;
 			size_type extent;
 			size_type extent2;
 			size_type extent1;
@@ -164,7 +228,7 @@ namespace rabbit{
 				size_type r = 0;				
 				for(; pos < m;++pos){
 					if(!exists_(pos)){				
-					}else if(key2pos(keys[pos]) == n){
+					}else if(key2pos(get_segment_key(pos)) == n){
 						++r;						
 					}					
 				}
@@ -182,27 +246,62 @@ namespace rabbit{
 			inline size_type key2pos(const _K& k) const {
 				
 				size_type h = (size_type)_H()(k);
-				
-				return (h + (h >> config.PRIMARY_BITS)) & extent1;///
+				h += (h >> config.PRIMARY_BITS);/// prevents multiples of extent from hashing to same spot
+				return (h ) & extent1;///
 			}
 			
 			/// total data size, never less than than size()
 			size_type get_data_size() const {
 				return extent+overflow;
 			}
-
-			/// sets a bit in a bucket vector of type _Bt
-			void set_bucket_bit(_Exists & bits, size_type pos, bool f){
-				size_type bucket = (pos >> config.BITS_LOG2_SIZE);
-#ifdef _MSC_VER
-#pragma warning(disable:4804)
-#endif				
+			size_type get_segment_number(size_type pos) const {
+				return (pos >> config.BITS_LOG2_SIZE);
+			}
+			_Bt get_segment_index(size_type pos) const {
+				return (_Bt)(pos & (config.BITS_SIZE1));
+			}
+			_Segment &get_segment(size_type pos) {
+				return segments[get_segment_number(pos)];
+			}
+			
+			const _Segment &get_segment(size_type pos) const {
+				return segments[get_segment_number(pos)];
+			}
+			_ElPair get_segment_pair(size_type pos) const {
+				return segments[get_segment_number(pos)].pair(get_segment_index(pos));
+			}
+			const _K & get_segment_key(size_type pos) const {
+				return get_segment(pos).key(get_segment_index(pos));
+			}
+			const _V & get_segment_value(size_type pos) const {
+				return get_segment(pos).value(get_segment_index(pos));
+			}
+			_ElPair& get_segment_pair(size_type pos) {
+				return segments[get_segment_number(pos)].pair(get_segment_index(pos));
+			}			
+			_K & get_segment_key(size_type pos) {
+				return get_segment(pos).key(get_segment_index(pos));
+			}
+			_V & get_segment_value(size_type pos) {
+				return get_segment(pos).value(get_segment_index(pos));
+			}
+			void set_segment_key(size_type pos, const _K &k) {
+				get_segment(pos).key(get_segment_index(pos)) = k;
+			}
+			void set_segment_value(size_type pos, const _V &v) {
+				get_segment(pos).value(get_segment_index(pos)) = v;
+			}
+			void set_segment_bit(_Bt& w, _Bt index, bool f){
+				
+				#ifdef _MSC_VER
+				#pragma warning(disable:4804)
+				#endif				
 				/// lifted directly from Bit Twiddling Hacks
 				/// https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetTable
 				/// TODO: table wont go over 1<<32
-				_Bt m = ((_Bt)pos) & (config.BITS_SIZE1); /// because its power of 2
+				_Bt m = index;
 				m = (_Bt)1ul << m;// the bit mask
-				_Bt& w = bits[bucket]; // the word to modify:  
+				
 				/// the branching way 		
 				/// if (f) w |= m; else w &= ~m; 
 				// TODO: not superscalar: add to a traits;
@@ -210,54 +309,24 @@ namespace rabbit{
 				// TODO: OR, for superscalar CPUs: also to traits;
 				w = (w & ~m) | (-f & m);
 			}
-
+			
 			void set_exists(size_type pos, bool f){
-				set_bucket_bit(exists, pos, f);				
+				set_segment_bit(get_segment(pos).exists, get_segment_index(pos), f);
 			}
 
 			void set_erased(size_type pos, bool f){
-				set_bucket_bit(erased, pos, f);
-			}
-			
-			/// fast generic bit counting - NOT currently used but might be
-			/// lifted (again) directly from Bit Twiddling Hacks
-			/// https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetTable
-			template<typename IntT>
-			unsigned int count_bits
-			(	IntT v	// count bits set in this ((8<=n<=128)-bit value)
-			) const {
-				/// A generalization of the best bit counting method to integers of 
-				/// bit-widths upto 128 (parameterized by type T) is this:
-				unsigned int c; // store the total here
-				/// ~(IntT)0 is the bitwise maximum of IntT which would be n consecutive true bits
-				v = v - ((v >> 1) & (IntT)~(IntT)0/3);                           		// temp
-				
-				v = (v & (IntT)~(IntT)0/15*3) + ((v >> 2) & (IntT)~(IntT)0/15*3);     	// temp
-				v = (v + (v >> 4)) & (IntT)~(IntT)0/255*15;                      		// temp MIN 8 BITS
-				c = (IntT)(v * ((IntT)~(IntT)0/255)) >> (sizeof(IntT) - 1) * config.CHAR_BITS; // count
-				return c;
-			}
-			/// count on bits in the given bucket
-			/// each bucket 
-			size_type count_bucket(size_type b) const {
-				return count_bits<_Bt>(exists[b]);
-			}
-			inline bool is_bit(const _Exists& bits, size_type pos) const {				
-				_Bt bit = (_Bt)(pos & (config.BITS_SIZE1));
-				_Bt v = bits[(pos >> config.BITS_LOG2_SIZE)];
-				_Bt r = ((v >> bit) & (_Bt)1ul);
-				return r != 0;
+				set_segment_bit(get_segment(pos).erased, get_segment_index(pos), f);				
 			}
 			
 			inline bool exists_(size_type pos) const {
-				return is_bit(exists, pos);
+				return get_segment(pos).is_exists(get_segment_index(pos));
 			}
 
 			inline bool erased_(size_type pos) const {
-				if(!removed) return false;
+				
+				const _Segment &s = get_segment(pos);
 				/// works because the likelyhood of a lot of erased elements are low
-				return erased[pos >> config.BITS_LOG2_SIZE] && 
-					is_bit(erased, pos);
+				return  s.erased && s.is_erased(get_segment_index(pos));
 			}
 			
 			/// clears all data and resize the new data vector to the parameter
@@ -274,17 +343,10 @@ namespace rabbit{
 				elements = 0;
 				removed = 0;
 				size_type esize = (get_data_size()/config.BITS_SIZE)+1;
-				
-				exists.clear();
-				erased.clear();
-				data.clear();
-				keys.clear();
-				
-				erased.resize(esize);
-				exists.resize(esize);
-				
-				data.resize(get_data_size());
-				keys.resize(get_data_size());
+			
+				segments.clear();
+				segments.resize(esize);
+							
 				min_element = get_data_size();
 				buckets = 0;
 
@@ -312,25 +374,37 @@ namespace rabbit{
 			hash_kernel& operator=(const hash_kernel& right){
 				config = right.config;
 				extent = right.extent;
-				exists = right.exists;
-				erased = right.erased;
+				
+				segments = right.segments;
 				buckets = right.buckets;
 				removed = right.removed;
 				mf = right.mf;				
-				data = right.data;
 				min_element = right.min_element ;
 				elements = right.elements;				
 				return *this;
 			}
 			inline bool raw_equal_key(size_type pos,const _K& k) const {
-				const _K& l = keys[pos];
+				const _K& l = get_segment(pos).key(get_segment_index(pos));
 				return eq_f(l, k) ;
 			}
-			bool equal_key(size_type pos,const _K& k) const {
-				if(removed)
-					return raw_equal_key(pos,k) && !erased_(pos);
-				else
-					return raw_equal_key(pos,k) ;
+			inline bool segment_equal_key(size_type pos,const _K& k) const {
+				_Bt index = get_segment_index(pos);
+				const _Segment& s = get_segment(pos);
+				const _K& l = s.key(index);
+				return eq_f(l, k) && !s.is_erased(index);
+			}
+			inline bool segment_equal_key_exists(size_type pos,const _K& k) const {
+				_Bt index = get_segment_index(pos);
+				const _Segment& s = get_segment(pos);
+				const _K& l = s.key(index);
+				return s.is_exists(index) && eq_f(l, k) && !s.is_erased(index) ;
+			}
+			
+			bool equal_key(size_type pos,const _K& k) const {				
+				_Bt index = get_segment_index(pos);
+				const _Segment& s = get_segment(pos);
+				const _K& l = s.key(index);
+				return eq_f(l, k) && !s.is_erased(index);
 			}
 
 			/// when all inputs to this function is unique relative to current hash map(i.e. they dont exist in the hashmap)
@@ -340,15 +414,14 @@ namespace rabbit{
 				size_type m = std::min<size_type>(extent, pos + config.PROBES);				
 				++pos;				
 				for(; pos < m;){
-					if(exists[(pos>>config.BITS_LOG2_SIZE)]==config.ALL_BITS_SET){						
+					if(get_segment(pos).exists == config.ALL_BITS_SET){						
 						pos += (config.BITS_SIZE - (pos & (config.BITS_SIZE1)));
 					}else{
 						if(!exists_(pos)){
-							set_exists(pos, true);						
-							data[pos].first = k;						
-							keys[pos] = k;
+							set_exists(pos, true);													
+							set_segment_key(pos, k);
 							++elements;
-							return &(data[pos].second);					
+							return &(get_segment_value(pos));
 						}
 						++pos;
 					}
@@ -357,11 +430,10 @@ namespace rabbit{
 
 				for(pos = extent; pos < get_data_size();++pos){
 					if(!exists_(pos)){
-						set_exists(pos, true);						
-						data[pos].first = k;						
-						keys[pos] = k;
+						set_exists(pos, true);												
+						set_segment_key(pos, k);
 						++elements;
-						return &(data[pos].second);
+						return &(get_segment_value(pos));
 					}
 				};
 				
@@ -372,13 +444,14 @@ namespace rabbit{
 
 				/// eventualy an out of memory (bad_allocation) exception will occur
 				size_type pos = key2pos(k);
+				_Segment &s = get_segment(pos);
+				_Bt si = get_segment_index(pos);
 				
-				if(exists[(pos>>config.BITS_LOG2_SIZE)]==0 || !exists_(pos)){
-					set_exists(pos, true);
-					data[pos].first = k;					
-					keys[pos] = k;
+				if(s.exists ==0 || !s.is_exists(si)){
+					s.set_exists(si, true);					
+					s.key(si) = k;
 					++elements;
-					return &(data[pos].second);
+					return &(s.value(si));
 				}
 				return unique_subscript_rest(k, pos);
 			}
@@ -392,21 +465,19 @@ namespace rabbit{
 				++pos;
 				
 				for(; pos < m;){
-					if(erased[pos>>config.BITS_LOG2_SIZE]==config.ALL_BITS_SET){						
+					if(get_segment(pos).erased == config.ALL_BITS_SET){						
 						pos += (config.BITS_SIZE - (pos & (config.BITS_SIZE-1)));
 					}else{
-						if(exists[pos>>config.BITS_LOG2_SIZE]==0 || !exists_(pos)){
+						if(get_segment(pos).exists == 0 || !exists_(pos)){
 							set_exists(pos, true);
-							set_erased(pos, false);
-							data[pos].first = k;
-							keys[pos] = k;
-							
-							data[pos].second = _V();						
+							set_erased(pos, false);							
+							set_segment_key(pos, k);
+							set_segment_value(pos, _V());						
 							++elements;
-							return &(data[pos].second);					
+							return &(get_segment_value(pos));					
 						}else if(!erased_(pos)){
 							if (raw_equal_key(pos,k)){
-								return &(data[pos].second);
+								return &(get_segment_value(pos));
 							}
 						}
 						++pos;
@@ -424,7 +495,7 @@ namespace rabbit{
 					if(!exists_(pos)){
 						last_empty = pos;
 					}else if(equal_key(pos,k)){							
-						return &(data[pos].second);
+						return &(get_segment_value(pos));
 					}
 				};
 				
@@ -436,27 +507,23 @@ namespace rabbit{
 					if(erased_(pos)){
 						set_erased(pos,false); /// un erase the element
 						--removed;
-						set_exists(pos, true);
-						data[pos].first = k;
-						keys[pos] = k;
-						data[pos].second = _V();					
+						set_exists(pos, true);						
+						set_segment_key(pos, k);						
+						set_segment_value(pos, _V());
 						++elements;
-						return &(data[pos].second);
+						return &(get_segment_value(pos));
 					}
 				}
 				if(last_empty > 0){
 					pos = last_empty;
 					if(!exists_(pos)){
 						set_exists(pos,true);
-						set_erased(pos,false);
-						data[pos].first = k;
-						keys[pos] = k;
-						data[pos].second = _V();
+						set_erased(pos,false);						
+						set_segment_key(pos, k);
+						set_segment_value(pos, _V());
 						++elements;
-						return &(data[pos].second);
+						return &(get_segment_value(pos));
 					
-					}else{
-
 					}
 				}
 				return nullptr;
@@ -464,16 +531,16 @@ namespace rabbit{
 			_V* subscript(const _K& k){
 				/// eventualy an out of memory (bad_allocation) exception will occur
 				size_type pos = key2pos(k);
-				
-				if(!exists_(pos)){
+				_Segment &s = get_segment(pos);
+				_Bt si = get_segment_index(pos);
+				if(!s.is_exists(si)){
 					set_exists(pos, true);
-					data[pos].first = k;
-					keys[pos] = k;
-					data[pos].second = _V();					
+					s.key(si) = k;					
+					s.value(si) = _V();					
 					++elements;
-					return &(data[pos].second);
+					return &(s.value(si));
 				}else if(raw_equal_key(pos,k)){
-					return &(data[pos].second);
+					return &(s.value(si));
 				}
 				return subscript_rest(k, pos);
 			}
@@ -482,10 +549,9 @@ namespace rabbit{
 				size_type pos = (*this).find(k);		
 				if(pos != (*this).end()){
 					set_erased(pos, true);
-					++removed;
-					data[pos].first = _K();
-					keys[pos] = _K();
-					data[pos].second = _V();						
+					++removed;					
+					set_segment_key(pos,  _K());
+					set_segment_value(pos, _V());						
 					--elements;									
 					return true;
 				}
@@ -507,7 +573,7 @@ namespace rabbit{
 			bool get(const _K& k, _V& v) const {
 				size_type pos = find(k);			
 				if(pos != (*this).end()){
-					v = data[pos].second;
+					v = get_segment_value(pos);
 					return true;
 				}
 				return false;
@@ -517,7 +583,7 @@ namespace rabbit{
 				size_type m = std::min<size_type>(extent, pos + config.PROBES);
 				++pos;
 				for(; pos < m;){
-					if(exists[pos >> config.BITS_LOG2_SIZE] == 0){
+					if(get_segment(pos).exists == 0){
 						pos += (config.BITS_SIZE - (pos & (config.BITS_SIZE-1)));
 					}else if(exists_(pos) && equal_key(pos,k)){
 						return pos;
@@ -534,13 +600,12 @@ namespace rabbit{
 				return end();
 			}
 			size_type find(const _K& k) const {				
-				if(!elements) return end();
-				size_type pos = key2pos(k);
-				if(!removed && raw_equal_key(pos,k) && exists_(pos)) return pos;				
-				if(exists_(pos)){ ///exists[pos >> BITS_LOG2_SIZE] == ALL_BITS_SET || 
-					if(equal_key(pos,k))
-						return pos;
+				
+				size_type pos = key2pos(k);				
+				if(segment_equal_key_exists(pos,k)){ ///get_segment(pos).exists == ALL_BITS_SET || 
+					return pos;
 				}				
+				if(!elements) return end();
 				return find_rest(k,pos);
 			}
 			
@@ -565,7 +630,7 @@ namespace rabbit{
 		public:
 		struct iterator{
 			const unordered_map* h;
-			const hash_kernel * hc;
+			hash_kernel * hc;
 			size_type pos;
 			
 			iterator(){
@@ -596,17 +661,17 @@ namespace rabbit{
 			iterator operator++(int){
 				return (*this);
 			}
-			_ElPair& operator*() const {
-				return const_cast<hash_kernel *>(hc)->data[pos];
+			const _ElPair operator*() const {
+				return const_cast<hash_kernel *>(hc)->get_segment_pair((*this).pos);
 			}
-			const _ElPair& operator*() {
-				return hc->data[(*this).pos];
+			_ElPair& operator*() {
+				return hc->get_segment_pair((*this).pos);
 			}
 			_ElPair* operator->() const {
-				return &(const_cast<hash_kernel *>(hc)->data[pos]);
+				return &(const_cast<hash_kernel *>(hc)->get_segment_pair((*this).pos));
 			}
 			const _ElPair* operator->() {
-				return &(hc->data[pos]);
+				return &(hc->get_segment_pair((*this).pos));
 			}
 			bool operator==(const iterator& r) const {
 				return h==r.h&&pos == r.pos;
@@ -655,10 +720,10 @@ namespace rabbit{
 				return (*this);
 			}
 			const _ElPair& operator*() const {
-				return const_cast<unordered_map*>(h)->current->data[pos];
+				return const_cast<unordered_map*>(h)->current->get_segment_pair(pos);
 			}
 			const _ElPair* operator->() const {
-				return &(const_cast<unordered_map*>(h)->current->data[pos]);
+				return &(const_cast<unordered_map*>(h)->current->get_segment_pair(pos));
 			}
 			
 			bool operator==(const const_iterator& r) const {
@@ -719,8 +784,6 @@ namespace rabbit{
 			rabbit_config config;
 			size_type to = std::max<size_type>(to_, config.MIN_EXTENT);
 			/// can cause oom e because of recursive rehash'es
-			
-			_Data temp;
 			
 			typename hash_kernel::ptr rehashed = std::make_shared<hash_kernel>();
 			size_type extent = current->get_extent();
