@@ -295,7 +295,7 @@ void test_dense_hash_long(size_t ts){
 	h.set_empty_key(-2l);
 	tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random_narrow(ts, script);
+	t.gen_random(ts, script);
 	t.bench_hash_simple(h,script);	
 #endif
 }
@@ -307,7 +307,7 @@ void test_sparse_hash(size_t ts){
 	_Map h;
 	typename tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random_narrow(ts, script);
+	t.gen_random(ts, script);
 	t.bench_hash_simple(h,script);	
 #endif
 }
@@ -315,12 +315,12 @@ void test_sparse_hash(size_t ts){
 template<typename T>
 void test_rabbit_hash(size_t ts){
 	printf("rabbit hash test\n");
-	typedef rabbit::unordered_map<T,long> _Map;
+	typedef rabbit::unordered_map<T, long> _Map;
 	_Map h;
 	
 	typename tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random_narrow(ts, script);
+	t.gen_random(ts, script);
 	t.bench_hash_simple(h,script);
 	
 }
@@ -366,8 +366,8 @@ int main(int argc, char **argv)
 	
 	if(false){
 		//typedef std::string _K;
-		typedef unsigned long _K;
-		test_dense_hash_long(ts);
+		typedef long _K;
+		//test_dense_hash_long(ts);
 		//test_sparse_hash<_K>(ts);
 
 
@@ -375,7 +375,7 @@ int main(int argc, char **argv)
 
 	
 		test_rabbit_hash<_K>(ts);
-		test_rabbit_hash_erase<_K>(ts/10);
+		//test_rabbit_hash_erase<_K>(ts/10);
 	}else{
 		google_times(ts);
 	}

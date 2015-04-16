@@ -58,7 +58,7 @@ namespace rabbit{
 			return h % this->extent;
 		}
 		inline size_type next_size(){
-			double r = 1.8 * this->extent;
+			double r = 1.55 * this->extent;
 			assert(r > (double)extent);
 			return (size_type)r;
 		}
@@ -94,9 +94,50 @@ namespace rabbit{
 			return (size_type)r;
 		}
 	};
-
+	template<typename _Ht>
+	struct rabbit_hash{	
+		unsigned long operator()(const _Ht& k) const{	
+			return std::hash<_Ht>(k);		
+		};
+	};
+	template<>
+	struct rabbit_hash<long>{	
+		unsigned long operator()(const long& k) const{	
+			return (unsigned long)k;		
+		};
+	};
+	template<>
+	struct rabbit_hash<unsigned long>{	
+		unsigned long operator()(const unsigned long& k) const{	
+			return k;		
+		};
+	};
+	template<>
+	struct rabbit_hash<unsigned int>{	
+		unsigned long operator()(const unsigned int& k) const{	
+			return (unsigned long)k;		
+		};
+	};
+	template<>
+	struct rabbit_hash<int>{	
+		unsigned long operator()(const int& k) const{	
+			return k;		
+		};
+	};
+	template<>
+	struct rabbit_hash<unsigned long long>{	
+		unsigned long operator()(const unsigned long long& k) const{	
+			return (unsigned long)k;		
+		};
+	};
+	template<>
+	struct rabbit_hash<long long>{	
+		unsigned long operator()(const long long& k) const{	
+			return (unsigned long)k;		
+		};
+	};
 	struct default_traits{
-		typedef unsigned short _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
+		typedef unsigned char _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		typedef unsigned long _Size_Type;
 		typedef _Size_Type size_type;
 		class rabbit_config{
@@ -145,7 +186,7 @@ namespace rabbit{
 				BITS_SIZE1 = BITS_SIZE-1;
 				BITS_LOG2_SIZE = log2(BITS_SIZE);
 				ALL_BITS_SET = ~(_Bt)0;
-				PROBES = 32; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)								
+				PROBES = 64; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)								
 				MIN_EXTENT = 8; /// start size of the hash table
 				MIN_OVERFLOW = 1024; 
 			}
@@ -153,7 +194,7 @@ namespace rabbit{
 		typedef _BinMapper<rabbit_config> _Mapper;
 	};
 	
-	template <typename _K, typename _V, typename _H = std::hash<_K>, typename _E = std::equal_to<_K>, typename _Allocator = std::allocator<_K>, typename _Traits = default_traits >
+	template <typename _K, typename _V, typename _H = rabbit_hash<_K>, typename _E = std::equal_to<_K>, typename _Allocator = std::allocator<_K>, typename _Traits = default_traits >
 	class unordered_map {
 	public:
 		typedef _K key_type;
@@ -235,7 +276,7 @@ namespace rabbit{
 
 		struct _KeySegment{
 		private:
-			_K keys[sizeof(_Bt)*8];								
+			_K keys[sizeof(_Bt)*8];
 		private:
 			void set_bit(_Bt& w, _Bt index, bool f){
 				
@@ -247,8 +288,9 @@ namespace rabbit{
 				//w = (w & ~m) | (-f & m);
 			}
 		public:
-			_Bt exists;
-			_Bt erased;		
+			_Bt exists;			
+			_Bt erased;
+			
 			inline const _K &key(_Bt ix) const {
 				return keys[ix];
 			}
@@ -266,9 +308,8 @@ namespace rabbit{
 				 return (erased == ~(_Bt)0);
 			}
 
-			inline bool is_exists(_Bt bit) const {								
-				_Bt r = ((exists >> bit) & (_Bt)1ul);
-				return r!=0;
+			bool is_exists(_Bt bit) const {												
+				return ((exists >> bit) & (_Bt)1ul);
 			}
 									
 			void set_exists(_Bt index, bool f){				
@@ -290,6 +331,7 @@ namespace rabbit{
 		/// the vector that will contain the segmented mapping pairs and flags
 		
 		typedef std::vector<_Segment, _Allocator> _Segments;
+		typedef std::vector<_K, _Allocator> _Keys;
 		typedef std::vector<_V, _Allocator> _Values;
 		
 		struct hash_kernel{
@@ -298,8 +340,10 @@ namespace rabbit{
 
 			/// the existence and erased bit sets are a factor of BITS_SIZE+1 less than the extent
 			_Segments clusters;///a.k.a. pages
-						
+			_Keys keys;
+
 			_Values values;
+			
 						
 			size_type elements;
 			size_type overflow;
@@ -356,7 +400,7 @@ namespace rabbit{
 				return (_Bt)(pos & (config.BITS_SIZE1));
 			}
 			_Segment &get_segment(size_type pos) {
-				return clusters[get_segment_number(pos)];
+				return clusters[pos >> config.BITS_LOG2_SIZE];
 			}
 			
 			const _Segment &get_segment(size_type pos) const {
@@ -369,6 +413,7 @@ namespace rabbit{
 			}
 			const _K & get_segment_key(size_type pos) const {
 				return get_segment(pos).key(get_segment_index(pos));
+				//return keys[pos];
 			}
 			const _V & get_segment_value(size_type pos) const {
 				//return get_segment(pos).value(get_segment_index(pos));
@@ -382,6 +427,7 @@ namespace rabbit{
 			}			
 			_K & get_segment_key(size_type pos) {
 				return get_segment(pos).key(get_segment_index(pos));
+				//return keys[pos];
 			}
 			_V & get_segment_value(size_type pos) {
 				//return get_segment(pos).value(get_segment_index(pos));
@@ -389,6 +435,7 @@ namespace rabbit{
 			}
 			void set_segment_key(size_type pos, const _K &k) {
 				get_segment(pos).key(get_segment_index(pos)) = k;
+				//keys[pos] = k;
 			}
 			void set_segment_value(size_type pos, const _V &v) {
 				//get_segment(pos).value(get_segment_index(pos)) = v;
@@ -452,6 +499,7 @@ namespace rabbit{
 				clusters.clear();
 
 				values.resize(get_data_size());
+				keys.resize(get_data_size());
 				clusters.resize(esize);
 							
 				min_element = get_data_size();
@@ -491,26 +539,26 @@ namespace rabbit{
 				return *this;
 			}
 			inline bool raw_equal_key(size_type pos,const _K& k) const {
-				const _K& l = get_segment(pos).key(get_segment_index(pos));
+				const _K& l = get_segment_key(pos); ///.key(get_segment_index(pos));
 				return eq_f(l, k) ;
 			}
 			inline bool segment_equal_key(size_type pos,const _K& k) const {
 				_Bt index = get_segment_index(pos);
 				const _Segment& s = get_segment(pos);
-				const _K& l = s.key(index);
+				const _K& l = get_segment_key(pos);
 				return eq_f(l, k) && !s.is_erased(index);
 			}
 			inline bool segment_equal_key_exists(size_type pos,const _K& k) const {
 				_Bt index = get_segment_index(pos);
 				const _Segment& s = get_segment(pos);
-				const _K& l = s.key(index);
+				const _K& l = get_segment_key(pos);
 				return s.is_exists(index) && eq_f(l, k) && !s.is_erased(index) ;
 			}
 			
 			bool equal_key(size_type pos,const _K& k) const {				
 				_Bt index = get_segment_index(pos);
 				const _Segment& s = get_segment(pos);
-				const _K& l = s.key(index);
+				const _K& l = get_segment_key(pos);
 				return eq_f(l, k) && !s.is_erased(index);
 			}
 
@@ -551,12 +599,12 @@ namespace rabbit{
 
 				/// eventualy an out of memory (bad_allocation) exception will occur
 				size_type pos = map_key(k);
-				_Segment &s = get_segment(pos);
+				_Segment &s = clusters[pos >> config.BITS_LOG2_SIZE];/// get_segment(pos)
 				_Bt si = get_segment_index(pos);
 				
 				if(s.exists ==0 || !s.is_exists(si)){
 					s.set_exists(si, true);					
-					s.key(si) = k;
+					set_segment_key(pos, k);
 					++elements;
 					return &(get_segment_value(pos));
 				}
@@ -643,7 +691,7 @@ namespace rabbit{
 				_Bt si = get_segment_index(pos);
 				if(!s.is_exists(si)){
 					s.set_exists(si,true);
-					s.key(si) = k;					
+					set_segment_key(pos, k);					
 					set_segment_value(pos,_V());					
 					++elements;
 					return &(get_segment_value(pos));
