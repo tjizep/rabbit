@@ -44,10 +44,12 @@ namespace rabbit{
 	struct _ModMapper{
 		typedef typename _Config::size_type size_type;
 		size_type extent;
+		double backoff;
 		_Config config;
 		_ModMapper(){
 		}
 		_ModMapper(size_type new_extent, const _Config& config){
+			this->backoff = get_max_backoff();
 			this->config = config;
 			
 			this->extent = new_extent;
@@ -57,8 +59,38 @@ namespace rabbit{
 			
 			return h % this->extent;
 		}
+		double get_min_backoff() const {
+			return 2;
+		}
+		double get_max_backoff() const {
+			return 8;
+		}
+		
+		/// Truncated Linear Backoff in Rehasing after collisions	
+		/// growth factor is calculated as a binary exponential 
+		/// backoff (yes, analogous to the one used in network congestion control)
+		/// in evidence of hash collisions the the growth factor is exponentialy 
+		/// decreased as memory becomes a scarce resource.
+		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
+		double recalc_growth_factor(size_type elements)  {
+			return 1.9;
+			double growth_factor = backoff;
+			bool linear = true;
+			if(linear){
+				double d = 0.81;				
+				if(backoff - d > get_min_backoff()){
+					backoff -= d ;					
+				}else backoff = get_min_backoff();				
+			}else{								
+				double backof_factor = 0.502;
+				backoff = get_min_backoff() + (( backoff - get_min_backoff() ) * backof_factor);
+				
+			}
+			
+			return growth_factor ;
+		}
 		inline size_type next_size(){
-			double r = 1.55 * this->extent;
+			double r = recalc_growth_factor(this->extent) * this->extent;
 			assert(r > (double)extent);
 			return (size_type)r;
 		}
@@ -71,12 +103,13 @@ namespace rabbit{
 		size_type extent1;
 		size_type extent2;
 		size_type primary_bits;
+		double backoff;
 		_Config config;
 		_BinMapper(){
 		}
 		_BinMapper(size_type new_extent,const _Config& config){
 			this->config = config;
-			
+			this->backoff = get_max_backoff();
 			this->extent = 1 << this->config.log2(new_extent);
 			
 			this->extent1 = this->extent-1;	
@@ -86,10 +119,42 @@ namespace rabbit{
 		}
 		
 		inline size_type operator()(size_type h) const {										
-			return (h+(h >> this->primary_bits)) & this->extent1;///
+			return (h+(h>>this->primary_bits)) & this->extent1;///
+		}
+		
+		double get_min_backoff() const {
+			return 2;
+		}
+		double get_max_backoff() const {
+			return 8;
+		}
+		
+		/// Truncated Linear Backoff in Rehasing after collisions	
+		/// growth factor is calculated as a binary exponential 
+		/// backoff (yes, analogous to the one used in network congestion control)
+		/// in evidence of hash collisions the the growth factor is exponentialy 
+		/// decreased as memory becomes a scarce resource.
+		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
+		double recalc_growth_factor(size_type elements)  {
+			return 2;
+			double growth_factor = backoff;
+			bool linear = true;
+			if(linear){
+				double d = 0.81;				
+				if(backoff - d > get_min_backoff()){
+					backoff -= d ;					
+				}								
+			}else{								
+				double backof_factor = 0.502;
+				backoff = get_min_backoff() + (( backoff - get_min_backoff() ) * backof_factor);
+				
+			}
+			
+			return growth_factor ;
 		}
 		inline size_type next_size(){
-			double r = 2 * this->extent;
+
+			double r = recalc_growth_factor(this->extent) * this->extent;
 			assert(r > (double)extent);
 			return (size_type)r;
 		}
@@ -137,7 +202,7 @@ namespace rabbit{
 		};
 	};
 	struct default_traits{
-		typedef unsigned char _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
+		typedef unsigned short _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		typedef unsigned long _Size_Type;
 		typedef _Size_Type size_type;
 		class rabbit_config{
@@ -187,8 +252,8 @@ namespace rabbit{
 				BITS_LOG2_SIZE = log2(BITS_SIZE);
 				ALL_BITS_SET = ~(_Bt)0;
 				PROBES = 64; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)								
-				MIN_EXTENT = 8; /// start size of the hash table
-				MIN_OVERFLOW = 1024; 
+				MIN_EXTENT = 32; /// start size of the hash table
+				MIN_OVERFLOW = 256; 
 			}
 		};
 		typedef _BinMapper<rabbit_config> _Mapper;
@@ -275,6 +340,9 @@ namespace rabbit{
 		} ;
 
 		struct _KeySegment{
+		public:
+			_Bt exists;			
+			_Bt erased;
 		private:
 			_K keys[sizeof(_Bt)*8];
 		private:
@@ -288,8 +356,6 @@ namespace rabbit{
 				//w = (w & ~m) | (-f & m);
 			}
 		public:
-			_Bt exists;			
-			_Bt erased;
 			
 			inline const _K &key(_Bt ix) const {
 				return keys[ix];
@@ -486,7 +552,7 @@ namespace rabbit{
 				
 				mf = 1.0;
 				assert(config.MIN_OVERFLOW > 0);
-				overflow = std::min<size_type>(get_extent()/1024,config.MIN_OVERFLOW);
+				overflow = config.MIN_OVERFLOW; //std::min<size_type>(get_extent()/1024,config.MIN_OVERFLOW);
 				if(overflow < config.MIN_OVERFLOW){
 					overflow = config.MIN_OVERFLOW;
 				}
@@ -552,7 +618,7 @@ namespace rabbit{
 				_Bt index = get_segment_index(pos);
 				const _Segment& s = get_segment(pos);
 				const _K& l = get_segment_key(pos);
-				return s.is_exists(index) && eq_f(l, k) && !s.is_erased(index) ;
+				return eq_f(l, k) && s.is_exists(index) && !s.is_erased(index) ;
 			}
 			
 			bool equal_key(size_type pos,const _K& k) const {				
@@ -602,7 +668,7 @@ namespace rabbit{
 				_Segment &s = clusters[pos >> config.BITS_LOG2_SIZE];/// get_segment(pos)
 				_Bt si = get_segment_index(pos);
 				
-				if(s.exists ==0 || !s.is_exists(si)){
+				if(!s.is_exists(si)){
 					s.set_exists(si, true);					
 					set_segment_key(pos, k);
 					++elements;
@@ -741,7 +807,7 @@ namespace rabbit{
 				for(; pos < m;){
 					if(get_segment(pos).exists == 0){
 						pos += (config.BITS_SIZE - (pos & (config.BITS_SIZE-1)));
-					}else if(exists_(pos) && equal_key(pos,k)){
+					}else if(equal_key(pos,k) && exists_(pos)){
 						return pos;
 					}else{
 						++pos;

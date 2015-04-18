@@ -129,7 +129,7 @@ public:
 		double start = get_proc_mem_use();
 		std::minstd_rand rd;
 		std::mt19937 gen(rd());
-		std::uniform_int_distribution<long long> dis(1<<24, 1ll<<32);
+		std::uniform_int_distribution<long long> dis(1<<24, 1ll<<31);
 		/// script creation is not benched
 		_InputField v;
 		for(size_t r = 0; r < count;++r){
@@ -262,6 +262,7 @@ public:
 			if(h.count(script[k]) == 0){
 				printf("ERROR: could not find %ld\n",(long int)k);
 			};
+			if(false){
 			auto f = h.find(script[k]);
 			
 			if(f==h.end() || (*f).second != (typename _MapT::mapped_type)k+1){
@@ -274,6 +275,9 @@ public:
 						printf("ERROR: could not iterator find %ld\n",(long int)k);
 					}					
 				}
+			}
+			
+
 			}
 		}	
 		
@@ -295,7 +299,7 @@ void test_dense_hash_long(size_t ts){
 	h.set_empty_key(-2l);
 	tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random(ts, script);
+	t.gen_random_narrow(ts, script);
 	t.bench_hash_simple(h,script);	
 #endif
 }
@@ -307,7 +311,7 @@ void test_sparse_hash(size_t ts){
 	_Map h;
 	typename tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random(ts, script);
+	t.gen_random_narrow(ts, script);
 	t.bench_hash_simple(h,script);	
 #endif
 }
@@ -315,12 +319,12 @@ void test_sparse_hash(size_t ts){
 template<typename T>
 void test_rabbit_hash(size_t ts){
 	printf("rabbit hash test\n");
-	typedef rabbit::unordered_map<T, long> _Map;
+	typedef rabbit::unordered_map<T,long> _Map;
 	_Map h;
 	
 	typename tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random(ts, script);
+	t.gen_random_narrow(ts, script);
 	t.bench_hash_simple(h,script);
 	
 }
@@ -366,8 +370,8 @@ int main(int argc, char **argv)
 	
 	if(false){
 		//typedef std::string _K;
-		typedef long _K;
-		//test_dense_hash_long(ts);
+		typedef unsigned long _K;
+		test_dense_hash_long(ts);
 		//test_sparse_hash<_K>(ts);
 
 
@@ -375,7 +379,7 @@ int main(int argc, char **argv)
 
 	
 		test_rabbit_hash<_K>(ts);
-		//test_rabbit_hash_erase<_K>(ts/10);
+		test_rabbit_hash_erase<_K>(ts/10);
 	}else{
 		google_times(ts);
 	}
