@@ -67,11 +67,7 @@ namespace rabbit{
 			return 8;
 		}
 		
-		/// Truncated Linear Backoff in Rehasing after collisions	
-		/// growth factor is calculated as a binary exponential 
-		/// backoff (yes, analogous to the one used in network congestion control)
-		/// in evidence of hash collisions the the growth factor is exponentialy 
-		/// decreased as memory becomes a scarce resource.
+		/// Truncated Linear Backoff in Rehasing after collisions			
 		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
 		double recalc_growth_factor(size_type elements)  {
 			return 1.8;
@@ -106,13 +102,12 @@ namespace rabbit{
 		/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
 		///	hash randomizer available or if its performance is unpredicatable like in msvc
 		size_type primary_bits;
-		double backoff;
+		
 		_Config config;
 		_BinMapper(){
 		}
 		_BinMapper(size_type new_extent,const _Config& config){
 			this->config = config;
-			this->backoff = get_max_backoff();
 			this->extent = 1 << this->config.log2(new_extent);
 			
 			this->extent1 = this->extent-1;	
@@ -125,35 +120,8 @@ namespace rabbit{
 			return (h+(h>>this->primary_bits)) & this->extent1;///
 		}
 		
-		double get_min_backoff() const {
-			return 2;
-		}
-		double get_max_backoff() const {
-			return 8;
-		}
-		
-		/// Truncated Linear Backoff in Rehasing after collisions	
-		/// growth factor is calculated as a binary exponential 
-		/// backoff (yes, analogous to the one used in network congestion control)
-		/// in evidence of hash collisions the the growth factor is exponentialy 
-		/// decreased as memory becomes a scarce resource.
-		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
 		double recalc_growth_factor(size_type elements)  {
-			return 2;
-			double growth_factor = backoff;
-			bool linear = true;
-			if(linear){
-				double d = 0.81;				
-				if(backoff - d > get_min_backoff()){
-					backoff -= d ;					
-				}								
-			}else{								
-				double backof_factor = 0.502;
-				backoff = get_min_backoff() + (( backoff - get_min_backoff() ) * backof_factor);
-				
-			}
-			
-			return growth_factor ;
+			return 2;		
 		}
 		inline size_type next_size(){
 
