@@ -40,6 +40,7 @@ THE SOFTWARE.
 #define RABBIT_NOINLINE_
 #endif
 namespace rabbit{
+	/// us the mod mapper to get even smaller hash tables with small speed decrease
 	template <typename _Config>
 	struct _ModMapper{
 		typedef typename _Config::size_type size_type;
@@ -73,7 +74,7 @@ namespace rabbit{
 		/// decreased as memory becomes a scarce resource.
 		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
 		double recalc_growth_factor(size_type elements)  {
-			return 1.9;
+			return 1.8;
 			double growth_factor = backoff;
 			bool linear = true;
 			if(linear){
@@ -95,13 +96,15 @@ namespace rabbit{
 			return (size_type)r;
 		}
 	};
-	
+	/// the faster mapper still has pretty good space use (half of normal hash tables)
 	template <typename _Config>		
 	struct _BinMapper{
 		typedef typename _Config::size_type size_type;
 		size_type extent;
 		size_type extent1;
 		size_type extent2;
+		/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
+		///	hash randomizer available or if its performance is unpredicatable like in msvc
 		size_type primary_bits;
 		double backoff;
 		_Config config;
@@ -223,8 +226,6 @@ namespace rabbit{
 			/// maximum probes per bucket
 			_Bt PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
 			size_type BITS_LOG2_SIZE;
-			/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
-			///	hash randomizer available 
 			
 			size_type MIN_EXTENT;
 			size_type MIN_OVERFLOW ; 
@@ -251,9 +252,9 @@ namespace rabbit{
 				BITS_SIZE1 = BITS_SIZE-1;
 				BITS_LOG2_SIZE = log2(BITS_SIZE);
 				ALL_BITS_SET = ~(_Bt)0;
-				PROBES = 64; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)								
-				MIN_EXTENT = 8; /// start size of the hash table
-				MIN_OVERFLOW = 256; 
+				PROBES = 256; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)								
+				MIN_EXTENT = 2; /// start size of the hash table
+				MIN_OVERFLOW = 1024; 
 			}
 		};
 		typedef _BinMapper<rabbit_config> _Mapper;
@@ -997,11 +998,11 @@ namespace rabbit{
 		}
 		void reserve(size_type atleast){
 			
-			rehash((size_type)((double)atleast*2));
+			rehash((size_type)((double)atleast*1.3));
 		}
 		void resize(size_type atleast){
 			
-			rehash((size_type)((double)atleast*2));
+			rehash((size_type)((double)atleast*1.3));
 		}
 		void rehash(size_type to_){
 			rabbit_config config;
