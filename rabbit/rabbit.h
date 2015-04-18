@@ -202,7 +202,7 @@ namespace rabbit{
 		};
 	};
 	struct default_traits{
-		typedef unsigned short _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
+		typedef unsigned char _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		typedef unsigned long _Size_Type;
 		typedef _Size_Type size_type;
 		class rabbit_config{
@@ -252,8 +252,8 @@ namespace rabbit{
 				BITS_LOG2_SIZE = log2(BITS_SIZE);
 				ALL_BITS_SET = ~(_Bt)0;
 				PROBES = 64; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)								
-				MIN_EXTENT = 32; /// start size of the hash table
-				MIN_OVERFLOW = 256; 
+				MIN_EXTENT = 4; /// start size of the hash table
+				MIN_OVERFLOW = 32; 
 			}
 		};
 		typedef _BinMapper<rabbit_config> _Mapper;
@@ -552,7 +552,7 @@ namespace rabbit{
 				
 				mf = 1.0;
 				assert(config.MIN_OVERFLOW > 0);
-				overflow = config.MIN_OVERFLOW; //std::min<size_type>(get_extent()/1024,config.MIN_OVERFLOW);
+				overflow = std::min<size_type>(get_extent()/1024,config.MIN_OVERFLOW);
 				if(overflow < config.MIN_OVERFLOW){
 					overflow = config.MIN_OVERFLOW;
 				}
@@ -686,23 +686,23 @@ namespace rabbit{
 				++pos;
 				
 				for(; pos < m;){
-					if(get_segment(pos).all_erased()){						
-						pos += (config.BITS_SIZE - (pos & (config.BITS_SIZE-1)));
-					}else{
-						if(get_segment(pos).exists == 0 || !exists_(pos)){
-							set_exists(pos, true);
-							set_erased(pos, false);							
-							set_segment_key(pos, k);
-							set_segment_value(pos, _V());						
-							++elements;
-							return &(get_segment_value(pos));					
-						}else if(!erased_(pos)){
-							if (raw_equal_key(pos,k)){
-								return &(get_segment_value(pos));
-							}
+					///if(get_segment(pos).all_erased()){						
+					///	pos += (config.BITS_SIZE - (pos & (config.BITS_SIZE-1)));
+					///}else{
+					if( !exists_(pos)){//get_segment(pos).exists == 0 ||
+						set_exists(pos, true);
+						set_erased(pos, false);							
+						set_segment_key(pos, k);
+						set_segment_value(pos, _V());						
+						++elements;
+						return &(get_segment_value(pos));					
+					}else if(!erased_(pos)){
+						if (raw_equal_key(pos,k)){
+							return &(get_segment_value(pos));
 						}
-						++pos;
 					}
+					++pos;
+					//}
 				}
 
 				
@@ -714,8 +714,9 @@ namespace rabbit{
 				size_type last_empty = 0;
 				for(pos = get_extent(); pos < get_data_size();++pos){
 					if(!exists_(pos)){
-						last_empty = pos;
-						break;
+						//if(last_empty < get_extent())
+							last_empty = pos;
+							break;
 					}else if(equal_key(pos,k)){							
 						return &(get_segment_value(pos));
 					}

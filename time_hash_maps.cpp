@@ -626,7 +626,7 @@ static void time_map_toggle(int iters) {
 
   const size_t start = CurrentMemoryUsage();
   t.Reset();
-  for (i = 0; i < iters; i++) {
+  for (i = 0; i < iters; i++) {	
     set[i] = i+1;
     set.erase(i);
   }
