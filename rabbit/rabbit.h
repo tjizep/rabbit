@@ -252,8 +252,8 @@ namespace rabbit{
 				BITS_LOG2_SIZE = log2(BITS_SIZE);
 				ALL_BITS_SET = ~(_Bt)0;
 				PROBES = 64; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)								
-				MIN_EXTENT = 4; /// start size of the hash table
-				MIN_OVERFLOW = 32; 
+				MIN_EXTENT = 8; /// start size of the hash table
+				MIN_OVERFLOW = 256; 
 			}
 		};
 		typedef _BinMapper<rabbit_config> _Mapper;
