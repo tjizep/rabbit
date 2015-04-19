@@ -102,14 +102,12 @@ namespace rabbit{
 		size_type extent;
 		size_type extent1;
 		size_type extent2;
-		size_type primary_bits;
-		double backoff;
+		size_type primary_bits;	
 		_Config config;
 		_BinMapper(){
 		}
 		_BinMapper(size_type new_extent,const _Config& config){
-			this->config = config;
-			this->backoff = get_max_backoff();
+			this->config = config;		
 			this->extent = 1 << this->config.log2(new_extent);
 			
 			this->extent1 = this->extent-1;	
@@ -121,37 +119,11 @@ namespace rabbit{
 		inline size_type operator()(size_type h) const {										
 			return (h+(h>>this->primary_bits)) & this->extent1;///
 		}
-		
-		double get_min_backoff() const {
-			return 2;
-		}
-		double get_max_backoff() const {
-			return 8;
-		}
-		
-		/// Truncated Linear Backoff in Rehasing after collisions	
-		/// growth factor is calculated as a binary exponential 
-		/// backoff (yes, analogous to the one used in network congestion control)
-		/// in evidence of hash collisions the the growth factor is exponentialy 
-		/// decreased as memory becomes a scarce resource.
-		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
+			
 		double recalc_growth_factor(size_type elements)  {
 			return 2;
-			double growth_factor = backoff;
-			bool linear = true;
-			if(linear){
-				double d = 0.81;				
-				if(backoff - d > get_min_backoff()){
-					backoff -= d ;					
-				}								
-			}else{								
-				double backof_factor = 0.502;
-				backoff = get_min_backoff() + (( backoff - get_min_backoff() ) * backof_factor);
-				
-			}
-			
-			return growth_factor ;
 		}
+
 		inline size_type next_size(){
 
 			double r = recalc_growth_factor(this->extent) * this->extent;
@@ -251,7 +223,7 @@ namespace rabbit{
 				BITS_SIZE1 = BITS_SIZE-1;
 				BITS_LOG2_SIZE = log2(BITS_SIZE);
 				ALL_BITS_SET = ~(_Bt)0;
-				PROBES = 256; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)								
+				PROBES = 512; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)								
 				MIN_EXTENT = BITS_SIZE; /// start size of the hash table
 				MIN_OVERFLOW = BITS_SIZE*4; 
 			}
@@ -958,10 +930,10 @@ namespace rabbit{
 			}
 			
 			bool operator==(const const_iterator& r) const {
-				return h==r.h&&pos == r.pos;
+				return (pos == r.pos);
 			}
 			bool operator!=(const const_iterator& r) const {
-				return (h!=r.h)||(pos != r.pos);
+				return (pos != r.pos);
 			}
 		};
 
@@ -1005,11 +977,11 @@ namespace rabbit{
 		}
 		void reserve(size_type atleast){
 			
-			rehash((size_type)((double)atleast*1.3));
+			rehash((size_type)((double)atleast*1.8));
 		}
 		void resize(size_type atleast){
 			
-			rehash((size_type)((double)atleast*1.3));
+			rehash((size_type)((double)atleast*1.8));
 		}
 		void rehash(size_type to_){
 			rabbit_config config;
