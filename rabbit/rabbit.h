@@ -174,7 +174,7 @@ namespace rabbit{
 		};
 	};
 	struct default_traits{
-		typedef unsigned short _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
+		typedef unsigned int _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		typedef unsigned long _Size_Type;
 		typedef _Size_Type size_type;
 		class rabbit_config{
@@ -224,15 +224,15 @@ namespace rabbit{
 				BITS_LOG2_SIZE = log2(BITS_SIZE);
 				ALL_BITS_SET = ~(_Bt)0;
 				PROBES = 512; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)								
-				MIN_EXTENT = BITS_SIZE; /// start size of the hash table
-				MIN_OVERFLOW = BITS_SIZE*4; 
+				MIN_EXTENT = BITS_SIZE/2; /// start size of the hash table
+				MIN_OVERFLOW = BITS_SIZE*8/sizeof(_Bt); 
 			}
 		};
 		typedef _BinMapper<rabbit_config> _Mapper;
 	};
 	
 	template <typename _K, typename _V, typename _H = rabbit_hash<_K>, typename _E = std::equal_to<_K>, typename _Allocator = std::allocator<_K>, typename _Traits = default_traits >
-	class unordered_map {
+	class basic_unordered_map {
 	public:
 		typedef _K key_type;
 		
@@ -325,7 +325,7 @@ namespace rabbit{
 				#endif								
 				_Bt m = (_Bt)1ul << index;// the bit mask				
 				w ^= (-f ^ w) & m;
-				//w = (w & ~m) | (-f & m);
+				///w = (w & ~m) | (-f & m);
 			}
 		public:
 			
@@ -832,14 +832,14 @@ namespace rabbit{
 		}; /// hash_kernel
 		public:
 		struct iterator{
-			const unordered_map* h;
+			const basic_unordered_map* h;
 			hash_kernel * hc;
 			size_type pos;
 			
 			iterator(){
 				
 			}
-			iterator(const unordered_map* h, size_type pos): h(h),pos(pos){
+			iterator(const basic_unordered_map* h, size_type pos): h(h),pos(pos){
 				 hc = h->current.get();
 			}
 			iterator(const iterator& r){
@@ -864,34 +864,46 @@ namespace rabbit{
 			iterator operator++(int){
 				return (*this);
 			}
+			inline _V& get_value(){
+				return const_cast<hash_kernel *>(hc)->get_segment_value((*this).pos);
+			}
+			inline const _V& get_value() const {
+				return hc->get_segment_value((*this).pos);
+			}
+			inline _K& get_key() {
+				return const_cast<hash_kernel *>(hc)->get_segment_key((*this).pos);
+			}
+			inline const _K& get_key() const {
+				return hc->get_segment_key((*this).pos);
+			}
 			const _ElPair operator*() const {
 				return const_cast<hash_kernel *>(hc)->get_segment_pair((*this).pos);
 			}
-			_ElPair& operator*() {
+			inline _ElPair& operator*() {
 				return hc->get_segment_pair((*this).pos);
 			}
-			_ElPair* operator->() const {
+			inline _ElPair* operator->() const {
 				return &(const_cast<hash_kernel *>(hc)->get_segment_pair((*this).pos));
 			}
-			const _ElPair* operator->() {
+			inline const _ElPair* operator->() {
 				return &(hc->get_segment_pair((*this).pos));
 			}
-			bool operator==(const iterator& r) const {
-				return h==r.h&&pos == r.pos;
+			inline bool operator==(const iterator& r) const {
+				return (pos == r.pos);
 			}
 			bool operator!=(const iterator& r) const {
-				return (h!=r.h)||(pos != r.pos);
+				return (pos != r.pos);
 			}
 		};
 		
 		struct const_iterator{
-			const unordered_map* h;
+			const basic_unordered_map* h;
 			size_type pos;
 			
 			const_iterator(){
 				
 			}
-			const_iterator(const unordered_map* h, size_type pos): h(h),pos(pos){
+			const_iterator(const basic_unordered_map* h, size_type pos): h(h),pos(pos){
 				
 			}
 			const_iterator(const iterator& r){
@@ -923,10 +935,10 @@ namespace rabbit{
 				return (*this);
 			}
 			const _ElPair& operator*() const {
-				return const_cast<unordered_map*>(h)->current->get_segment_pair(pos);
+				return const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos);
 			}
 			const _ElPair* operator->() const {
-				return &(const_cast<unordered_map*>(h)->current->get_segment_pair(pos));
+				return &(const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos));
 			}
 			
 			bool operator==(const const_iterator& r) const {
@@ -999,9 +1011,9 @@ namespace rabbit{
 					iterator e = end();
 					size_type ctr = 0;
 					for(iterator i = begin();i != e;++i){						
-						_V* v = rehashed->unique_subscript((*i).first);	
+						_V* v = rehashed->unique_subscript(i.get_key());	
 						if(v != nullptr){
-							*v = (*i).second;
+							*v = i.get_value();
 							/// a cheap check to illuminate subtle bugs during development
 							if(++ctr != rehashed->elements){
 								cout << "iterations " << ctr << " elements " << rehashed->elements << " extent " << rehashed->get_extent() << endl;
@@ -1040,19 +1052,19 @@ namespace rabbit{
 			set_current(std::make_shared<hash_kernel>());
 		}
 		
-		unordered_map() {
+		basic_unordered_map() {
 			clear();
 		}
 		
-		unordered_map(const unordered_map& right) {			
+		basic_unordered_map(const basic_unordered_map& right) {			
 			*this = right;
 		}
 		
-		~unordered_map(){
+		~basic_unordered_map(){
 			
 		}
 		
-		unordered_map& operator=(const unordered_map& right){
+		basic_unordered_map& operator=(const basic_unordered_map& right){
 			(*this).clear();
 			(*this).reserve(right.size());
 			const_iterator e = right.end();
@@ -1118,94 +1130,25 @@ namespace rabbit{
 		}
 	};
 	/// the unordered set
-	template <typename _K, typename _H = std::hash<_K>>
-	class unordered_set{
+	template <typename _K, typename _V, typename _H = rabbit_hash<_K>>
+	class unordered_map : public basic_unordered_map<_K,_V,_H>{
 	protected:
-		typedef unordered_map<_K,char,_H> _Container;
+		typedef basic_unordered_map<_K,_V,_H> _Container;
 	public:
-		typedef typename _Container::size_type size_type;
-	private:		 
-		 _Container container;		 
-	public:
-		struct iterator{
-			
-			typename _Container::iterator pos;
-			
-			iterator(){
 				
-			}
-			iterator(typename _Container::iterator pos): pos(pos){
-				
-			}
-			iterator(const iterator& r){
-				(*this) = r;
-			}
-			iterator& operator=(const iterator& r){
-				pos = r.pos;
-				return (*this);
-			}
-			iterator& operator++(){
-				++pos;								
-				return (*this);
-			}
-			iterator operator++(int){
-				return (*this);
-			}
-			_K& operator*() const {
-				return (*pos).first;
-			}
-			const _K& operator*() {
-				return (*pos).first;
-			}
-			bool operator==(const iterator& r) const {
-				return pos == r.pos;
-			}
-			bool operator!=(const iterator& r) const {
-				return (pos != r.pos);
-			}
-		};
+		unordered_map(){
+		}
 
-		struct const_iterator{
-			
-			typename _Container::const_iterator pos;
-			
-			const_iterator(){
-				
-			}
-			const_iterator(typename _Container::iterator pos): pos(pos){
-				
-			}
-			const_iterator(const const_iterator& r){
-				(*this) = r;
-			}
-			const_iterator(const iterator& r){
-				(*this) = r;
-			}
-			const_iterator& operator=(const iterator& r){
-				pos = r.pos;
-				return (*this);
-			}
-			const_iterator& operator=(const const_iterator& r){
-				pos = r.pos;
-				return (*this);
-			}
-			const_iterator& operator++(){
-				++pos;								
-				return (*this);
-			}
-			const_iterator operator++(int){
-				return (*this);
-			}
-			const _K& operator*() const {
-				return (*pos).first;
-			}
-			bool operator==(const const_iterator& r) const {
-				return pos == r.pos;
-			}
-			bool operator!=(const const_iterator& r) const {
-				return (pos != r.pos);
-			}
-		};
+		~unordered_map(){
+		}
+		
+	}; /// unordered set
+	/// the unordered set
+	template <typename _K, typename _H = rabbit_hash<_K>>
+	class unordered_set : public basic_unordered_map<_K,char,_H>{
+	protected:
+		typedef basic_unordered_map<_K,char,_H> _Container;
+	public:
 		
 		
 		unordered_set(){
@@ -1213,71 +1156,11 @@ namespace rabbit{
 
 		~unordered_set(){
 		}
-		void rehash(size_type n){		
-			container.rehash(n);
-		}
-		float load_factor() const{
-			return container.load_factor() ;
-		}
-
-		size_type bucket_count() const {
-			container.bucket_count() ;
-		}
-		size_type bucket_size ( size_type n ) const{
-			return container.bucket_size ( n );
-		}
-		float max_load_factor() const {
-			return container.max_load_factor();
-		}
-	
-		void max_load_factor ( float z ){
-			container.max_load_factor(z);
-		}
-		void clear(){
-			container.clear();
-		}
-		
-		unordered_set& operator=(const unordered_set& right){
-			container = right.container;
-			return *this;
-		}
 		
 		void insert(const _K& k){
-			container.insert(k,'0');
+			_Container::insert(k,'0');
 		}
 		
-		void erase(const _K& k){
-			container.erase(k);
-		}
-		
-		void erase(iterator i){
-			container.erase((*i).first);
-		}
-		
-		void erase(const_iterator i){
-			container.erase((*i).first);
-		}
-		
-		size_type size() const {
-			return container.size();
-		}
-
-		bool empty() const {
-			return container.empty();
-		}
-		iterator end() const {
-			return container.end();
-		}
-		iterator begin() const {
-			return container.begin();
-		}
-		iterator find(const _K& k) const {
-			return container.find(k);
-		}
-		
-		size_type count(const _K& k) const{
-			return container.count(k);
-		}
 	}; /// unordered set
 }; // rab-bit
 
