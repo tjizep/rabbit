@@ -40,7 +40,6 @@ THE SOFTWARE.
 #define RABBIT_NOINLINE_
 #endif
 namespace rabbit{
-	/// us the mod mapper to get even smaller hash tables with small speed decrease
 	template <typename _Config>
 	struct _ModMapper{
 		typedef typename _Config::size_type size_type;
@@ -67,10 +66,14 @@ namespace rabbit{
 			return 8;
 		}
 		
-		/// Truncated Linear Backoff in Rehasing after collisions			
+		/// Truncated Linear Backoff in Rehasing after collisions	
+		/// growth factor is calculated as a binary exponential 
+		/// backoff (yes, analogous to the one used in network congestion control)
+		/// in evidence of hash collisions the the growth factor is exponentialy 
+		/// decreased as memory becomes a scarce resource.
 		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
 		double recalc_growth_factor(size_type elements)  {
-			return 1.8;
+			return 1.9;
 			double growth_factor = backoff;
 			bool linear = true;
 			if(linear){
@@ -92,22 +95,21 @@ namespace rabbit{
 			return (size_type)r;
 		}
 	};
-	/// the faster mapper still has pretty good space use (half of normal hash tables)
+	
 	template <typename _Config>		
 	struct _BinMapper{
 		typedef typename _Config::size_type size_type;
 		size_type extent;
 		size_type extent1;
 		size_type extent2;
-		/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
-		///	hash randomizer available or if its performance is unpredicatable like in msvc
 		size_type primary_bits;
-		
+		double backoff;
 		_Config config;
 		_BinMapper(){
 		}
 		_BinMapper(size_type new_extent,const _Config& config){
 			this->config = config;
+			this->backoff = get_max_backoff();
 			this->extent = 1 << this->config.log2(new_extent);
 			
 			this->extent1 = this->extent-1;	
@@ -120,8 +122,35 @@ namespace rabbit{
 			return (h+(h>>this->primary_bits)) & this->extent1;///
 		}
 		
+		double get_min_backoff() const {
+			return 2;
+		}
+		double get_max_backoff() const {
+			return 8;
+		}
+		
+		/// Truncated Linear Backoff in Rehasing after collisions	
+		/// growth factor is calculated as a binary exponential 
+		/// backoff (yes, analogous to the one used in network congestion control)
+		/// in evidence of hash collisions the the growth factor is exponentialy 
+		/// decreased as memory becomes a scarce resource.
+		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
 		double recalc_growth_factor(size_type elements)  {
-			return 2;		
+			return 2;
+			double growth_factor = backoff;
+			bool linear = true;
+			if(linear){
+				double d = 0.81;				
+				if(backoff - d > get_min_backoff()){
+					backoff -= d ;					
+				}								
+			}else{								
+				double backof_factor = 0.502;
+				backoff = get_min_backoff() + (( backoff - get_min_backoff() ) * backof_factor);
+				
+			}
+			
+			return growth_factor ;
 		}
 		inline size_type next_size(){
 
@@ -173,7 +202,7 @@ namespace rabbit{
 		};
 	};
 	struct default_traits{
-		typedef unsigned char _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
+		typedef unsigned short _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		typedef unsigned long _Size_Type;
 		typedef _Size_Type size_type;
 		class rabbit_config{
@@ -194,6 +223,8 @@ namespace rabbit{
 			/// maximum probes per bucket
 			size_type PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
 			size_type BITS_LOG2_SIZE;
+			/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
+			///	hash randomizer available 
 			
 			size_type MIN_EXTENT;
 			size_type MIN_OVERFLOW ; 
@@ -220,17 +251,16 @@ namespace rabbit{
 				BITS_SIZE1 = BITS_SIZE-1;
 				BITS_LOG2_SIZE = log2(BITS_SIZE);
 				ALL_BITS_SET = ~(_Bt)0;
-				PROBES = std::max<size_type>(BITS_SIZE, 128); /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)								
-				MIN_EXTENT = BITS_SIZE; /// start size of the hash table - must be multiples of bits size
-				MIN_OVERFLOW = BITS_SIZE*8; ///- must be multiples of bits size
+				PROBES = 256; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)								
+				MIN_EXTENT = BITS_SIZE; /// start size of the hash table
+				MIN_OVERFLOW = BITS_SIZE*4; 
 			}
 		};
 		typedef _BinMapper<rabbit_config> _Mapper;
-		//typedef _ModMapper<rabbit_config> _Mapper;
 	};
 	
 	template <typename _K, typename _V, typename _H = rabbit_hash<_K>, typename _E = std::equal_to<_K>, typename _Allocator = std::allocator<_K>, typename _Traits = default_traits >
-	class basic_unordered_map {
+	class unordered_map {
 	public:
 		typedef _K key_type;
 		
@@ -362,7 +392,7 @@ namespace rabbit{
 			}
 			
 		} ;
-		//typedef _KeySegment _PairSegment;
+		//typedef _PairSegment _Segment;
 		typedef _KeySegment _Segment;
 		/// the vector that will contain the segmented mapping pairs and flags
 		
@@ -522,7 +552,7 @@ namespace rabbit{
 				
 				mf = 1.0;
 				assert(config.MIN_OVERFLOW > 0);
-				overflow = std::min<size_type>(get_extent()/1024,config.MIN_OVERFLOW);
+				overflow = config.MIN_OVERFLOW; //std::min<size_type>(get_extent()/1024,config.MIN_OVERFLOW);
 				if(overflow < config.MIN_OVERFLOW){
 					overflow = config.MIN_OVERFLOW;
 				}
@@ -535,7 +565,7 @@ namespace rabbit{
 				clusters.clear();
 
 				values.resize(get_data_size());
-				//keys.resize(get_data_size());
+				
 				clusters.resize(esize);
 							
 				min_element = get_data_size();
@@ -605,9 +635,9 @@ namespace rabbit{
 				size_type m = std::min<size_type>(get_extent(), pos + config.PROBES);				
 				++pos;				
 				for(; pos < m;){
-					if(get_segment(pos).exists == config.ALL_BITS_SET){						
+					/*if(get_segment(pos).exists == config.ALL_BITS_SET){						
 						pos += (config.BITS_SIZE - (pos & (config.BITS_SIZE1)));
-					}else{
+					}else{*/
 						if(!exists_(pos)){
 							set_exists(pos, true);													
 							set_segment_key(pos, k);
@@ -615,7 +645,7 @@ namespace rabbit{
 							return &(get_segment_value(pos));
 						}
 						++pos;
-					}
+					//}
 										
 				}
 
@@ -656,49 +686,51 @@ namespace rabbit{
 				++pos;
 				
 				for(; pos < m;){
-				
-					if( !exists_(pos)){//get_segment(pos).exists == 0 ||
-						set_exists(pos, true);
-						set_erased(pos, false);							
-						set_segment_key(pos, k);
-						set_segment_value(pos, _V());						
-						++elements;
-						return &(get_segment_value(pos));					
-					}else if(!erased_(pos)){
-						if (raw_equal_key(pos,k)){
-							return &(get_segment_value(pos));
+					/*if(get_segment(pos).all_erased()){						
+						pos += (config.BITS_SIZE - (pos & (config.BITS_SIZE-1)));
+					}else{*/
+						if(get_segment(pos).exists == 0 || !exists_(pos)){
+							set_exists(pos, true);
+							set_erased(pos, false);							
+							set_segment_key(pos, k);
+							set_segment_value(pos, _V());						
+							++elements;
+							return &(get_segment_value(pos));					
+						}else if(!erased_(pos)){
+							if (raw_equal_key(pos,k)){
+								return &(get_segment_value(pos));
+							}
 						}
-					}
-					++pos;					
-				}								
+						++pos;
+					//}
+				}
+
+				
 										
+				/// this is quite slow so only calc when reaching overflow
 				
 				size_type last_empty = 0;
-				
-				pos = get_extent();
-				
 				if(elements){
-					/// this is quite slow so only calc when reaching overflow
 					if(load_factor() > max_load_factor()){				
 						return nullptr;
-					}	
-					while(pos < get_data_size()){
-						if(get_segment(pos).exists==0){
-							last_empty = pos;
-							pos += config.BITS_SIZE;						
+					}		
+					for(pos = get_extent(); pos < get_data_size();){
+						if(get_segment(pos).exists == 0){
+							pos += (config.BITS_SIZE - (pos & (config.BITS_SIZE-1)));
 						}else{
-							size_type e = pos + config.BITS_SIZE;
-							for(; pos < e;++pos){
-								if(!exists_(pos)){						
-									last_empty = pos;
-								}else if(equal_key(pos,k)){							
-									return &(get_segment_value(pos));
-								}						
+							if(!exists_(pos)){
+								last_empty = pos;						
+							}else if(equal_key(pos,k)){							
+								return &(get_segment_value(pos));
 							}
-						}				
-					}									
+							++pos;
+						}
+					};
+				}else{
+					last_empty = get_data_size()-1;
 				}
-				/// the key was not found now opurtunistically unerase it				
+				
+				/// the key was not found now opurtunistically unerase it
 				/// this could be more aggressive to avoid potential rehashes
 
 				if((*this).removed){
@@ -828,14 +860,15 @@ namespace rabbit{
 		}; /// hash_kernel
 		public:
 		struct iterator{
-			const basic_unordered_map* h;			
+			const unordered_map* h;
+			hash_kernel * hc;
 			size_type pos;
 			
 			iterator(){
 				
 			}
-			iterator(const basic_unordered_map* h, size_type pos): h(h),pos(pos){
-				 
+			iterator(const unordered_map* h, size_type pos): h(h),pos(pos){
+				 hc = h->current.get();
 			}
 			iterator(const iterator& r){
 				(*this) = r;
@@ -843,14 +876,14 @@ namespace rabbit{
 			iterator& operator=(const iterator& r){
 				h = r.h;
 				pos = r.pos;
-				
+				hc = r.hc;
 				return (*this);
 			}
 			iterator& operator++(){
 				++pos;
 				/// todo optimize with 32-bit or 64-bit zero counting
 				
-				while(pos < h->current->get_data_size() && (!h->current->exists_(pos) || h->current->erased_(pos))){
+				while(pos < hc->get_data_size() && (!hc->exists_(pos) || hc->erased_(pos))){
 					++pos;
 				}
 				
@@ -860,33 +893,33 @@ namespace rabbit{
 				return (*this);
 			}
 			const _ElPair operator*() const {
-				return const_cast<basic_unordered_map *>(h)->current->get_segment_pair((*this).pos);
+				return const_cast<hash_kernel *>(hc)->get_segment_pair((*this).pos);
 			}
 			_ElPair& operator*() {
-				return h->current->get_segment_pair((*this).pos);
+				return hc->get_segment_pair((*this).pos);
 			}
 			_ElPair* operator->() const {
-				return &(const_cast<basic_unordered_map *>(h)->current->get_segment_pair((*this).pos));
+				return &(const_cast<hash_kernel *>(hc)->get_segment_pair((*this).pos));
 			}
 			const _ElPair* operator->() {
-				return &(h->current->get_segment_pair((*this).pos));
+				return &(hc->get_segment_pair((*this).pos));
 			}
 			bool operator==(const iterator& r) const {
-				return pos == r.pos;
+				return h==r.h&&pos == r.pos;
 			}
 			bool operator!=(const iterator& r) const {
-				return pos != r.pos;
+				return (h!=r.h)||(pos != r.pos);
 			}
 		};
 		
 		struct const_iterator{
-			const basic_unordered_map* h;
+			const unordered_map* h;
 			size_type pos;
 			
 			const_iterator(){
 				
 			}
-			const_iterator(const basic_unordered_map* h, size_type pos): h(h),pos(pos){
+			const_iterator(const unordered_map* h, size_type pos): h(h),pos(pos){
 				
 			}
 			const_iterator(const iterator& r){
@@ -918,10 +951,10 @@ namespace rabbit{
 				return (*this);
 			}
 			const _ElPair& operator*() const {
-				return const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos);
+				return const_cast<unordered_map*>(h)->current->get_segment_pair(pos);
 			}
 			const _ElPair* operator->() const {
-				return &(const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos));
+				return &(const_cast<unordered_map*>(h)->current->get_segment_pair(pos));
 			}
 			
 			bool operator==(const const_iterator& r) const {
@@ -972,11 +1005,11 @@ namespace rabbit{
 		}
 		void reserve(size_type atleast){
 			
-			rehash((size_type)((double)atleast*1.7));
+			rehash((size_type)((double)atleast*1.3));
 		}
 		void resize(size_type atleast){
 			
-			rehash((size_type)((double)atleast*1.7));
+			rehash((size_type)((double)atleast*1.3));
 		}
 		void rehash(size_type to_){
 			rabbit_config config;
@@ -1035,19 +1068,19 @@ namespace rabbit{
 			set_current(std::make_shared<hash_kernel>());
 		}
 		
-		basic_unordered_map() {
+		unordered_map() {
 			clear();
 		}
 		
-		basic_unordered_map(const basic_unordered_map& right) {			
+		unordered_map(const unordered_map& right) {			
 			*this = right;
 		}
 		
-		~basic_unordered_map(){
+		~unordered_map(){
 			
 		}
 		
-		basic_unordered_map& operator=(const basic_unordered_map& right){
+		unordered_map& operator=(const unordered_map& right){
 			(*this).clear();
 			(*this).reserve(right.size());
 			const_iterator e = right.end();
@@ -1112,32 +1145,95 @@ namespace rabbit{
 			return current->size();
 		}
 	};
-
-	template <typename _K, typename _V, typename _H = std::hash<_K>>
-	class unordered_map : public basic_unordered_map<_K,char,_H>{
-	protected:
-		typedef basic_unordered_map<_K,_V,_H> _Container;	
-	public:
-		
-		
-		unordered_map(){
-		}
-
-		~unordered_map(){
-		}
-		
-		/*unordered_map& operator=(const unordered_map& right){
-			return _Container::operator=(right);			
-		}*/		
-		
-	}; /// unordered map
-
 	/// the unordered set
 	template <typename _K, typename _H = std::hash<_K>>
-	class unordered_set : public unordered_map<_K,char,_H>{
+	class unordered_set{
 	protected:
-		typedef unordered_map<_K,char,_H> _Container;	
+		typedef unordered_map<_K,char,_H> _Container;
 	public:
+		typedef typename _Container::size_type size_type;
+	private:		 
+		 _Container container;		 
+	public:
+		struct iterator{
+			
+			typename _Container::iterator pos;
+			
+			iterator(){
+				
+			}
+			iterator(typename _Container::iterator pos): pos(pos){
+				
+			}
+			iterator(const iterator& r){
+				(*this) = r;
+			}
+			iterator& operator=(const iterator& r){
+				pos = r.pos;
+				return (*this);
+			}
+			iterator& operator++(){
+				++pos;								
+				return (*this);
+			}
+			iterator operator++(int){
+				return (*this);
+			}
+			_K& operator*() const {
+				return (*pos).first;
+			}
+			const _K& operator*() {
+				return (*pos).first;
+			}
+			bool operator==(const iterator& r) const {
+				return pos == r.pos;
+			}
+			bool operator!=(const iterator& r) const {
+				return (pos != r.pos);
+			}
+		};
+
+		struct const_iterator{
+			
+			typename _Container::const_iterator pos;
+			
+			const_iterator(){
+				
+			}
+			const_iterator(typename _Container::iterator pos): pos(pos){
+				
+			}
+			const_iterator(const const_iterator& r){
+				(*this) = r;
+			}
+			const_iterator(const iterator& r){
+				(*this) = r;
+			}
+			const_iterator& operator=(const iterator& r){
+				pos = r.pos;
+				return (*this);
+			}
+			const_iterator& operator=(const const_iterator& r){
+				pos = r.pos;
+				return (*this);
+			}
+			const_iterator& operator++(){
+				++pos;								
+				return (*this);
+			}
+			const_iterator operator++(int){
+				return (*this);
+			}
+			const _K& operator*() const {
+				return (*pos).first;
+			}
+			bool operator==(const const_iterator& r) const {
+				return pos == r.pos;
+			}
+			bool operator!=(const const_iterator& r) const {
+				return (pos != r.pos);
+			}
+		};
 		
 		
 		unordered_set(){
@@ -1145,13 +1241,71 @@ namespace rabbit{
 
 		~unordered_set(){
 		}
-		
+		void rehash(size_type n){		
+			container.rehash(n);
+		}
+		float load_factor() const{
+			return container.load_factor() ;
+		}
+
+		size_type bucket_count() const {
+			container.bucket_count() ;
+		}
+		size_type bucket_size ( size_type n ) const{
+			return container.bucket_size ( n );
+		}
+		float max_load_factor() const {
+			return container.max_load_factor();
+		}
 	
-		void insert(const _K& k){
-			_Container::insert(k,'0');
+		void max_load_factor ( float z ){
+			container.max_load_factor(z);
+		}
+		void clear(){
+			container.clear();
 		}
 		
+		unordered_set& operator=(const unordered_set& right){
+			container = right.container;
+			return *this;
+		}
 		
+		void insert(const _K& k){
+			container.insert(k,'0');
+		}
+		
+		void erase(const _K& k){
+			container.erase(k);
+		}
+		
+		void erase(iterator i){
+			container.erase((*i).first);
+		}
+		
+		void erase(const_iterator i){
+			container.erase((*i).first);
+		}
+		
+		size_type size() const {
+			return container.size();
+		}
+
+		bool empty() const {
+			return container.empty();
+		}
+		iterator end() const {
+			return container.end();
+		}
+		iterator begin() const {
+			return container.begin();
+		}
+		iterator find(const _K& k) const {
+			return container.find(k);
+		}
+		
+		size_type count(const _K& k) const{
+			return container.count(k);
+		}
 	}; /// unordered set
 }; // rab-bit
 
