@@ -128,7 +128,7 @@ static bool FLAGS_test_hash_map = true;
 static bool FLAGS_test_map = false;
 
 static bool FLAGS_test_4_bytes = true;
-static bool FLAGS_test_8_bytes = false;
+static bool FLAGS_test_8_bytes = true;
 static bool FLAGS_test_16_bytes = true;
 static bool FLAGS_test_256_bytes = false;
 
