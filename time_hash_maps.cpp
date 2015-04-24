@@ -128,7 +128,7 @@ static bool FLAGS_test_hash_map = true;
 static bool FLAGS_test_map = false;
 
 static bool FLAGS_test_4_bytes = true;
-static bool FLAGS_test_8_bytes = true;
+static bool FLAGS_test_8_bytes = false;
 static bool FLAGS_test_16_bytes = true;
 static bool FLAGS_test_256_bytes = false;
 
@@ -262,7 +262,7 @@ template<int Size, int Hashsize> class HashObject {
     for (size_t i = 0; i < Hashsize - sizeof(i_); ++i) {
       hashval += buffer_[i];
     }
-    return SPARSEHASH_HASH<int>()(hashval);
+    return hashval; ///SPARSEHASH_HASH<int>()();
   }
 
   bool operator==(const class_type& that) const { return this->i_ == that.i_; }

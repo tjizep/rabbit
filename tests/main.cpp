@@ -204,7 +204,6 @@ public:
 	
 		size_t s = count/10;
 		for(size_t j = 0; j < count; ++j){
-			
 			h[script[j]] = (typename _MapT::mapped_type)j+1;
 			if(j % s == 0){
 				std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -320,8 +319,7 @@ template<typename T>
 void test_rabbit_hash(size_t ts){
 	printf("rabbit hash test\n");
 	typedef rabbit::unordered_map<T,long> _Map;
-	_Map h;
-	
+	_Map h;	
 	typename tester<_Map>::_Script script;
 	tester<_Map> t;
 	t.gen_random_narrow(ts, script);
@@ -335,7 +333,7 @@ void test_rabbit_hash_erase(size_t ts){
 	_Map h;
 	
 	typename tester<_Map>::_Script script;
-	tester<_Map> t;
+	tester<_Map> t;	
 	t.gen_random(ts, script);
 	t.bench_hash(h,script);	
 	t.erase_test(h,script);
@@ -365,10 +363,10 @@ void more_tests(){
 }
 int main(int argc, char **argv)
 {
-	///::Sleep(1000);
+	::Sleep(1000);
 	int ts = 10000000;
 	
-	if(false){
+	if(true){
 		//typedef std::string _K;
 		typedef unsigned long _K;
 		test_dense_hash_long(ts);
