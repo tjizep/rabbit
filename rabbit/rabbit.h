@@ -552,8 +552,7 @@ namespace rabbit{
 				clusters = right.clusters;
 				buckets = right.buckets;
 				removed = right.removed;
-				mf = right.mf;				
-				min_element = right.min_element ;
+				mf = right.mf;								
 				elements = right.elements;				
 				return *this;
 			}
@@ -563,15 +562,13 @@ namespace rabbit{
 			}
 			inline bool segment_equal_key(size_type pos,const _K& k) const {
 				_Bt index = get_segment_index(pos);
-				const _Segment& s = get_segment(pos);
-				const _K& l = get_segment_key(pos);
-				return eq_f(l, k) ;
+				const _Segment& s = get_segment(pos);				
+				return eq_f(s.key(index), k) ;
 			}
 			inline bool segment_equal_key_exists(size_type pos,const _K& k) const {
 				_Bt index = get_segment_index(pos);
-				const _Segment& s = get_segment(pos);
-				const _K& l = get_segment_key(pos);
-				return eq_f(l, k) && s.is_exists(index);
+				const _Segment& s = get_segment(pos);				
+				return eq_f(s.key(index), k) && s.is_exists(index);
 			}
 			
 			bool equal_key(size_type pos,const _K& k) const {				
@@ -582,34 +579,20 @@ namespace rabbit{
 			/// when all inputs to this function is unique relative to current hash map(i.e. they dont exist in the hashmap)
 			/// and there where no erasures. for maximum fillrate in rehash
 			_V* unique_subscript_rest(const _K& k, size_type pos){
-				size_type epos = pos;	
+				
 				size_type h = pos;
 				
 				size_type start = 0;					
-				size_type probe = 0;
-					
-				for(; probe < config.PROBES;probe += 4){													
-					if(!exists_(pos)){
-						start = pos;
-						break;
-					};
-					++pos;
-					if(!exists_(pos)){
-						start = pos;
-						break;
-					};
-					++pos;
-					if(!exists_(pos)){
-						start = pos;
-						break;
-					};
-					++pos;
-					if(!exists_(pos)){
-						start = pos;
-						break;
-					};
-					++pos;
-				}
+				
+				if(!exists_(pos)){
+					start = pos;
+				}else if(!exists_(++pos)){
+					start = pos;
+				}else if(!exists_(++pos)){
+					start = pos;
+				}else if(!exists_(++pos)){
+					start = pos;
+				};
 				if(start > 0){
 					set_exists(pos, true);												
 					set_segment_key(pos, k);
@@ -791,26 +774,16 @@ namespace rabbit{
 			size_type find_rest(const _K& k, size_type pos) const {
 				size_type h = pos;
 				
-				
-				for(size_type probe=0; probe < config.PROBES;probe+=4){					
-					if(exists_(pos)){
-						if(equal_key(pos,k)) return pos;
-					};				
-					++pos;
-					if(exists_(pos)){
-						if(equal_key(pos,k)) return pos;
-					};				
-					++pos;
-					if(exists_(pos)){
-						if(equal_key(pos,k)) return pos;
-					};		
-					++pos;
-					if(exists_(pos)){
-						if(equal_key(pos,k)) return pos;
-					};		
-					++pos;						
-				}
-				
+				if(exists_(pos) && equal_key(pos,k)){
+					return pos;
+				}else if(exists_(++pos) && equal_key(pos,k)){
+					return pos;
+				}else if(exists_(++pos) && equal_key(pos,k)){
+					return pos;
+				}else if(exists_(++pos) && equal_key(pos,k)){
+					return pos;
+				};		
+				++pos;						
 				
 				//size_type e = ((overflow_elements/8)+1)*8;
 				//if(get_data_size() < e) e = get_data_size(); ///overflow is divisible by 8
