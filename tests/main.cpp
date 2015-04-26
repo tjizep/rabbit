@@ -322,7 +322,7 @@ void test_rabbit_hash(size_t ts){
 	_Map h;	
 	typename tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random_narrow(ts, script);
+	t.gen_random(ts, script);
 	t.bench_hash_simple(h,script);
 	
 }

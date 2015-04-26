@@ -115,7 +115,7 @@ namespace rabbit{
 		
 		inline size_type operator()(size_type h) const {		
 
-			return (h+(h>>this->primary_bits)) & this->extent1;
+			return (h+(h>>this->primary_bits)) & this->extent1; 
 
 		}
 			
@@ -174,7 +174,7 @@ namespace rabbit{
 	};
 
 	struct default_traits{
-		typedef unsigned long _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
+		typedef unsigned int _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		typedef unsigned long _Size_Type;
 		typedef _Size_Type size_type;
 		class rabbit_config{
@@ -192,14 +192,14 @@ namespace rabbit{
 			_Bt BITS_SIZE ;
 			_Bt BITS_SIZE1 ;			
 			_Bt ALL_BITS_SET ;
-			/// maximum probes per access (currently unused, but might be )
+			/// maximum probes per access
 			size_type PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)			
 			size_type BITS_LOG2_SIZE;
 			/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
 			///	hash randomizer available 
 			
 			size_type MIN_EXTENT;
-			size_type MIN_OVERFLOW ; 
+			size_type MAX_OVERFLOW ; 
 			
 			rabbit_config(const rabbit_config& right){
 				*this = right;
@@ -214,7 +214,7 @@ namespace rabbit{
 				PROBES = right.PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
 				
 				MIN_EXTENT = right.MIN_EXTENT;
-				MIN_OVERFLOW = right.MIN_OVERFLOW; 
+				MAX_OVERFLOW = right.MAX_OVERFLOW; 
 				return *this;
 			}
 			
@@ -224,9 +224,9 @@ namespace rabbit{
 				BITS_SIZE1 = BITS_SIZE-1;
 				BITS_LOG2_SIZE = log2(BITS_SIZE);
 				ALL_BITS_SET = ~(_Bt)0;				
-				PROBES = 4; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)								
-				MIN_EXTENT = BITS_SIZE; /// start size of the hash table
-				MIN_OVERFLOW = 1024; //BITS_SIZE*8/sizeof(_Bt); 
+				PROBES = 8;							
+				MIN_EXTENT = 4; /// start size of the hash table
+				MAX_OVERFLOW = 2048; //BITS_SIZE*8/sizeof(_Bt); 
 			
 			}
 		};
@@ -373,6 +373,7 @@ namespace rabbit{
 			/// settings configuration
 			rabbit_config config;
 			size_type elements;
+			size_type probes;
 			/// the existence bit set is a factor of BITS_SIZE+1 less than the extent
 			_Segment* clusters;///a.k.a. pages
 			//_Keys keys;
@@ -410,7 +411,7 @@ namespace rabbit{
 			/// mainly to satisfy stl conventions
 			size_type bucket_size ( size_type n ) const{
 				size_type pos = n;
-				size_type m = std::min<size_type>(get_extent(), pos + config.PROBES);
+				size_type m = std::min<size_type>(get_extent(), pos + probes);
 				size_type r = 0;				
 				for(; pos < m;++pos){
 					if(!exists_(pos)){				
@@ -548,12 +549,12 @@ namespace rabbit{
 				key_mapper = _Mapper(new_extent,config); 
 				
 				mf = 1.0;
-				assert(config.MIN_OVERFLOW > 0);
-				overflow = config.MIN_OVERFLOW; //std::min<size_type>(get_extent()/1024,config.MIN_OVERFLOW);
+				assert(config.MAX_OVERFLOW > 0);
+				overflow = std::min<size_type>(get_extent()/config.MAX_OVERFLOW+16,config.MAX_OVERFLOW);
 				assert(overflow > 0);
 				elements = 0;
 				removed = 0;
-			
+				probes = config.PROBES; /// start probes
 				overflow_elements = get_o_start();
 
 				size_type esize = get_e_size();				
@@ -620,6 +621,15 @@ namespace rabbit{
 				const _Segment& s = get_segment(pos);				
 				return eq_f(s.key(index), k) && s.is_exists(index);
 			}
+			inline bool erase_segment_equal_key_exists(size_type pos,const _K& k) {
+				_Bt index = get_segment_index(pos);
+				const _Segment& s = get_segment(pos);				
+				if(eq_f(s.key(index), k) && s.is_exists(index)){
+					s.set_exists(index, false);
+					return true;
+				}
+				return false;
+			}
 			
 			bool equal_key(size_type pos,const _K& k) const {				
 				const _K& l = get_segment_key(pos);
@@ -631,23 +641,23 @@ namespace rabbit{
 			_V* unique_subscript_rest(const _K& k, size_type pos){
 				
 				size_type h = pos;
-				
+				++pos;
 				size_type start = 0;					
-				
-				if(!exists_(pos)){
-					start = pos;
-				}else if(!exists_(++pos)){
-					start = pos;
+				for(unsigned int i =0; i < probes;++i){
+
+					if(!exists_(pos)){
+						set_exists(pos, true);												
+						set_segment_key(pos, k);
+						++elements;							
+						return create_segment_value(pos);
+					}
+					++pos;				
 				}
-				if(start > 0){
-					set_exists(pos, true);												
-					set_segment_key(pos, k);
-					++elements;							
-					return create_segment_value(pos);
-				};
+
 				
 				if(overflow_elements < end()){
 					pos = overflow_elements++;
+					probes = config.PROBES + config.log2(overflow_elements)/4;
 					if(!exists_(pos)){
 						set_overflows(h,true);
 						set_exists(pos, true);												
@@ -663,9 +673,9 @@ namespace rabbit{
 			
 				/// eventualy an out of memory (bad_allocation) exception will occur
 				size_type pos = map_key(k);
-				_Segment &s = clusters[pos >> config.BITS_LOG2_SIZE];/// get_segment(pos)
 				_Bt si = get_segment_index(pos);
-				
+				_Segment &s = clusters[pos >> config.BITS_LOG2_SIZE];/// get_segment(pos)
+								
 				if(!s.is_exists(si)){
 					s.set_exists(si, true);					
 					s.key(si) = k;
@@ -677,54 +687,36 @@ namespace rabbit{
 				return unique_subscript_rest(k, pos);
 			}
 			_V* subscript_rest(const _K& k, size_type pos,size_type h){
-				
-				size_type at_empty;
-				
-				pos = h;
-				if(!exists_(pos)){
-					set_exists(pos, true);					
-					set_segment_key(pos, k);
-					++elements;
-					return create_segment_value(pos);
+				pos = h;				
+				++pos;
+				for(unsigned int i =0; i < probes;++i){
+					_Bt si = get_segment_index(pos);
+					_Segment& s = get_segment(pos);
+					if(!s.is_exists(si)){
+						s.set_exists(si, true);
+						s.key(si)=k;						
+						++elements;
+						return create_segment_value(pos);
+					}
+					++pos;
 				}
-				at_empty = end();				
-				size_type start = pos;
-					
-				if(!exists_(pos)){
-					at_empty = pos;					
-				}else if(!exists_(++pos)){
-					at_empty = pos;						
-				}
+
+				size_type at_empty = end();				
 				
-				if(at_empty == end()){					
-					if(overflow_elements < end()){
-						if(!exists_(overflow_elements)){
-							at_empty = overflow_elements++;		
-							set_overflows(h, true);
-						}
-					}else if (removed){
-						size_type e = ((overflow_elements/8)+1)*8;
-						if(end() < e) e = end(); ///overflow is divisible by 8
-						for(pos=get_o_start(); pos < e; ){		
-							if(!exists_(pos) ) at_empty = pos; break;
-							++pos;
-							if(!exists_(pos) ) at_empty = pos; break;
-							++pos;
-							if(!exists_(pos) ) at_empty = pos; break;			
-							++pos;
-							if(!exists_(pos) ) at_empty = pos; break;			
-							++pos;
-							if(!exists_(pos) ) at_empty = pos; break;			
-							++pos;
-							if(!exists_(pos) ) at_empty = pos; break;			
-							++pos;
-							if(!exists_(pos) ) at_empty = pos; break;			
-							++pos;
-							if(!exists_(pos) ) at_empty = pos; break;			
-							++pos;					
-						}
+				if(overflow_elements < end()){
+					if(!exists_(overflow_elements)){
+						at_empty = overflow_elements++;		
+						probes = config.PROBES + config.log2(overflow_elements)/4;
+						set_overflows(h, true);
+					}
+				}else if (removed){
+					size_type e = end();					
+					for(pos=get_o_start(); pos < e; ){		
+						if(!exists_(pos) ) at_empty = pos; break;
+						++pos;						
 					}
 				}
+				
 				pos = at_empty;		
 				if(pos != end()){
 					
@@ -749,8 +741,21 @@ namespace rabbit{
 			}
 			bool erase(const _K& k){
 				
-				size_type h;
-				size_type pos = find(k,h);	
+				size_type pos = map_key(k);				
+				if(segment_equal_key_exists(pos,k)){ ///get_segment(pos).exists == ALL_BITS_SET || 
+					set_exists(pos, false);
+					++removed;					
+					//set_segment_key(pos,  _K());
+					//set_segment_value(pos, _V());			
+					destroy_segment_value(pos);
+					--elements;														
+					return true;
+				}				
+				
+				size_type h = pos;
+				
+				pos = find_rest(k,pos);
+
 				if(pos != (*this).end()){					
 					set_exists(pos, false);
 					++removed;					
@@ -798,13 +803,43 @@ namespace rabbit{
 			
 			size_type find_rest(const _K& k, size_type pos) const {
 				size_type h = pos;
+				++pos;
+				for(unsigned int i =0; i < probes;){
+					_Bt si = get_segment_index(pos);
+					if(si+8 < config.BITS_SIZE){
+						const _Segment& s = get_segment(pos);
+						
+						if(eq_f(s.key(  si), k) && s.is_exists(si))
+							return pos;
+						if(eq_f(s.key(++si), k) && s.is_exists(si))
+							return pos+1;
+						if(eq_f(s.key(++si), k) && s.is_exists(si))
+							return pos+2;
+						if(eq_f(s.key(++si), k) && s.is_exists(si))
+							return pos+3;
+						if(eq_f(s.key(++si), k) && s.is_exists(si))
+							return pos+4;
+						if(eq_f(s.key(++si), k) && s.is_exists(si))
+							return pos+5;
+						if(eq_f(s.key(++si), k) && s.is_exists(si))
+							return pos+6;
+						if(eq_f(s.key(++si), k) && s.is_exists(si))
+							return pos+7;
+					
+						i+=8;
+						pos+=8;
+						
+					}else{
 				
-				if(exists_(pos) && equal_key(pos,k)){
-					return pos;
-				}else if(exists_(++pos) && equal_key(pos,k)){
-					return pos;
+						if(segment_equal_key_exists(pos,k)){
+							return pos;
+						}
+						
+						++pos;
+						i+=1;
+					}
+					
 				}
-				++pos;						
 				
 				//size_type e = ((overflow_elements/8)+1)*8;
 				//if(get_data_size() < e) e = get_data_size(); ///overflow is divisible by 8
@@ -1101,12 +1136,12 @@ namespace rabbit{
 						if(v != nullptr){
 							*v = i.get_value();
 							/// a cheap check to illuminate subtle bugs during development
-							/*if(++ctr != rehashed->elements){
+							if(++ctr != rehashed->elements){
 								cout << "iterations " << ctr << " elements " << rehashed->elements << " extent " << rehashed->get_extent() << endl;
 								cout << "inside rehash " << rehashed->get_extent() << endl;
 								cout << "new " << rehashed->elements << " current size:"  << current->elements << endl;		
 								throw bad_alloc();
-							}*/
+							}
 						}else{							
 							
 							rehashed = make_shared<hash_kernel>();

@@ -130,7 +130,9 @@ static bool FLAGS_test_map = false;
 static bool FLAGS_test_4_bytes = true;
 static bool FLAGS_test_8_bytes = true;
 static bool FLAGS_test_16_bytes = true;
-static bool FLAGS_test_256_bytes = false;
+static bool FLAGS_test_256_bytes = true;
+
+static bool growth_only = false;
 
 #if defined(HAVE_UNORDERED_MAP)
 using HASH_NAMESPACE::unordered_map;
@@ -714,14 +716,14 @@ static void measure_map(const char* label, int obj_size, int iters,
                         bool stress_hash_function) {
   printf("\n%s (%d byte objects, %d iterations):\n", label, obj_size, iters);
   if (1) time_map_grow<MapType>(iters);
-  if (1) time_map_grow_predicted<MapType>(iters);
-  if (1) time_map_replace<MapType>(iters);
-  if (1) time_map_fetch_random<MapType>(iters);
-  if (1) time_map_fetch_sequential<MapType>(iters);
-  if (1) time_map_fetch_empty<MapType>(iters);
-  if (1) time_map_remove<MapType>(iters);
-  if (1) time_map_toggle<MapType>(iters);
-  if (1) time_map_iterate<MapType>(iters);
+  if (1 && !growth_only) time_map_grow_predicted<MapType>(iters);
+  if (1 && !growth_only) time_map_replace<MapType>(iters);
+  if (1 && !growth_only) time_map_fetch_random<MapType>(iters);
+  if (1 && !growth_only) time_map_fetch_sequential<MapType>(iters);
+  if (1 && !growth_only) time_map_fetch_empty<MapType>(iters);
+  if (1 && !growth_only) time_map_remove<MapType>(iters);
+  if (1 && !growth_only) time_map_toggle<MapType>(iters);
+  if (1 && !growth_only) time_map_iterate<MapType>(iters);
   // This last test is useful only if the map type uses hashing.
   // And it's slow, so use fewer iterations.
   if (stress_hash_function) {
