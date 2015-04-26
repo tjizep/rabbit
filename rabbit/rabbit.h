@@ -174,7 +174,7 @@ namespace rabbit{
 	};
 
 	struct default_traits{
-		typedef unsigned short _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
+		typedef unsigned long _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		typedef unsigned long _Size_Type;
 		typedef _Size_Type size_type;
 		class rabbit_config{
@@ -192,7 +192,7 @@ namespace rabbit{
 			_Bt BITS_SIZE ;
 			_Bt BITS_SIZE1 ;			
 			_Bt ALL_BITS_SET ;
-			/// maximum probes per bucket
+			/// maximum probes per access (currently unused, but might be )
 			size_type PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)			
 			size_type BITS_LOG2_SIZE;
 			/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
@@ -226,7 +226,7 @@ namespace rabbit{
 				ALL_BITS_SET = ~(_Bt)0;				
 				PROBES = 4; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)								
 				MIN_EXTENT = BITS_SIZE; /// start size of the hash table
-				MIN_OVERFLOW = 256; //BITS_SIZE*8/sizeof(_Bt); 
+				MIN_OVERFLOW = 1024; //BITS_SIZE*8/sizeof(_Bt); 
 			
 			}
 		};
@@ -560,13 +560,11 @@ namespace rabbit{
 				
 				clusters = get_segment_allocator().allocate(esize);				
 				values = get_value_allocator().allocate(get_data_size());
-				//for(size_type v = 0; v < get_data_size();++v){
-					//get_value_allocator().construct(&values[v]);
-				//}
+			
 				for(size_type c = 0; c < esize; ++c){
 					get_value_allocator().construct(&clusters[c]);
 				}
-
+				set_exists(get_data_size(),true);
 				buckets = 0;
 
 			};
@@ -598,14 +596,14 @@ namespace rabbit{
 				removed = right.removed;
 				mf = right.mf;								
 				elements = right.elements;				
-				size_type esize = (get_data_size()/config.BITS_SIZE)+1;
+				size_type esize = get_e_size();
 
 				clusters = get_segment_allocator().allocate(esize);				
 				values = get_value_allocator().allocate(get_data_size());
 				
 				std::copy(values, right.values, right.values+right.get_data_size());
 				std::copy(clusters, right.clusters, right.clusters+esize);
-								
+				
 				return *this;
 			}
 			inline bool raw_equal_key(size_type pos,const _K& k) const {
@@ -614,7 +612,7 @@ namespace rabbit{
 			}
 			inline bool segment_equal_key(size_type pos,const _K& k) const {
 				_Bt index = get_segment_index(pos);
-				const _Segment& s = get_segment(pos);				
+				const _Segment& s = get_segment(pos);
 				return eq_f(s.key(index), k) ;
 			}
 			inline bool segment_equal_key_exists(size_type pos,const _K& k) const {
@@ -640,11 +638,7 @@ namespace rabbit{
 					start = pos;
 				}else if(!exists_(++pos)){
 					start = pos;
-				}else if(!exists_(++pos)){
-					start = pos;
-				}else if(!exists_(++pos)){
-					start = pos;
-				};
+				}
 				if(start > 0){
 					set_exists(pos, true);												
 					set_segment_key(pos, k);
@@ -652,7 +646,7 @@ namespace rabbit{
 					return create_segment_value(pos);
 				};
 				
-				if(overflow_elements < get_data_size()){
+				if(overflow_elements < end()){
 					pos = overflow_elements++;
 					if(!exists_(pos)){
 						set_overflows(h,true);
@@ -674,7 +668,7 @@ namespace rabbit{
 				
 				if(!s.is_exists(si)){
 					s.set_exists(si, true);					
-					set_segment_key(pos, k);
+					s.key(si) = k;
 					++elements;
 					
 					return create_segment_value(pos);
@@ -700,22 +694,17 @@ namespace rabbit{
 					at_empty = pos;					
 				}else if(!exists_(++pos)){
 					at_empty = pos;						
-				}else if(!exists_(++pos)){
-					at_empty = pos;						
-				}else if(!exists_(++pos)){
-					at_empty = pos;						
-				};
+				}
 				
-				if(at_empty == end()){
-					size_type e = get_data_size();
-					if(overflow_elements < get_data_size()){
+				if(at_empty == end()){					
+					if(overflow_elements < end()){
 						if(!exists_(overflow_elements)){
 							at_empty = overflow_elements++;		
 							set_overflows(h, true);
 						}
 					}else if (removed){
 						size_type e = ((overflow_elements/8)+1)*8;
-						if(get_data_size() < e) e = get_data_size(); ///overflow is divisible by 8
+						if(end() < e) e = end(); ///overflow is divisible by 8
 						for(pos=get_o_start(); pos < e; ){		
 							if(!exists_(pos) ) at_empty = pos; break;
 							++pos;
@@ -814,11 +803,7 @@ namespace rabbit{
 					return pos;
 				}else if(exists_(++pos) && equal_key(pos,k)){
 					return pos;
-				}else if(exists_(++pos) && equal_key(pos,k)){
-					return pos;
-				}else if(exists_(++pos) && equal_key(pos,k)){
-					return pos;
-				};		
+				}
 				++pos;						
 				
 				//size_type e = ((overflow_elements/8)+1)*8;
@@ -887,15 +872,36 @@ namespace rabbit{
 		}; /// hash_kernel
 		public:
 		struct iterator{
+		
 			const basic_unordered_map* h;
 			hash_kernel * hc;
 			size_type pos;
-			
+		private:
+			_Bt index;
+			_Bt exists;
+			void set_index(){
+				const _Segment& s = hc->get_segment(pos);
+				exists = s.exists;
+				index = hc->get_segment_index(pos);
+			}
+			void check_index(){
+				
+			}
+			void increment(){
+				++pos;
+				++index;				
+				if(index == hc->config.BITS_SIZE){
+					set_index();	
+				}
+				
+			}
+		public:
 			iterator(){
 				
 			}
 			iterator(const basic_unordered_map* h, size_type pos): h(h),pos(pos){
 				 hc = h->current.get();
+				 set_index();
 			}
 			iterator(const iterator& r){
 				(*this) = r;
@@ -904,14 +910,13 @@ namespace rabbit{
 				h = r.h;
 				pos = r.pos;
 				hc = r.hc;
+				set_index();
 				return (*this);
 			}
 			iterator& operator++(){
-				++pos;
-				/// todo optimize with 32-bit or 64-bit zero counting
-				
-				while(pos < hc->get_data_size() && !hc->exists_(pos) ){
-					++pos;
+				increment();
+				while( ( exists & (1<<index) ) == (_Bt)0){
+					increment();
 				}
 				
 				return (*this);
@@ -952,14 +957,36 @@ namespace rabbit{
 		};
 		
 		struct const_iterator{
+		private:
 			const basic_unordered_map* h;
+			const hash_kernel * hc;
+			_Bt index;
+			_Bt exists;
+			void set_index(){
+				const _Segment& s = hc->get_segment(pos);
+				exists = s.exists;
+				index = hc->get_segment_index(pos);
+			}
+			void check_index(){
+				
+			}
+			void increment(){
+				++pos;
+				++index;				
+				if(index == hc->config.BITS_SIZE){
+					set_index();	
+				}
+				
+			}
+		public:
 			size_type pos;
 			
 			const_iterator(){
 				
 			}
 			const_iterator(const basic_unordered_map* h, size_type pos): h(h),pos(pos){
-				
+				 hc = h->current.get();
+				 set_index();
 			}
 			const_iterator(const iterator& r){
 				(*this) = r;
@@ -968,21 +995,25 @@ namespace rabbit{
 			const_iterator& operator=(const iterator& r){
 				h = r.h;
 				pos = r.pos;
+				hc = r.hc;
+				set_index();
 				return (*this);
 			}
 
 			const_iterator& operator=(const const_iterator& r){
 				h = r.h;
 				pos = r.pos;
+				hc = r.hc;
+				index = r.index;
 				return (*this);
 			}
 
-			const_iterator& operator++(){
-				++pos;
-				/// todo optimize with 32-bit or 64-bit zero counting
-				while(pos < h->current->get_data_size() && !h->current->exists_(pos) ){
-					++pos;
+			const_iterator& operator++(){								
+				increment();
+				while( (exists & (1<<index)) == (_Bt)0){
+					increment();
 				}
+				
 				
 				return (*this);
 			}
@@ -1070,12 +1101,12 @@ namespace rabbit{
 						if(v != nullptr){
 							*v = i.get_value();
 							/// a cheap check to illuminate subtle bugs during development
-							if(++ctr != rehashed->elements){
+							/*if(++ctr != rehashed->elements){
 								cout << "iterations " << ctr << " elements " << rehashed->elements << " extent " << rehashed->get_extent() << endl;
 								cout << "inside rehash " << rehashed->get_extent() << endl;
 								cout << "new " << rehashed->elements << " current size:"  << current->elements << endl;		
 								throw bad_alloc();
-							}
+							}*/
 						}else{							
 							
 							rehashed = make_shared<hash_kernel>();
