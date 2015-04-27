@@ -363,10 +363,10 @@ void more_tests(){
 }
 int main(int argc, char **argv)
 {
-	::Sleep(1000);
+	///::Sleep(1000);
 	int ts = 10000000;
 	
-	if(true){
+	if(false){
 		//typedef std::string _K;
 		typedef unsigned long _K;
 		test_dense_hash_long(ts);
