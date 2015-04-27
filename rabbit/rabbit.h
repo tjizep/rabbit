@@ -105,7 +105,7 @@ namespace rabbit{
 		}
 		_BinMapper(size_type new_extent,const _Config& config){
 			this->config = config;		
-			this->extent = 1 << this->config.log2(new_extent);
+			this->extent = ((size_type)1) << this->config.log2(new_extent);
 			
 			this->extent1 = this->extent-1;	
 			this->extent2 = this->config.log2(new_extent);								
@@ -174,8 +174,8 @@ namespace rabbit{
 	};
 
 	struct default_traits{
-		typedef unsigned int _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
-		typedef unsigned long _Size_Type;
+		typedef unsigned long long _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
+		typedef size_t _Size_Type;
 		typedef _Size_Type size_type;
 		class rabbit_config{
 		public:
@@ -222,10 +222,10 @@ namespace rabbit{
 				CHAR_BITS = 8;						
 				BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
 				BITS_SIZE1 = BITS_SIZE-1;
-				BITS_LOG2_SIZE = log2(BITS_SIZE);
+				BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 				ALL_BITS_SET = ~(_Bt)0;				
-				PROBES = 8;							
-				MIN_EXTENT = 4; /// start size of the hash table
+				PROBES = 2;							
+				MIN_EXTENT = 2; /// start size of the hash table
 				MAX_OVERFLOW = 2048; //BITS_SIZE*8/sizeof(_Bt); 
 			
 			}
@@ -531,7 +531,7 @@ namespace rabbit{
 			}
 
 			size_type get_e_size() const {
-				return (get_data_size()/config.BITS_SIZE)+1;
+				return (size_type) (get_data_size()/config.BITS_SIZE)+1;
 			}
 
 			void free_data(){									
@@ -914,10 +914,12 @@ namespace rabbit{
 		private:
 			_Bt index;
 			_Bt exists;
+			_Bt bsize;
 			void set_index(){
 				const _Segment& s = hc->get_segment(pos);
 				exists = s.exists;
 				index = hc->get_segment_index(pos);
+				bsize =  hc->config.BITS_SIZE;
 			}
 			void check_index(){
 				
@@ -925,7 +927,7 @@ namespace rabbit{
 			void increment(){
 				++pos;
 				++index;				
-				if(index == hc->config.BITS_SIZE){
+				if(index == bsize){
 					set_index();	
 				}
 				
@@ -950,7 +952,7 @@ namespace rabbit{
 			}
 			iterator& operator++(){
 				increment();
-				while( ( exists & (1<<index) ) == (_Bt)0){
+				while( ( exists & (((_Bt)1)<<index) ) == (_Bt)0){
 					increment();
 				}
 				
@@ -1045,7 +1047,7 @@ namespace rabbit{
 
 			const_iterator& operator++(){								
 				increment();
-				while( (exists & (1<<index)) == (_Bt)0){
+				while( (exists & (((_Bt)1)<<index)) == (_Bt)0){
 					increment();
 				}
 				
