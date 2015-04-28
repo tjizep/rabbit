@@ -552,8 +552,22 @@ namespace rabbit{
 			}
 
 			void free_data(){									
-				if(values) get_value_allocator().deallocate(values,get_data_size());				
-				if(clusters) get_segment_allocator().deallocate(clusters,get_e_size());
+				if(values) {
+					
+					for(size_type pos = 0; pos < get_data_size(); ++pos){
+						if(exists_(pos)){
+							get_value_allocator().destroy(&values[pos]);
+						}
+					}
+					get_value_allocator().deallocate(values,get_data_size());				
+				}
+				if(clusters) {
+					size_type esize = get_e_size();
+					for(size_type c = 0; c < esize; ++c){
+						get_segment_allocator().destroy(&clusters[c]);
+					}
+					get_segment_allocator().deallocate(clusters,get_e_size());
+				}
 				values = nullptr;
 				clusters = nullptr;
 			}
@@ -580,7 +594,7 @@ namespace rabbit{
 				values = get_value_allocator().allocate(get_data_size());
 			
 				for(size_type c = 0; c < esize; ++c){
-					get_value_allocator().construct(&clusters[c]);
+					get_segment_allocator().construct(&clusters[c]);
 				}
 				set_exists(get_data_size(),true);
 				buckets = 0;
@@ -641,7 +655,7 @@ namespace rabbit{
 			inline bool segment_equal_key_exists(size_type pos,const _K& k) const {
 				_Bt index = get_segment_index(pos);
 				const _Segment& s = get_segment(pos);				
-				return eq_f(s.key(index), k) && s.is_exists(index);
+				return  eq_f(s.key(index), k) && s.is_exists(index) ;
 			}
 			inline bool erase_segment_equal_key_exists(size_type pos,const _K& k) {
 				_Bt index = get_segment_index(pos);
@@ -762,6 +776,7 @@ namespace rabbit{
 					
 					return &(get_segment_value(pos));			
 				}
+
 				return subscript_rest(k,pos,h);
 			}
 			bool erase(const _K& k){
@@ -904,12 +919,12 @@ namespace rabbit{
 				return find_rest(k,pos);
 			}
 			size_type find(const _K& k) const {				
-				if(!elements) return end();
+				
 				size_type pos = map_key(k);				
 				if(segment_equal_key_exists(pos,k)){ ///get_segment(pos).exists == ALL_BITS_SET || 
 					return pos;
 				}				
-								
+				if(!elements) return end();				
 				return find_rest(k,pos);
 			}
 			
