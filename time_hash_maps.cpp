@@ -123,15 +123,15 @@ using GOOGLE_NAMESPACE::dense_hash_map;
 using GOOGLE_NAMESPACE::sparse_hash_map;
 
 static bool FLAGS_test_sparse_hash_map = true;
-static bool FLAGS_test_dense_hash_map = false;
-static bool FLAGS_test_rabbit_unordered_map = false;
-static bool FLAGS_test_rabbit_sparse_unordered_map = false;
+static bool FLAGS_test_dense_hash_map = true;
+static bool FLAGS_test_rabbit_unordered_map = true;
+static bool FLAGS_test_rabbit_sparse_unordered_map = true;
 static bool FLAGS_test_hash_map = false;
 static bool FLAGS_test_map = false;
 
 static bool FLAGS_test_4_bytes = true;
-static bool FLAGS_test_8_bytes = false;
-static bool FLAGS_test_16_bytes = false;
+static bool FLAGS_test_8_bytes = true;
+static bool FLAGS_test_16_bytes = true;
 static bool FLAGS_test_256_bytes = false;
 
 static bool growth_only = false;
@@ -722,7 +722,7 @@ static void measure_map(const char* label, int obj_size, int iters,
                         bool stress_hash_function) {
   printf("\n%s (%d byte objects, %d iterations):\n", label, obj_size, iters);
   if (1) time_map_grow<MapType>(iters);
-  if (1 && !growth_only) time_map_grow_predicted<MapType>(iters);
+  if (1) time_map_grow_predicted<MapType>(iters);
   if (1 && !growth_only) time_map_replace<MapType>(iters);
   if (1 && !growth_only) time_map_fetch_random<MapType>(iters);
   if (1 && !growth_only) time_map_fetch_sequential<MapType>(iters);
@@ -732,7 +732,7 @@ static void measure_map(const char* label, int obj_size, int iters,
   if (1 && !growth_only) time_map_iterate<MapType>(iters);
   // This last test is useful only if the map type uses hashing.
   // And it's slow, so use fewer iterations.
-  if (stress_hash_function) {
+  if (stress_hash_function && !growth_only) {
     // Blank line in the output makes clear that what follows isn't part of the
     // table of results that we just printed.
     puts("");
@@ -749,20 +749,22 @@ static void test_all_maps(int obj_size, int iters) {
                  EasyUseSparseHashMap<ObjType*, int, HashFn> >(
         "SPARSE_HASH_MAP", obj_size, iters, stress_hash_function);
 
+  if (FLAGS_test_rabbit_sparse_unordered_map)
+    measure_map< EasyUseRabbitSparseUnorderedMap<ObjType, int, HashFn>,
+                 EasyUseRabbitSparseUnorderedMap<ObjType*, int, HashFn> >(
+        "RABBIT SPARSE_UNORDERED_MAP", obj_size, iters, stress_hash_function);
+
   if (FLAGS_test_dense_hash_map)
     measure_map< EasyUseDenseHashMap<ObjType, int, HashFn>,
                  EasyUseDenseHashMap<ObjType*, int, HashFn> >(
         "DENSE_HASH_MAP", obj_size, iters, stress_hash_function);
 
-  if (FLAGS_test_rabbit_sparse_unordered_map)
+  if (FLAGS_test_rabbit_unordered_map)
     measure_map< EasyUseRabbitUnorderedMap<ObjType, int, HashFn>,
                  EasyUseRabbitUnorderedMap<ObjType*, int, HashFn> >(
-        "RABBIT SPARSE_UNORDERED_MAP", obj_size, iters, stress_hash_function);
-  if (FLAGS_test_rabbit_unordered_map)
-    measure_map< EasyUseRabbitSparseUnorderedMap<ObjType, int, HashFn>,
-                 EasyUseRabbitSparseUnorderedMap<ObjType*, int, HashFn> >(
-        "RABBIT UNORDERED_MAP", obj_size, iters, stress_hash_function);
+        "RABBIT (LESS SPARSE) UNORDERED_MAP", obj_size, iters, stress_hash_function);
 
+  
   if (FLAGS_test_map)
     measure_map< EasyUseMap<ObjType, int>,
                  EasyUseMap<ObjType*, int> >(

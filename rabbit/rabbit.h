@@ -63,7 +63,9 @@ namespace rabbit{
 		double get_max_backoff() const {
 			return 8;
 		}
-		
+		double resize_factor() const {
+			return 1.3;
+		}
 		/// Truncated Linear Backoff in Rehasing after collisions	
 		/// growth factor is calculated as a binary exponential 
 		/// backoff (yes, analogous to the one used in network congestion control)
@@ -71,7 +73,7 @@ namespace rabbit{
 		/// decreased as memory becomes a scarce resource.
 		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
 		double recalc_growth_factor(size_type elements)  {
-			return 1.9;
+			return 1.80;
 			double growth_factor = backoff;
 			bool linear = true;
 			if(linear){
@@ -120,7 +122,9 @@ namespace rabbit{
 			return (h+(h>>this->primary_bits)) & this->extent1; 
 
 		}
-			
+		double resize_factor() const {
+			return 2;
+		}
 		double recalc_growth_factor(size_type elements)  {
 			return 2;
 		}
@@ -178,6 +182,8 @@ namespace rabbit{
 	class basic_config{
 	public:
 		typedef unsigned long long _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
+		/// if even more speed is desired but you'r willing to live with a 4 billion key limit then
+		/// typedef unsigned long size_type;
 		typedef size_t size_type;
 
 		size_type log2(size_type n){
@@ -224,7 +230,7 @@ namespace rabbit{
 			BITS_SIZE1 = BITS_SIZE-1;
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;				
-			PROBES = 2;							
+			PROBES = 4;							
 			MIN_EXTENT = 16; /// start size of the hash table
 			MAX_OVERFLOW = 2048; //BITS_SIZE*8/sizeof(_Bt); 
 			
@@ -586,6 +592,9 @@ namespace rabbit{
 				values = nullptr;
 				clusters = nullptr;
 			}
+			double get_resize_factor() const {
+				return key_mapper.resize_factor();
+			}
 			/// clears all data and resize the new data vector to the parameter
 			void resize_clear(size_type new_extent){
 				/// inverse of factor used to determine overflow list
@@ -709,7 +718,7 @@ namespace rabbit{
 				
 				if(overflow_elements < end()){
 					pos = overflow_elements++;
-					probes = config.PROBES + config.log2(overflow_elements)/4;
+					probes = config.PROBES + config.log2(overflow_elements)/2;
 					if(!exists_(pos)){
 						set_overflows(h,true);
 						set_exists(pos, true);												
@@ -759,7 +768,7 @@ namespace rabbit{
 				if(overflow_elements < end()){
 					if(!exists_(overflow_elements)){
 						at_empty = overflow_elements++;		
-						probes = config.PROBES + config.log2(overflow_elements)/4;
+						probes = config.PROBES + config.log2(overflow_elements)/2;
 						set_overflows(h, true);
 					}
 				}else if (removed){
@@ -783,15 +792,24 @@ namespace rabbit{
 			}
 			_V* subscript(const _K& k){
 				/// eventualy an out of memory (bad_allocation) exception will occur
-				last_modified = end();
-				size_type h;
-				size_type pos = find(k,h);
-				
-				if(pos != end()){
-					
-					return &(get_segment_value(pos));			
+				size_type pos = map_key(k);				
+				_Bt si = get_segment_index(pos);
+				_Segment& s = get_segment(pos);
+				bool key_exists = s.is_exists(si);
+				if(!removed && !key_exists){
+					s.set_exists(si, true);
+					s.key(si)=k;						
+					++elements;
+					return create_segment_value(pos);
+				}else if(key_exists && eq_f(s.key(si),k)){
+					return &(get_segment_value(pos));
 				}
-
+				
+				size_type h = pos;
+				pos = find_rest(k,pos);
+				if(pos != end()){
+					return &(get_segment_value(pos));
+				}
 				return subscript_rest(k,pos,h);
 			}
 			bool erase(const _K& k){
@@ -1168,11 +1186,11 @@ namespace rabbit{
 		}
 		void reserve(size_type atleast){
 			
-			rehash((size_type)((double)atleast*2));
+			rehash((size_type)((double)atleast*current->get_resize_factor()));
 		}
 		void resize(size_type atleast){
 			
-			rehash((size_type)((double)atleast*2));
+			rehash((size_type)((double)atleast*current->get_resize_factor()));
 		}
 		void rehash(size_type to_){			
 			rabbit_config config;
@@ -1559,6 +1577,7 @@ public:
 	typedef _Kty key_type;
 	typedef _Ty mapped_type;	
 	typedef _Keyeq key_equal;
+	typedef unordered_map<_Kty, _Ty, _Hasher, _Keyeq, _Alloc, _Traits> _Base;
 	typedef typename _Base::key_compare key_compare;
 
 //	typedef typename _Base::value_compare value_compare;

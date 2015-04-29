@@ -363,7 +363,9 @@ void more_tests(){
 }
 int main(int argc, char **argv)
 {
+#ifdef _MSC_VER
 	::Sleep(1000);
+#endif
 	int ts = 10000000;
 	
 	if(false){
