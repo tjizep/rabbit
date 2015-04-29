@@ -122,15 +122,17 @@ using std::vector;
 using GOOGLE_NAMESPACE::dense_hash_map;
 using GOOGLE_NAMESPACE::sparse_hash_map;
 
-static bool FLAGS_test_sparse_hash_map = false;
-static bool FLAGS_test_dense_hash_map = true;
-static bool FLAGS_test_hash_map = true;
+static bool FLAGS_test_sparse_hash_map = true;
+static bool FLAGS_test_dense_hash_map = false;
+static bool FLAGS_test_rabbit_unordered_map = false;
+static bool FLAGS_test_rabbit_sparse_unordered_map = false;
+static bool FLAGS_test_hash_map = false;
 static bool FLAGS_test_map = false;
 
 static bool FLAGS_test_4_bytes = true;
-static bool FLAGS_test_8_bytes = true;
-static bool FLAGS_test_16_bytes = true;
-static bool FLAGS_test_256_bytes = true;
+static bool FLAGS_test_8_bytes = false;
+static bool FLAGS_test_16_bytes = false;
+static bool FLAGS_test_256_bytes = false;
 
 static bool growth_only = false;
 
@@ -184,7 +186,11 @@ class EasyUseDenseHashMap<K*, V, H> : public dense_hash_map<K*,V,H> {
 
 
 template<typename K, typename V, typename H>
-class EasyUseHashMap : public rabbit::unordered_map<K,V,H> {
+class EasyUseRabbitUnorderedMap : public rabbit::unordered_map<K,V,H> {
+public:  
+};
+template<typename K, typename V, typename H>
+class EasyUseRabbitSparseUnorderedMap : public rabbit::sparse_unordered_map<K,V,H> {
 public:  
 };
 
@@ -748,9 +754,13 @@ static void test_all_maps(int obj_size, int iters) {
                  EasyUseDenseHashMap<ObjType*, int, HashFn> >(
         "DENSE_HASH_MAP", obj_size, iters, stress_hash_function);
 
-  if (FLAGS_test_hash_map)
-    measure_map< EasyUseHashMap<ObjType, int, HashFn>,
-                 EasyUseHashMap<ObjType*, int, HashFn> >(
+  if (FLAGS_test_rabbit_sparse_unordered_map)
+    measure_map< EasyUseRabbitUnorderedMap<ObjType, int, HashFn>,
+                 EasyUseRabbitUnorderedMap<ObjType*, int, HashFn> >(
+        "RABBIT SPARSE_UNORDERED_MAP", obj_size, iters, stress_hash_function);
+  if (FLAGS_test_rabbit_unordered_map)
+    measure_map< EasyUseRabbitSparseUnorderedMap<ObjType, int, HashFn>,
+                 EasyUseRabbitSparseUnorderedMap<ObjType*, int, HashFn> >(
         "RABBIT UNORDERED_MAP", obj_size, iters, stress_hash_function);
 
   if (FLAGS_test_map)

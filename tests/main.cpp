@@ -363,7 +363,7 @@ void more_tests(){
 }
 int main(int argc, char **argv)
 {
-	///::Sleep(1000);
+	::Sleep(1000);
 	int ts = 10000000;
 	
 	if(false){

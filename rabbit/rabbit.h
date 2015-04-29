@@ -37,9 +37,10 @@ THE SOFTWARE.
 #define RABBIT_NOINLINE_
 #endif
 namespace rabbit{
-	template <typename _Config>
+	template <class _Config>
 	struct _ModMapper{
-		typedef typename _Config::size_type size_type;
+		typedef _Config config_type;
+		typedef typename config_type::size_type size_type;
 		size_type extent;
 		double backoff;
 		_Config config;
@@ -93,9 +94,10 @@ namespace rabbit{
 		}
 	};
 	
-	template <typename _Config>		
+	template <class _Config>		
 	struct _BinMapper{
 		typedef typename _Config::size_type size_type;
+		typedef _Config config_type;
 		size_type extent;
 		size_type extent1;
 		size_type extent2;
@@ -172,69 +174,81 @@ namespace rabbit{
 			return (unsigned long)k;		
 		};
 	};
-
-	struct default_traits{
-		typedef unsigned long long _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
-		typedef size_t _Size_Type;
-		typedef ptrdiff_t difference_type;
-		typedef _Size_Type size_type;
-		class rabbit_config{
-		public:
-			typedef _Size_Type size_type;
-			size_type log2(size_type n){
-				size_type r = 0; 
-				while (n >>= 1) 
-				{
-				  r++;
-				}
-				return r;
-			}
-			_Bt CHAR_BITS ;					
-			_Bt BITS_SIZE ;
-			_Bt BITS_SIZE1 ;			
-			_Bt ALL_BITS_SET ;
-			/// maximum probes per access
-			size_type PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)			
-			size_type BITS_LOG2_SIZE;
-			/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
-			///	hash randomizer available 
-			
-			size_type MIN_EXTENT;
-			size_type MAX_OVERFLOW ; 
-			
-			rabbit_config(const rabbit_config& right){
-				*this = right;
-			}
-			
-			rabbit_config& operator=(const rabbit_config& right){
-				CHAR_BITS = right.CHAR_BITS;						
-				BITS_SIZE = right.BITS_SIZE;
-				BITS_SIZE1 = right.BITS_SIZE1;
-				BITS_LOG2_SIZE = right.BITS_LOG2_SIZE;
-				ALL_BITS_SET = right.ALL_BITS_SET;
-				PROBES = right.PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
-				
-				MIN_EXTENT = right.MIN_EXTENT;
-				MAX_OVERFLOW = right.MAX_OVERFLOW; 
-				return *this;
-			}
-			
-			rabbit_config(){
-				CHAR_BITS = 8;						
-				BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
-				BITS_SIZE1 = BITS_SIZE-1;
-				BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
-				ALL_BITS_SET = ~(_Bt)0;				
-				PROBES = 2;							
-				MIN_EXTENT = 2; /// start size of the hash table
-				MAX_OVERFLOW = 2048; //BITS_SIZE*8/sizeof(_Bt); 
-			
-			}
-		};
-		typedef _BinMapper<rabbit_config> _Mapper;
-	};
 	
-	template <typename _K, typename _V, typename _H = rabbit_hash<_K>, typename _E = std::equal_to<_K>, typename _Allocator = std::allocator<_K>, typename _Traits = default_traits >
+	class basic_config{
+	public:
+		typedef unsigned long long _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
+		typedef size_t size_type;
+
+		size_type log2(size_type n){
+			size_type r = 0; 
+			while (n >>= 1) 
+			{
+				r++;
+			}
+			return r;
+		}
+		_Bt CHAR_BITS ;					
+		_Bt BITS_SIZE ;
+		_Bt BITS_SIZE1 ;			
+		_Bt ALL_BITS_SET ;
+		/// maximum probes per access
+		size_type PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)			
+		size_type BITS_LOG2_SIZE;
+		/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
+		///	hash randomizer available 
+			
+		size_type MIN_EXTENT;
+		size_type MAX_OVERFLOW ; 
+			
+		basic_config(const basic_config& right){
+			*this = right;
+		}
+			
+		basic_config& operator=(const basic_config& right){
+			CHAR_BITS = right.CHAR_BITS;						
+			BITS_SIZE = right.BITS_SIZE;
+			BITS_SIZE1 = right.BITS_SIZE1;
+			BITS_LOG2_SIZE = right.BITS_LOG2_SIZE;
+			ALL_BITS_SET = right.ALL_BITS_SET;
+			PROBES = right.PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
+				
+			MIN_EXTENT = right.MIN_EXTENT;
+			MAX_OVERFLOW = right.MAX_OVERFLOW; 
+			return *this;
+		}
+			
+		basic_config(){
+			CHAR_BITS = 8;						
+			BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
+			BITS_SIZE1 = BITS_SIZE-1;
+			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
+			ALL_BITS_SET = ~(_Bt)0;				
+			PROBES = 2;							
+			MIN_EXTENT = 16; /// start size of the hash table
+			MAX_OVERFLOW = 2048; //BITS_SIZE*8/sizeof(_Bt); 
+			
+		}
+	};
+	template<class _InMapper>
+	struct basic_traits{
+		typedef typename _InMapper::config_type rabbit_config;		
+		typedef typename rabbit_config::_Bt _Bt;
+		typedef typename rabbit_config::size_type size_type;
+		typedef ptrdiff_t difference_type;
+		typedef _InMapper _Mapper;
+	};
+	typedef basic_traits<_BinMapper<basic_config> > default_traits;
+	typedef basic_traits<_ModMapper<basic_config> > sparse_traits;
+
+	template 
+	<	class _K
+	,	class _V
+	,	class _H = rabbit_hash<_K>
+	,	class _E = std::equal_to<_K>
+	,	class _Allocator = std::allocator<_K>
+	,	class _Traits = default_traits 
+	>
 	class basic_unordered_map {
 	public:
 		typedef _K key_type;
@@ -322,6 +336,7 @@ namespace rabbit{
 		} ;
 
 		struct _KeySegment{
+		
 		public:
 			_Bt exists;			
 			_Bt overflows;			
@@ -353,7 +368,7 @@ namespace rabbit{
 			inline bool none_exists() const {
 				 return (exists == (_Bt)0);
 			}
-			bool is_exists(_Bt bit) const {												
+			inline bool is_exists(_Bt bit) const {												
 				return ((exists >> bit) & (_Bt)1ul);
 			}
 									
@@ -1341,13 +1356,14 @@ template
 ,	class _Hasher = rabbit_hash<_Kty>
 ,	class _Keyeq = std::equal_to<_Kty>
 ,	class _Alloc = std::allocator<std::pair<const _Kty, _Ty> >
+,	class _Traits = default_traits
 >
-class unordered_map :  public basic_unordered_map<_Kty, _Ty, _Hasher, _Keyeq, _Alloc>
+class unordered_map :  public basic_unordered_map<_Kty, _Ty, _Hasher, _Keyeq, _Alloc, _Traits>
 {	// hash table of {key, mapped} values, unique keys
 public:
-	typedef basic_unordered_map<_Kty, _Ty, _Hasher, _Keyeq, _Alloc> _Base;
+	typedef basic_unordered_map<_Kty, _Ty, _Hasher, _Keyeq, _Alloc, _Traits> _Base;
 
-	typedef unordered_map<_Kty, _Ty, _Hasher, _Keyeq, _Alloc> _Myt;
+	typedef unordered_map<_Kty, _Ty, _Hasher, _Keyeq, _Alloc, _Traits> _Myt;
 
 	typedef _Hasher hasher;
 	typedef _Kty key_type;
@@ -1527,6 +1543,45 @@ public:
 
 	
 
+};
+template
+<	class _Kty
+,	class _Ty
+,	class _Hasher = rabbit_hash<_Kty>
+,	class _Keyeq = std::equal_to<_Kty>
+,	class _Alloc = std::allocator<std::pair<const _Kty, _Ty> >
+,	class _Traits = sparse_traits
+>
+class sparse_unordered_map :  public unordered_map<_Kty, _Ty, _Hasher, _Keyeq, _Alloc, _Traits>
+{
+public:
+	typedef _Hasher hasher;
+	typedef _Kty key_type;
+	typedef _Ty mapped_type;	
+	typedef _Keyeq key_equal;
+	typedef typename _Base::key_compare key_compare;
+
+//	typedef typename _Base::value_compare value_compare;
+	typedef typename _Base::allocator_type allocator_type;
+	typedef typename _Base::size_type size_type;
+	typedef typename _Base::difference_type difference_type;
+	typedef typename _Base::pointer pointer;
+	typedef typename _Base::const_pointer const_pointer;
+	typedef typename _Base::reference reference;
+	typedef typename _Base::const_reference const_reference;
+	typedef typename _Base::iterator iterator;
+	typedef typename _Base::const_iterator const_iterator;
+//	typedef typename _Base::reverse_iterator reverse_iterator;
+//	typedef typename _Base::const_reverse_iterator
+//		const_reverse_iterator;
+	typedef typename _Base::value_type value_type;
+
+	typedef typename _Base::iterator local_iterator;
+	typedef typename _Base::const_iterator const_local_iterator;
+	sparse_unordered_map(){
+	}
+	~sparse_unordered_map(){
+	}
 };
 
 /// the unordered set
