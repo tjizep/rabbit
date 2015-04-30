@@ -297,7 +297,7 @@ void test_dense_hash_long(size_t ts){
 	_Map h;
 	h.set_deleted_key((_T)-1l);
 	h.set_empty_key((_T)-2l);
-	tester<_Map>::_Script script;
+	typename tester<_Map>::_Script script;
 	tester<_Map> t;
 	t.gen_random_narrow(ts, script);
 	t.bench_hash_simple(h,script);	

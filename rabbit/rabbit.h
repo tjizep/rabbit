@@ -851,6 +851,9 @@ namespace rabbit{
 					//set_segment_key(pos,  _K());
 					//set_segment_value(pos, _V());			
 					destroy_segment_value(pos);
+					if(bucket_size(h) <= 1){
+						set_overflows(h,false);
+					}
 					--elements;									
 					if(pos >= get_o_start()){
 						size_type c = get_o_start();
