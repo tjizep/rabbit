@@ -181,7 +181,7 @@ namespace rabbit{
 	
 	class basic_config{
 	public:
-		typedef unsigned long long _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
+		typedef unsigned long long int _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		/// if even more speed is desired but you'r willing to live with a 4 billion key limit then
 		/// typedef unsigned long size_type;
 		typedef size_t size_type;
@@ -231,8 +231,8 @@ namespace rabbit{
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;				
 			PROBES = 32;							
-			MIN_EXTENT = 16; /// start size of the hash table
-			MAX_OVERFLOW = 512; //BITS_SIZE*8/sizeof(_Bt); 
+			MIN_EXTENT = 8; /// start size of the hash table
+			MAX_OVERFLOW = 1024; //BITS_SIZE*8/sizeof(_Bt); 
 			
 		}
 	};
@@ -448,8 +448,10 @@ namespace rabbit{
 			/// mainly to satisfy stl conventions
 			size_type bucket_size ( size_type n ) const{
 				size_type pos = n;
-				if(!overflows_(pos) && exists_(pos)){
-					return 1;
+				if(!overflows_(pos)) {
+					if(exists_(pos))
+						return 1;
+					else return 0;
 				}
 				size_type m = pos + probes;
 				size_type r = 0;				
@@ -458,6 +460,14 @@ namespace rabbit{
 					}else if(map_key(get_segment_key(pos)) == n){
 						++r;						
 					}					
+				}
+				size_type e = end();					
+				for(pos=get_o_start(); pos < e; ){		
+					if(!exists_(pos)){				
+					}else if(map_key(get_segment_key(pos)) == n){
+						++r;						
+					}
+					++pos;						
 				}
 				return r;				
 			}
@@ -852,7 +862,7 @@ namespace rabbit{
 					//set_segment_value(pos, _V());			
 					destroy_segment_value(pos);
 					if(bucket_size(h) <= 1){
-						set_overflows(h,false);
+						//set_overflows(h,false);
 					}
 					--elements;									
 					if(pos >= get_o_start()){

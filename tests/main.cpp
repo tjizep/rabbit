@@ -129,7 +129,7 @@ public:
 		double start = get_proc_mem_use();
 		std::minstd_rand rd;
 		std::mt19937 gen(rd());
-		std::uniform_int_distribution<long long> dis(1<<24, 1ll<<31);
+		std::uniform_int_distribution<long long> dis(1<<24, 1ll<<48);
 		/// script creation is not benched
 		_InputField v;
 		for(size_t r = 0; r < count;++r){
@@ -200,10 +200,10 @@ public:
 		/// create a list of random numbers and add to test script
 		double mem_start = get_proc_mem_use();
 		std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-		size_t count = script.size();
+		typename _MapT::size_type count = (_MapT::size_type)script.size();
 	
-		size_t s = count/10;
-		h.resize(count);
+		typename _MapT::size_type s = count/10;
+
 		for(size_t j = 0; j < count; ++j){
 			h[script[j]] = (typename _MapT::mapped_type)j+1;
 			if(j % s == 0){
@@ -293,13 +293,13 @@ template<typename _T>
 void test_dense_hash_long(size_t ts){
 #ifdef _HAS_GOOGLE_HASH_
 	printf("google dense hash test\n");
-	typedef ::google::dense_hash_map<_T,long> _Map;
+	typedef ::google::dense_hash_map<_T,long,rabbit::rabbit_hash<_T>> _Map;
 	_Map h;
 	h.set_deleted_key((_T)-1l);
 	h.set_empty_key((_T)-2l);
 	typename tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random_narrow(ts, script);
+	t.gen_random(ts, script);
 	t.bench_hash_simple(h,script);	
 #endif
 }
@@ -311,7 +311,7 @@ void test_sparse_hash(size_t ts){
 	_Map h;
 	typename tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random_narrow(ts, script);
+	t.gen_random(ts, script);
 	t.bench_hash_simple(h,script);	
 #endif
 }
@@ -323,7 +323,7 @@ void test_rabbit_hash(size_t ts){
 	_Map h;	
 	typename tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random_narrow(ts, script);
+	t.gen_random(ts, script);
 	t.bench_hash_simple(h,script);
 	
 }
@@ -345,7 +345,7 @@ template<typename T>
 void test_std_hash(size_t ts){
 #ifdef _HAS_STD_HASH_
 	printf("std hash test\n");
-	typedef std::unordered_map<T,long> _Map;
+	typedef std::unordered_map<T,long,rabbit::rabbit_hash<T>> _Map;
 	_Map h;
 	
 	typename tester<_Map>::_Script script;
@@ -372,7 +372,7 @@ int main(int argc, char **argv)
 	if(false){
 		//typedef std::string _K;
 		typedef unsigned long long _K;
-		test_dense_hash_long<_K>(ts);
+		//test_dense_hash_long<_K>(ts);
 		//test_sparse_hash<_K>(ts);
 
 
@@ -380,7 +380,7 @@ int main(int argc, char **argv)
 
 	
 		test_rabbit_hash<_K>(ts);
-		test_rabbit_hash_erase<_K>(ts/10);
+		//test_rabbit_hash_erase<_K>(ts/10);
 	}else{
 		google_times(ts);
 	}
