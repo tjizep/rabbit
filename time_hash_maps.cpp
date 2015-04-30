@@ -122,17 +122,17 @@ using std::vector;
 using GOOGLE_NAMESPACE::dense_hash_map;
 using GOOGLE_NAMESPACE::sparse_hash_map;
 
-static bool FLAGS_test_sparse_hash_map = true;
+static bool FLAGS_test_sparse_hash_map = false;
 static bool FLAGS_test_dense_hash_map = true;
 static bool FLAGS_test_rabbit_unordered_map = true;
-static bool FLAGS_test_rabbit_sparse_unordered_map = true;
+static bool FLAGS_test_rabbit_sparse_unordered_map = false;
 static bool FLAGS_test_hash_map = false;
 static bool FLAGS_test_map = false;
 
 static bool FLAGS_test_4_bytes = true;
 static bool FLAGS_test_8_bytes = true;
 static bool FLAGS_test_16_bytes = true;
-static bool FLAGS_test_256_bytes = false;
+static bool FLAGS_test_256_bytes = true;
 
 static bool growth_only = false;
 

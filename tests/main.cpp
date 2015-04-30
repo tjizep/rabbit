@@ -203,6 +203,7 @@ public:
 		size_t count = script.size();
 	
 		size_t s = count/10;
+		h.resize(count);
 		for(size_t j = 0; j < count; ++j){
 			h[script[j]] = (typename _MapT::mapped_type)j+1;
 			if(j % s == 0){
@@ -288,14 +289,14 @@ public:
 		
 	}
 };
-
+template<typename _T>
 void test_dense_hash_long(size_t ts){
 #ifdef _HAS_GOOGLE_HASH_
 	printf("google dense hash test\n");
-	typedef ::google::dense_hash_map<long,long> _Map;
+	typedef ::google::dense_hash_map<_T,long> _Map;
 	_Map h;
-	h.set_deleted_key(-1l);
-	h.set_empty_key(-2l);
+	h.set_deleted_key((_T)-1l);
+	h.set_empty_key((_T)-2l);
 	tester<_Map>::_Script script;
 	tester<_Map> t;
 	t.gen_random_narrow(ts, script);
@@ -322,7 +323,7 @@ void test_rabbit_hash(size_t ts){
 	_Map h;	
 	typename tester<_Map>::_Script script;
 	tester<_Map> t;
-	t.gen_random(ts, script);
+	t.gen_random_narrow(ts, script);
 	t.bench_hash_simple(h,script);
 	
 }
@@ -370,8 +371,8 @@ int main(int argc, char **argv)
 	
 	if(false){
 		//typedef std::string _K;
-		typedef unsigned long _K;
-		test_dense_hash_long(ts);
+		typedef unsigned long long _K;
+		test_dense_hash_long<_K>(ts);
 		//test_sparse_hash<_K>(ts);
 
 
