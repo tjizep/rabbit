@@ -58,6 +58,7 @@
 #include <unordered_map>
 #include <sparsehash/internal/sparseconfig.h>
 #include <config.h>
+/// use _USE_SPARSE_HASH_ to use the sparse hash for testing
 #ifdef HAVE_INTTYPES_H
 # include <inttypes.h>
 #endif         // for uintptr_t
@@ -76,6 +77,7 @@ extern "C" {
 # include <sys/utsname.h>
 #endif      // for uname()
 }
+#define _USE_SPARSE_HASH_
 #ifdef _MSC_VER
 
 #define snprintf c99_snprintf
@@ -122,7 +124,7 @@ using std::vector;
 using GOOGLE_NAMESPACE::dense_hash_map;
 using GOOGLE_NAMESPACE::sparse_hash_map;
 
-static bool FLAGS_test_sparse_hash_map = false;
+static bool FLAGS_test_sparse_hash_map = true;
 static bool FLAGS_test_dense_hash_map = true;
 static bool FLAGS_test_rabbit_unordered_map = true;
 static bool FLAGS_test_rabbit_sparse_unordered_map = false;
@@ -270,7 +272,12 @@ template<int Size, int Hashsize> class HashObject {
     for (size_t i = 0; i < Hashsize - sizeof(i_); ++i) {
       hashval += buffer_[i];
     }
-    return hashval; ///SPARSEHASH_HASH<int>()();
+#ifdef _USE_SPARSE_HASH_
+    return SPARSEHASH_HASH<int>()(hashval);
+#else 
+	return hashval;
+#endif
+
   }
 
   bool operator==(const class_type& that) const { return this->i_ == that.i_; }
@@ -298,7 +305,11 @@ template<> class HashObject<sizeof(int), sizeof(int)> {
 
   size_t Hash() const {
     g_num_hashes++;
-    return i_; //SPARSEHASH_HASH<int>()(i_);
+#ifdef _USE_SPARSE_HASH_
+    return SPARSEHASH_HASH<int>()(i_);
+#else
+	return i_;
+#endif
   }
 
   bool operator==(const class_type& that) const { return this->i_ == that.i_; }

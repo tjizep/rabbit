@@ -200,7 +200,7 @@ public:
 		/// create a list of random numbers and add to test script
 		double mem_start = get_proc_mem_use();
 		std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-		typename _MapT::size_type count = (_MapT::size_type)script.size();
+		typename _MapT::size_type count = (typename _MapT::size_type)script.size();
 	
 		typename _MapT::size_type s = count/10;
 
