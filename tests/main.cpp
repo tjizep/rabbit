@@ -372,7 +372,7 @@ int main(int argc, char **argv)
 	if(false){
 		//typedef std::string _K;
 		typedef unsigned long long _K;
-		//test_dense_hash_long<_K>(ts);
+		test_dense_hash_long<_K>(ts);
 		//test_sparse_hash<_K>(ts);
 
 

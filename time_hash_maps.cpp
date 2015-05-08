@@ -59,6 +59,7 @@
 #include <sparsehash/internal/sparseconfig.h>
 #include <config.h>
 /// use _USE_SPARSE_HASH_ to use the sparse hash for testing
+
 #ifdef HAVE_INTTYPES_H
 # include <inttypes.h>
 #endif         // for uintptr_t
@@ -128,6 +129,7 @@ static bool FLAGS_test_sparse_hash_map = true;
 static bool FLAGS_test_dense_hash_map = true;
 static bool FLAGS_test_rabbit_unordered_map = true;
 static bool FLAGS_test_rabbit_sparse_unordered_map = false;
+static bool FLAGS_test_unordered_map = false;
 static bool FLAGS_test_hash_map = false;
 static bool FLAGS_test_map = false;
 
@@ -194,6 +196,12 @@ public:
 template<typename K, typename V, typename H>
 class EasyUseRabbitSparseUnorderedMap : public rabbit::sparse_unordered_map<K,V,H> {
 public:  
+};
+
+template<typename K, typename V, typename H>
+class EasyUseUnorderedMap : public std::unordered_map<K,V,H> {
+public:  
+	void resize(size_t r) { this->rehash(r); }
 };
 
 #if defined(HAVE_UNORDERED_MAP)
@@ -774,6 +782,11 @@ static void test_all_maps(int obj_size, int iters) {
     measure_map< EasyUseRabbitUnorderedMap<ObjType, int, HashFn>,
                  EasyUseRabbitUnorderedMap<ObjType*, int, HashFn> >(
         "RABBIT (LESS SPARSE) UNORDERED_MAP", obj_size, iters, stress_hash_function);
+
+  if (FLAGS_test_unordered_map)
+    measure_map< EasyUseUnorderedMap<ObjType, int, HashFn>,
+                 EasyUseUnorderedMap<ObjType*, int, HashFn> >(
+        "UNORDERED_MAP", obj_size, iters, stress_hash_function);
 
   
   if (FLAGS_test_map)
