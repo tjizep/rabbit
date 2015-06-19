@@ -32,9 +32,11 @@ THE SOFTWARE.
 /// it uses linear probing for the first level of fallback and then a overflow area or secondary hash
 
 #ifdef _MSC_VER
-#define RABBIT_NOINLINE_  _declspec(noinline)
+	#define RABBIT_NOINLINE_PRE _declspec(noinline)
+	#define RABBIT_NOINLINE_ 
 #else
-#define RABBIT_NOINLINE_
+	#define RABBIT_NOINLINE_PRE
+	#define RABBIT_NOINLINE_ __attribute__((noinline)) 
 #endif
 namespace rabbit{
 	template <class _Config>
@@ -188,7 +190,7 @@ namespace rabbit{
 		typedef unsigned long long int _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		/// if even more speed is desired but you'r willing to live with a 4 billion key limit then
 		/// typedef unsigned long size_type;
-		typedef size_t size_type;
+		typedef std::size_t size_type;
 
 		size_type log2(size_type n){
 			size_type r = 0; 
@@ -234,10 +236,10 @@ namespace rabbit{
 			BITS_SIZE1 = BITS_SIZE-1;
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;				
-			PROBES = 32;							
+			PROBES = 16;							
 			MIN_EXTENT = 8; /// start size of the hash table
-			MAX_OVERFLOW = 1024; //BITS_SIZE*8/sizeof(_Bt); 
-			
+			MAX_OVERFLOW = 512; //BITS_SIZE*8/sizeof(_Bt); 
+			assert(PROBES > log2((size_type)MAX_OVERFLOW));
 		}
 	};
 	template<class _InMapper>
@@ -495,7 +497,7 @@ namespace rabbit{
 			
 			/// total data size, never less than than size()
 			size_type get_data_size() const {
-				return get_extent()+config.PROBES+16+overflow;
+				return get_extent()+config.PROBES+overflow;
 			}
 			
 			/// the overflow start
@@ -647,9 +649,9 @@ namespace rabbit{
 				keys.resize(get_data_size());
 				clusters = get_segment_allocator().allocate(esize);				
 				values = get_value_allocator().allocate(get_data_size());
-			
+				_KeySegment ks;
 				for(size_type c = 0; c < esize; ++c){
-					get_segment_allocator().construct(&clusters[c]);
+					get_segment_allocator().construct(&clusters[c],ks);
 				}
 				set_exists(get_data_size(),true);
 				buckets = 0;
@@ -770,7 +772,7 @@ namespace rabbit{
 				
 				return unique_subscript_rest(k, pos);
 			}
-			_V* subscript_rest(const _K& k, size_type pos,size_type h){
+			_V* subscript_rest(const _K& k, size_type pos,size_type h) __attribute__((noinline)) {
 				pos = h;				
 				++pos;
 				for(unsigned int i =0; i < probes;++i){
@@ -844,7 +846,9 @@ namespace rabbit{
 				}
 				return subscript_rest(k,pos,h);
 			}
-			size_type erase_rest(const _K& k,size_type pos){
+			size_type erase_rest(const _K& k,size_type pos)
+			RABBIT_NOINLINE_ /// this function must never be inlined
+			{
 				size_type h = pos;
 				
 				pos = find_rest(k,pos);
@@ -889,8 +893,8 @@ namespace rabbit{
 				}				
 				if(!s.is_overflows(si)){
 					return 0;
-				}
-				return erase_rest(k, pos);
+				}else
+					return erase_rest(k, pos);
 				
 			}
 			/// not used (could be used where hash table must actually shrink too)
@@ -903,6 +907,20 @@ namespace rabbit{
 				if(pos == (*this).end()){
 					return 0;
 				}else return 1;
+			}
+			const _V& at(const _K& k) const {
+				size_type pos = find(k);			
+				if(pos != (*this).end()){
+					return get_segment_value(pos);					
+				}
+				throw std::exception();
+			}
+			_V& at(const _K& k) {
+				size_type pos = find(k);			
+				if(pos != (*this).end()){
+					return get_segment_value(pos);					
+				}
+				throw std::exception();
 			}
 
 			bool get(const _K& k, _V& v) const {
@@ -929,27 +947,10 @@ namespace rabbit{
 					
 				}
 				//if(overflowed_(h)){
-					//size_type e = ((overflow_elements/8)+1)*8;
-					//if(get_data_size() < e) e = get_data_size(); ///overflow is divisible by 8
-					for(pos=get_o_start(); pos < overflow_elements; ){		
-						if(equal_key(pos,k) && exists_(pos) ) return pos;											
-						++pos;
-						if(equal_key(pos,k) && exists_(pos) ) return pos;						
-						++pos;
-						if(equal_key(pos,k) && exists_(pos) ) return pos;						
-						++pos;
-						if(equal_key(pos,k) && exists_(pos) ) return pos;						
-						++pos;
-						if(equal_key(pos,k) && exists_(pos) ) return pos;						
-						++pos;
-						if(equal_key(pos,k) && exists_(pos) ) return pos;						
-						++pos;
-						if(equal_key(pos,k) && exists_(pos) ) return pos;						
-						++pos;
-						if(equal_key(pos,k) && exists_(pos) ) return pos;						
-						++pos;
-					
-					}
+				for(pos=get_o_start(); pos < overflow_elements; ){		
+					if(equal_key(pos,k) && exists_(pos) ) return pos;											
+					++pos;											
+				}
 				//}
 				
 			
@@ -957,7 +958,7 @@ namespace rabbit{
 				return end();
 			}
 			size_type find(const _K& k,size_type& pos) const {				
-				
+				if(!elements) return end();
 				pos = map_key(k);			
 				_Bt index = get_segment_index(pos);
 				const _Segment& s = get_segment(pos);				
@@ -965,9 +966,11 @@ namespace rabbit{
 				if(equal_key(pos,k) && s.is_exists(index) ){ ///get_segment(pos).exists == ALL_BITS_SET || 
 					return pos;
 				}				
+				
 				if(!s.is_overflows(index)){
 					return end();
 				}
+				
 				return find_rest(k,pos);
 			}
 			size_type find(const _K& k) const {				
@@ -1333,6 +1336,13 @@ namespace rabbit{
 		bool get(const _K& k, _V& v) const {
 			return (*this).current->get(k,v);
 		}
+		/// throws a exception when value could not match the key
+		const _V& at(const _K& k) const {
+			return (*this).current->at(k);
+		}
+		_V& at(const _K& k) {
+			return (*this).current->at(k);
+		}
 
 		_V& operator[](const _K& k){
 			_V *rv = current->subscript(k);
@@ -1558,6 +1568,13 @@ public:
 	_Myt& operator=(_Myt&& from){	// assign by moving _Right
 		_Base::move(from);
 		return (*this);
+	}
+	const mapped_type& at(const key_type& k) const {
+		return _Base::at(k);
+	}
+
+	mapped_type& at(const key_type& k) {
+		return _Base::at(k);
 	}
 
 	mapped_type& operator[](const key_type& k){	

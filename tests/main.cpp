@@ -129,7 +129,7 @@ public:
 		double start = get_proc_mem_use();
 		std::minstd_rand rd;
 		std::mt19937 gen(rd());
-		std::uniform_int_distribution<long long> dis(1<<24, 1ll<<48);
+		std::uniform_int_distribution<long long> dis(1ll<<24, 1ll<<48);
 		/// script creation is not benched
 		_InputField v;
 		for(size_t r = 0; r < count;++r){
@@ -380,7 +380,7 @@ int main(int argc, char **argv)
 
 	
 		test_rabbit_hash<_K>(ts);
-		//test_rabbit_hash_erase<_K>(ts/10);
+		test_rabbit_hash_erase<_K>(ts/10);
 	}else{
 		google_times(ts);
 	}
