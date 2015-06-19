@@ -772,7 +772,7 @@ namespace rabbit{
 				
 				return unique_subscript_rest(k, pos);
 			}
-			_V* subscript_rest(const _K& k, size_type pos,size_type h) __attribute__((noinline)) {
+			_V* subscript_rest(const _K& k, size_type pos,size_type h) {
 				pos = h;				
 				++pos;
 				for(unsigned int i =0; i < probes;++i){
