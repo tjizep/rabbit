@@ -78,7 +78,7 @@ extern "C" {
 # include <sys/utsname.h>
 #endif      // for uname()
 }
-#define _USE_SPARSE_HASH_
+//#define _USE_SPARSE_HASH_
 #ifdef _MSC_VER
 
 #define snprintf c99_snprintf
@@ -125,18 +125,18 @@ using std::vector;
 using GOOGLE_NAMESPACE::dense_hash_map;
 using GOOGLE_NAMESPACE::sparse_hash_map;
 
-static bool FLAGS_test_sparse_hash_map = false;
+static bool FLAGS_test_sparse_hash_map = true;
 static bool FLAGS_test_dense_hash_map = true;
 static bool FLAGS_test_rabbit_unordered_map = true;
 static bool FLAGS_test_rabbit_sparse_unordered_map = false;
-static bool FLAGS_test_unordered_map = false;
+static bool FLAGS_test_unordered_map = true;
 static bool FLAGS_test_hash_map = false;
 static bool FLAGS_test_map = false;
 
-static bool FLAGS_test_4_bytes = true;
+static bool FLAGS_test_4_bytes = false;
 static bool FLAGS_test_8_bytes = true;
-static bool FLAGS_test_16_bytes = true;
-static bool FLAGS_test_256_bytes = true;
+static bool FLAGS_test_16_bytes = false;
+static bool FLAGS_test_256_bytes = false;
 
 static bool growth_only = false;
 
@@ -191,16 +191,16 @@ class EasyUseDenseHashMap<K*, V, H> : public dense_hash_map<K*,V,H> {
 
 template<typename K, typename V, typename H>
 class EasyUseRabbitUnorderedMap : public rabbit::unordered_map<K,V,H> {
-public:  
+public:
 };
 template<typename K, typename V, typename H>
 class EasyUseRabbitSparseUnorderedMap : public rabbit::sparse_unordered_map<K,V,H> {
-public:  
+public:
 };
 
 template<typename K, typename V, typename H>
 class EasyUseUnorderedMap : public std::unordered_map<K,V,H> {
-public:  
+public:
 	void resize(size_t r) { this->rehash(r); }
 };
 
@@ -282,7 +282,7 @@ template<int Size, int Hashsize> class HashObject {
     }
 #ifdef _USE_SPARSE_HASH_
     return SPARSEHASH_HASH<int>()(hashval);
-#else 
+#else
 	return hashval;
 #endif
 
@@ -476,6 +476,7 @@ static size_t CurrentMemoryUsage() {
 #endif
 static size_t CurrentMemoryUsage() {
 #if defined HAVE_WINDOWS_H
+#if _MSC_VER
 	PROCESS_MEMORY_COUNTERS memCounter;
 	bool result = (GetProcessMemoryInfo(GetCurrentProcess(),
                                    &memCounter,
@@ -483,6 +484,7 @@ static size_t CurrentMemoryUsage() {
 	if(result){
 		return memCounter.WorkingSetSize;
 	}
+#endif
 #endif
 	return 0;
 }
@@ -572,11 +574,13 @@ static void time_map_fetch(int iters, const vector<int>& indices,
   r = 1;
   t.Reset();
   NumHashesSinceLastCall();
+
   for (i = 0; i < iters; i++) {
     r ^= static_cast<int>(set.find(indices[i]) != set.end());
   }
   double ut = t.UserTime();
   const size_t finish = CurrentMemoryUsage();
+
   srand(r);   // keep compiler from optimizing away r (we never call rand())
   report(title, ut, iters, start, finish);
 }
@@ -594,7 +598,7 @@ static void time_map_fetch_sequential(int iters) {
 static void shuffle(vector<int>* v) {
   srand(9);
   for (int n = (int) v->size(); n >= 2; n--) {
-    swap((*v)[n - 1], (*v)[static_cast<unsigned>(rand()) % n]);
+    swap((*v)[n - 1], (*v)[static_cast<unsigned long>(rand()*rand()) % n]);
   }
 }
 
@@ -653,7 +657,7 @@ static void time_map_toggle(int iters) {
 
   const size_t start = CurrentMemoryUsage();
   t.Reset();
-  for (i = 0; i < iters; i++) {	
+  for (i = 0; i < iters; i++) {
     set[i] = i+1;
     set.erase(i);
   }
@@ -788,7 +792,7 @@ static void test_all_maps(int obj_size, int iters) {
                  EasyUseUnorderedMap<ObjType*, int, HashFn> >(
         "UNORDERED_MAP", obj_size, iters, stress_hash_function);
 
-  
+
   if (FLAGS_test_map)
     measure_map< EasyUseMap<ObjType, int>,
                  EasyUseMap<ObjType*, int> >(

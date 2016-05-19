@@ -367,7 +367,7 @@ int main(int argc, char **argv)
 #ifdef _MSC_VER
 	::Sleep(1000);
 #endif
-	int ts = 10000000;
+	int ts = 3000000;
 	
 	if(false){
 		//typedef std::string _K;

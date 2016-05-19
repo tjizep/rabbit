@@ -29,6 +29,7 @@
 			</Target>
 		</Build>
 		<Compiler>
+			<Add option="-O3" />
 			<Add option="-std=c++11" />
 			<Add option="-fexceptions" />
 			<Add directory="C:/dev/cpp_all/rabbit" />
