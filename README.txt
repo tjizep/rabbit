@@ -17,7 +17,7 @@ Advantages:
 
 1. Very Fast and Small when set_sparse(false)(default) or just Fast and Very Small when set_sparse(true)
 2. Strong guarantees for hash table size in sparse mode
-   i.e. Sparse version of hash table is always smaller than google sparse hash
+   i.e. Sparse version of hash table is nearly always smaller(90% of the time) than google sparse hash
    even though it has a step shaped memory use curve
 3. Std api compatible with stl however only deviation is iterator cannot modify values in table
 4. sparseness can be dialled in dynamically when need arises - only effective after rehash
