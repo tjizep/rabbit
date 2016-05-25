@@ -128,13 +128,13 @@ using GOOGLE_NAMESPACE::sparse_hash_map;
 static bool FLAGS_test_sparse_hash_map = true;
 static bool FLAGS_test_dense_hash_map = true;
 static bool FLAGS_test_rabbit_unordered_map = true;
-static bool FLAGS_test_rabbit_sparse_unordered_map = false;
+static bool FLAGS_test_rabbit_sparse_unordered_map = true;
 static bool FLAGS_test_unordered_map = true;
 static bool FLAGS_test_hash_map = false;
 static bool FLAGS_test_map = false;
 
-static bool FLAGS_test_4_bytes = false;
-static bool FLAGS_test_8_bytes = true;
+static bool FLAGS_test_4_bytes = true;
+static bool FLAGS_test_8_bytes = false;
 static bool FLAGS_test_16_bytes = false;
 static bool FLAGS_test_256_bytes = false;
 
@@ -194,8 +194,11 @@ class EasyUseRabbitUnorderedMap : public rabbit::unordered_map<K,V,H> {
 public:
 };
 template<typename K, typename V, typename H>
-class EasyUseRabbitSparseUnorderedMap : public rabbit::sparse_unordered_map<K,V,H> {
+class EasyUseRabbitSparseUnorderedMap : public rabbit::unordered_map<K,V,H> {
 public:
+    EasyUseRabbitSparseUnorderedMap(){
+        rabbit::unordered_map<K,V,H>::set_sparse(true);
+    }
 };
 
 template<typename K, typename V, typename H>
@@ -476,7 +479,7 @@ static size_t CurrentMemoryUsage() {
 #endif
 static size_t CurrentMemoryUsage() {
 #if defined HAVE_WINDOWS_H
-#if _MSC_VER
+
 	PROCESS_MEMORY_COUNTERS memCounter;
 	bool result = (GetProcessMemoryInfo(GetCurrentProcess(),
                                    &memCounter,
@@ -484,7 +487,7 @@ static size_t CurrentMemoryUsage() {
 	if(result){
 		return memCounter.WorkingSetSize;
 	}
-#endif
+
 #endif
 	return 0;
 }
@@ -598,7 +601,7 @@ static void time_map_fetch_sequential(int iters) {
 static void shuffle(vector<int>* v) {
   srand(9);
   for (int n = (int) v->size(); n >= 2; n--) {
-    swap((*v)[n - 1], (*v)[static_cast<unsigned long>(rand()*rand()) % n]);
+    swap((*v)[n - 1], (*v)[static_cast<unsigned long>(rand()) % n]); /// add *rand() for more random
   }
 }
 

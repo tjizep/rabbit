@@ -21,10 +21,11 @@
 				<Option type="1" />
 				<Option compiler="gcc" />
 				<Compiler>
-					<Add option="-O2" />
+					<Add option="-fexpensive-optimizations" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
+					<Add library="psapi" />
 				</Linker>
 			</Target>
 		</Build>
@@ -32,10 +33,14 @@
 			<Add option="-O3" />
 			<Add option="-std=c++11" />
 			<Add option="-fexceptions" />
+			<Add option="-D_WIN32" />
 			<Add directory="C:/dev/cpp_all/rabbit" />
 			<Add directory="../../repo/sparsehash-2.0.2/src" />
 			<Add directory="../../repo/sparsehash-2.0.2/src/windows" />
 		</Compiler>
+		<Unit filename="../rabbit/rabbit.h" />
+		<Unit filename="../rabbit/unordered_map" />
+		<Unit filename="../rabbit/unordered_set" />
 		<Unit filename="../time_hash_maps.cpp" />
 		<Unit filename="main.cpp" />
 		<Extensions>
