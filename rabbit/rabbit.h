@@ -141,9 +141,28 @@ namespace rabbit{
 			return (size_type)r;
 		}
 	};
+	template<class _V>
+	class deref_ptr_proxy{
+    public:
+        const _V* inner;
+        deref_ptr_proxy(const _V& v):inner(&v){
+        }
+        deref_ptr_proxy():inner(nullptr){
+        }
+        deref_ptr_proxy(const deref_ptr_proxy& p) : inner(p.inner){
+        }
+        deref_ptr_proxy(deref_ptr_proxy& p) : inner(p.inner){
+        }
+	    inline operator  _V&() {
+	        return const_cast<_V&>(*inner);
+	    }
+	    inline operator const _V&() const {
+	        return *inner;
+	    }
+	};
 	template<typename _Ht>
 	struct rabbit_hash{
-		unsigned long operator()(const _Ht& k) const{
+		size_t operator()(const _Ht& k) const{
 			return (unsigned long)(size_t) std::hash<_Ht>()(k); ///
 		};
 	};
@@ -161,25 +180,25 @@ namespace rabbit{
 	};
 	template<>
 	struct rabbit_hash<unsigned int>{
-		unsigned long operator()(const unsigned int& k) const{
+		unsigned int operator()(const unsigned int& k) const{
 			return (unsigned long)k;
 		};
 	};
 	template<>
 	struct rabbit_hash<int>{
-		unsigned long operator()(const int& k) const{
+		unsigned int long operator()(const int& k) const{
 			return k;
 		};
 	};
 	template<>
 	struct rabbit_hash<unsigned long long>{
-		unsigned long operator()(const unsigned long long& k) const{
+		unsigned long long operator()(const unsigned long long& k) const{
 			return (unsigned long)k;
 		};
 	};
 	template<>
 	struct rabbit_hash<long long>{
-		unsigned long operator()(const long long& k) const{
+		unsigned long long operator()(const long long& k) const{
 			return (unsigned long)k;
 		};
 	};
@@ -211,7 +230,7 @@ namespace rabbit{
 
 		size_type MIN_EXTENT;
 		size_type MAX_OVERFLOW_FACTOR ;
-		
+
 		basic_config(const basic_config& right){
 			*this = right;
 		}
@@ -238,7 +257,7 @@ namespace rabbit{
 			PROBES = 16;
 			MIN_EXTENT = 4; /// start size of the hash table
 			MAX_OVERFLOW_FACTOR = 32768; //BITS_SIZE*8/sizeof(_Bt);
-			
+
 		}
 	};
 	template<class _InMapper>
@@ -252,7 +271,8 @@ namespace rabbit{
 	typedef basic_traits<_BinMapper<basic_config> > default_traits;
 	typedef basic_traits<_ModMapper<basic_config> > sparse_traits;
 
-	template
+
+    template
 	<	class _K
 	,	class _V
 	,	class _H = rabbit_hash<_K>
@@ -266,7 +286,7 @@ namespace rabbit{
 
 		typedef _V mapped_type;
 
-		typedef std::pair<_K,_V> _ElPair;
+		typedef std::pair<deref_ptr_proxy<_K>,deref_ptr_proxy<_V>> _ElPair;
 		typedef _ElPair value_type;
 		typedef typename _Traits::_Bt _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		typedef typename _Traits::size_type size_type;
@@ -289,6 +309,8 @@ namespace rabbit{
 	protected:
 
 		struct _PairSegment{
+        public:
+            typedef std::pair<_K, _V> _ElPair;
 		private:
 			_ElPair data[sizeof(_Bt)*8];
 		private:
@@ -396,7 +418,7 @@ namespace rabbit{
 			inline void toggle_exists(_Bt index){
 				exists ^= ((_Bt)1 << index);
 			}
-			
+
 
 			void set_overflows(_Bt index, bool f){
 				set_bit(overflows,index,f);
@@ -528,9 +550,8 @@ namespace rabbit{
 				return clusters[get_segment_number(pos)];
 			}
 
-			_ElPair get_segment_pair(size_type pos) const {
-				_ElPair r = std::make_pair(get_segment_key(pos),get_segment_value(pos));
-				return r;
+			const _ElPair get_segment_pair(size_type pos) const {
+				return std::make_pair(get_segment_key(pos),get_segment_value(pos));
 				//return clusters[get_segment_number(pos)].pair(get_segment_index(pos));
 			}
 
@@ -544,11 +565,10 @@ namespace rabbit{
 				return values[pos];
 			}
 
-			_ElPair rr;
-			_ElPair& get_segment_pair(size_type pos) {
+
+			_ElPair get_segment_pair(size_type pos) {
 				//return clusters[get_segment_number(pos)].pair(get_segment_index(pos));
-				rr = std::make_pair(get_segment_key(pos),get_segment_value(pos));
-				return rr;
+				return std::make_pair(get_segment_key(pos),get_segment_value(pos));
 			}
 
 			_K & get_segment_key(size_type pos) {
@@ -649,10 +669,10 @@ namespace rabbit{
 				key_mapper = _Mapper(new_extent,config);
 
 				mf = 1.0;
-				assert(config.MAX_OVERFLOW_FACTOR > 0);			
+				assert(config.MAX_OVERFLOW_FACTOR > 0);
 				if(is_sparse()){
 					probes = config.log2(new_extent)*16; /// start probes
-					overflow = probes*8; 
+					overflow = probes*8;
 				}else{
 					probes = config.PROBES;  /// start probes
 					overflow = get_extent()/config.MAX_OVERFLOW_FACTOR;
@@ -712,7 +732,7 @@ namespace rabbit{
 			void set_sparse(bool sparse){
 				this->sparse = sparse;
 			}
-			bool is_sparse() const{				
+			bool is_sparse() const{
 				return this->sparse;
 			}
 			hash_kernel& operator=(const hash_kernel& right){
@@ -775,7 +795,7 @@ namespace rabbit{
 				if(overflow_elements < end()){
 					pos = overflow_elements++;
 					if(is_sparse()){
-						//++probes; // += config.log2(overflow_elements);	
+						//++probes; // += config.log2(overflow_elements);
 					}
 					if(!exists_(pos)){
 						set_overflows(h,true);
@@ -831,7 +851,7 @@ namespace rabbit{
 				if(overflow_elements < end()){
 					if(!exists_(overflow_elements)){
 						at_empty = overflow_elements++;
-						if(is_sparse()){							
+						if(is_sparse()){
 							//++probes; // += config.log2(overflow_elements);
 						}
 
@@ -865,7 +885,7 @@ namespace rabbit{
 				_Bt si = get_segment_index(pos);
 				_Segment& s = get_segment(pos);
 				bool key_overflows = s.is_overflows(si);
-				bool key_exists = s.is_exists(si);				
+				bool key_exists = s.is_exists(si);
 				//key_overflows = s.is_overflows(si);
 				if(!key_overflows && !s.is_exists(si)){
 					s.toggle_exists(si);
@@ -905,7 +925,7 @@ namespace rabbit{
 								break;
 							}
 						}
-					}					
+					}
 					return 1;
 				}
 				return 0;
@@ -921,7 +941,7 @@ namespace rabbit{
 					s.toggle_exists(si);
 					destroy_segment_value(pos);
 					--elements;
-					++removed;				
+					++removed;
 					return 1;
 				}
 				if(!s.is_overflows(si)){
@@ -992,27 +1012,27 @@ namespace rabbit{
 			}
 			size_type find(const _K& k,size_type& pos) const {
 				pos = map_key(k);
-				bool is_empty = eq_f(empty_key,k);					
-				
+				bool is_empty = eq_f(empty_key,k);
+
 				if(is_empty){
 					_Bt index = get_segment_index(pos);
 					const _Segment& s = get_segment(pos);
-					if(s.is_exists(index) && equal_key(pos,k) ){ ///get_segment(pos).exists == ALL_BITS_SET ||						
+					if(s.is_exists(index) && equal_key(pos,k) ){ ///get_segment(pos).exists == ALL_BITS_SET ||
 						return pos;
-					}				
+					}
 					if(!s.is_overflows(index)){
 						return end();
-					}					
+					}
 				}else{
 					if(equal_key(pos,k)) return pos;
-					
+
 				}
 				_Bt index = get_segment_index(pos);
-				const _Segment& s = get_segment(pos);				
+				const _Segment& s = get_segment(pos);
 				if(!s.is_overflows(index)){
 					return end();
 				}
-					
+
 				return find_rest(k,pos);
 			}
 			size_type find(const _K& k) const {
@@ -1045,6 +1065,7 @@ namespace rabbit{
 			const basic_unordered_map* h;
 			kernel_ptr hc;
 			size_type pos;
+			mutable _ElPair rr;
 		private:
 			_Bt index;
 			_Bt exists;
@@ -1115,20 +1136,23 @@ namespace rabbit{
 				return hc->get_segment_pair((*this).pos);
 			}
 			inline _ElPair& operator*() {
-				return hc->get_segment_pair((*this).pos);
+			    rr = hc->get_segment_pair((*this).pos);
+				return rr;
 			}
 			inline _ElPair* operator->() const {
-				return &(hc->get_segment_pair((*this).pos));
+			    rr = const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos);
+				return &rr;
 			}
 			inline const _ElPair* operator->() {
-				return &(hc->get_segment_pair((*this).pos));
+			    rr = hc->get_segment_pair((*this).pos);
+				return &rr;
 			}
 			inline bool operator==(const iterator& r) const {
 				return (pos == r.pos);
 			}
 			bool operator!=(const iterator& r) const {
 				return (pos != r.pos);
-			}			
+			}
 		};
 
 		struct const_iterator{
@@ -1138,6 +1162,7 @@ namespace rabbit{
 			mutable kernel_ptr hc;
 			_Bt index;
 			_Bt exists;
+			mutable _ElPair rr;
 			void set_index(){
 				if(hc != nullptr){
 					const _Segment& s = hc->get_segment(pos);
@@ -1199,10 +1224,12 @@ namespace rabbit{
 				return (*this);
 			}
 			const _ElPair& operator*() const {
-				return const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos);
+			    rr = const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos);
+				return rr;
 			}
 			const _ElPair* operator->() const {
-				return &(const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos));
+			    rr = const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos);
+				return &rr;
 			}
 
 			bool operator==(const const_iterator& r) const {

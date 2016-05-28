@@ -393,7 +393,7 @@ int main(int argc, char **argv)
 #endif
 	int ts = 10000000;
 
-	if(true){
+	if(false){
 		//typedef std::string _K;
 		typedef unsigned long long _K;
 
