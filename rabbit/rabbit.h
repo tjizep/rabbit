@@ -27,6 +27,7 @@ THE SOFTWARE.
 #include <assert.h>
 #include <memory>
 #include <string>
+#include <random>
 
 /// the rab-bit hash
 /// probably the worlds simplest working hashtable - only kiddingk
@@ -45,6 +46,7 @@ namespace rabbit{
 		typedef _Config config_type;
 		typedef typename config_type::size_type size_type;
 		size_type extent;
+		size_type random_val;
 		double backoff;
 		_Config config;
 		_ModMapper(){
@@ -54,9 +56,12 @@ namespace rabbit{
 			this->config = config;
 
 			this->extent = new_extent;
-
+			srand ((unsigned int)time(NULL));
+			this->random_val = rand();
 		}
-
+		inline size_type randomize(size_type other) const {
+			return (other ^ random_val) % this->extent;
+		}
 		inline size_type operator()(size_type h) const {
 
 			return h % this->extent;
@@ -108,7 +113,7 @@ namespace rabbit{
 		size_type extent1;
 		size_type extent2;
 		size_type primary_bits;
-
+		size_type random_val;
 		_Config config;
 		_BinMapper(){
 		}
@@ -118,13 +123,20 @@ namespace rabbit{
 			this->extent1 = this->extent-1;
 			this->extent2 = this->config.log2(new_extent);
 			this->primary_bits = extent2;
-
+			std::minstd_rand rd;
+			std::mt19937 gen(rd());
+			std::uniform_int_distribution<long long> dis(1ll<<4, 1ll<<48);
+			this->random_val = dis(gen);
 		}
-
+		inline size_type randomize(size_type other) const {
+			return (other ^ random_val) & this->extent1;
+		}
 		inline size_type operator()(size_type h_n) const {
 			size_type h = h_n;
-
-			return (h+(h>>this->primary_bits)) & this->extent1; //
+			h += (h>>this->primary_bits); ///
+			//h += (h>>(2*this->primary_bits));
+			//h ^= random_val;
+			return   h & this->extent1; //
 
 		}
 		double resize_factor() const {
@@ -151,8 +163,7 @@ namespace rabbit{
         }
         deref_ptr_proxy(const deref_ptr_proxy& p) : inner(p.inner){
         }
-        deref_ptr_proxy(deref_ptr_proxy& p) : inner(p.inner){
-        }
+
 	    inline operator  _V&() {
 	        return const_cast<_V&>(*inner);
 	    }
@@ -224,6 +235,7 @@ namespace rabbit{
 		_Bt ALL_BITS_SET ;
 		/// maximum probes per access
 		size_type PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
+		size_type RAND_PROBES;
 		size_type BITS_LOG2_SIZE;
 		/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
 		///	hash randomizer available
@@ -242,7 +254,7 @@ namespace rabbit{
 			BITS_LOG2_SIZE = right.BITS_LOG2_SIZE;
 			ALL_BITS_SET = right.ALL_BITS_SET;
 			PROBES = right.PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
-
+			RAND_PROBES = right.RAND_PROBES;
 			MIN_EXTENT = right.MIN_EXTENT;
 			MAX_OVERFLOW_FACTOR = right.MAX_OVERFLOW_FACTOR;
 			return *this;
@@ -255,8 +267,9 @@ namespace rabbit{
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;
 			PROBES = 16;
+			RAND_PROBES = 3;
 			MIN_EXTENT = 4; /// start size of the hash table
-			MAX_OVERFLOW_FACTOR = 32768; //BITS_SIZE*8/sizeof(_Bt);
+			MAX_OVERFLOW_FACTOR = 8*32768; //BITS_SIZE*8/sizeof(_Bt);
 
 		}
 	};
@@ -451,6 +464,7 @@ namespace rabbit{
 			size_type initial_probes;
 			size_type probes;
 			size_type last_modified;
+			size_type random_val;
 			/// the existence bit set is a factor of BITS_SIZE+1 less than the extent
 			_Segment* clusters;///a.k.a. pages
 			_Keys keys;
@@ -775,6 +789,7 @@ namespace rabbit{
 			_V* unique_subscript_rest(const _K& k, size_type pos){
 
 				size_type h = pos;
+
 				++pos;
 				size_type start = 0;
 				for(unsigned int i =0; i < probes && pos < get_extent();++i){
@@ -790,7 +805,21 @@ namespace rabbit{
 					}
 					++pos;
 				}
-
+				/// a randomization step to help mitigate attacks
+				for(unsigned int i =0; i < config.RAND_PROBES;++i){
+					size_type rpos = randomize(h)+i;
+					_Bt rsi = get_segment_index(rpos);
+					_Segment& rs = get_segment(rpos);
+					if(!rs.is_exists(rsi)){
+						rs.toggle_exists(rsi);
+						//s.key(si)=k;
+						set_segment_key(rpos,k);
+						++elements;
+						set_overflows(h, true);/// set the original pos to overflow
+						keys_overflowed = true;
+						return create_segment_value(rpos);
+					}
+				}
 
 				if(overflow_elements < end()){
 					pos = overflow_elements++;
@@ -828,8 +857,12 @@ namespace rabbit{
 
 				return unique_subscript_rest(k, pos);
 			}
+			inline size_type randomize(size_type v) const {
+				return key_mapper.randomize(v);
+			}
 			_V* subscript_rest(const _K& k, size_type pos,size_type h) {
 				pos = h;
+
 				++pos;
 				for(unsigned int i =0; i < probes && pos < get_extent();++i){
 					_Bt si = get_segment_index(pos);
@@ -844,6 +877,20 @@ namespace rabbit{
 						return create_segment_value(pos);
 					}
 					++pos;
+				}
+				for(unsigned int i =0; i < config.RAND_PROBES ;++i){
+					size_type rpos = randomize(h)+i;
+					_Bt rsi = get_segment_index(rpos);
+					_Segment& rs = get_segment(rpos);
+					if(!rs.is_exists(rsi)){
+						rs.toggle_exists(rsi);
+						//s.key(si)=k;
+						set_segment_key(rpos,k);
+						++elements;
+						set_overflows(h, true);/// set the original pos to overflow
+						keys_overflowed = true;
+						return create_segment_value(rpos);
+					}
 				}
 
 				size_type at_empty = end();
@@ -987,7 +1034,9 @@ namespace rabbit{
 
 			size_type find_rest(const _K& k, size_type pos) const {
 				size_type h = pos;
+
 				++pos;
+
 				for(unsigned int i =0; i < probes && pos < get_extent();){
 					_Bt si = get_segment_index(pos);
 					if(segment_equal_key_exists(pos,k)){
@@ -999,6 +1048,14 @@ namespace rabbit{
 
 
 				}
+				/// randomization step for attack mitigation
+				for(unsigned int i =0; i < config.RAND_PROBES ;++i){
+					size_type rpos = randomize(h)+i;
+					if(equal_key(rpos,k) && exists_(rpos)){
+						return rpos;
+					}
+				}
+
 				//if(overflowed_(h)){
 				for(pos=get_o_start(); pos < overflow_elements; ){
 					if(equal_key(pos,k) && exists_(pos) ) return pos;
