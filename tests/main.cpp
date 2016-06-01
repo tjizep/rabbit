@@ -389,7 +389,7 @@ int main(int argc, char **argv)
 		
 		tester<_K>::_Script script;
 		tester<_K> t;
-		t.gen_random_narrow(ts, script);
+		t.gen_random(ts, script);
 		test_dense_hash<_K>(script,ts);
 		//test_sparse_hash<_K>(script,ts);
 		//test_std_hash<_K>(script,ts);

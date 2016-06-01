@@ -266,8 +266,8 @@ namespace rabbit{
 			BITS_SIZE1 = BITS_SIZE-1;
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;
-			PROBES = 16;
-			RAND_PROBES = 3;
+			PROBES = 8;
+			RAND_PROBES = 8;
 			MIN_EXTENT = 4; /// start size of the hash table
 			MAX_OVERFLOW_FACTOR = 8*32768; //BITS_SIZE*8/sizeof(_Bt);
 
@@ -806,8 +806,12 @@ namespace rabbit{
 					++pos;
 				}
 				/// a randomization step to help mitigate attacks
+				size_type spot = randomize(h);
 				for(unsigned int i =0; i < config.RAND_PROBES;++i){
-					size_type rpos = randomize(h)+i;
+					size_type rpos = spot+i;
+					if( rpos == get_extent() ){
+						break;
+					}
 					_Bt rsi = get_segment_index(rpos);
 					_Segment& rs = get_segment(rpos);
 					if(!rs.is_exists(rsi)){
@@ -819,6 +823,7 @@ namespace rabbit{
 						keys_overflowed = true;
 						return create_segment_value(rpos);
 					}
+					
 				}
 
 				if(overflow_elements < end()){
@@ -878,8 +883,12 @@ namespace rabbit{
 					}
 					++pos;
 				}
+				size_type spot = randomize(h);
 				for(unsigned int i =0; i < config.RAND_PROBES ;++i){
-					size_type rpos = randomize(h)+i;
+					size_type rpos = spot+i;
+					if( rpos == get_extent() ){
+						break;
+					}
 					_Bt rsi = get_segment_index(rpos);
 					_Segment& rs = get_segment(rpos);
 					if(!rs.is_exists(rsi)){
@@ -1049,8 +1058,12 @@ namespace rabbit{
 
 				}
 				/// randomization step for attack mitigation
+				size_type spot = randomize(h);
 				for(unsigned int i =0; i < config.RAND_PROBES ;++i){
-					size_type rpos = randomize(h)+i;
+					size_type rpos = spot+i;
+					if( rpos == get_extent() ){
+						break;
+					}
 					if(equal_key(rpos,k) && exists_(rpos)){
 						return rpos;
 					}
