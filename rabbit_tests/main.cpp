@@ -393,18 +393,18 @@ int main(int argc, char **argv)
 #endif
 	int ts = 10000000;
 
-	if(false){
+	if(true){
 		//typedef std::string _K;
 		typedef unsigned long long _K;
 
 		tester<_K>::_Script script;
 		tester<_K> t;
-		t.gen_random_narrow(ts, script);
+		t.gen_random(ts, script);
 		test_dense_hash<_K>(script,ts);
 		//test_sparse_hash<_K>(script,ts);
 		//test_std_hash<_K>(script,ts);
 		test_rabbit_hash<_K>(script,ts);
-		//test_rabbit_sparse_hash<_K>(script,ts);
+		test_rabbit_sparse_hash<_K>(script,ts);
 		//test_rabbit_hash_erase<_K>(ts/10);
 	}else{
 		google_times(ts);

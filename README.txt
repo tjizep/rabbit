@@ -9,6 +9,9 @@ Using:
 void rabbits(){
 	rabbit::unordered_map<int,int> int_map;
 	int_map.insert(0,1);
+	if(int_map[0] == 1){
+		/// xyz
+	}
 	...
 }
 
@@ -25,9 +28,8 @@ Advantages:
 Disadvantages
 -------------
 
-iterator * operator is slow because it copies the hash values to a temporary variable. 
-use the iterator::key() and iterator::value() functions instead.
-This problem could be fixed using a std::pair<_K*,_v*> instead.
+iterator * operator does not return a normal std::pair<K,V> its rather a std::pair<proxy<K>,proxy<V>>. 
+which may make certain type inferences impossible.
 
 Algorithm Descriprion
 ---------------------
@@ -41,24 +43,32 @@ Keys are located via a truncated linear probe of constant length in case of the 
 The linear probe is logarithmically related to the hash size when the sparse flag is set
 with the set_sparse(true) function.
 
-rabbit maintains each key associated with two bits seperately.
+Rabbit maintains each key associated with two bits seperately.
 The first bit is for a keys existence and a second bit is for a collision indicator.
 The collision indicator removes the need to search for non existing keys which is a 
 problem in the standard linear probing algorithm.
+
+The bits, keys and values are each stored in separate arrays to provide better CPU cache
+behaviour. For instance the existence bits will stay in cache longer so that memory access
+to these structures are reduced.
 
 Closed addressing
 -----------------
 
 At the end of the key array rabbit also maintains a single bucket. If any key is inserted and
-a open slot is not found within the current probe length it is added here.
-In the semi dense version of the algoritm the size of this bucket is maintained at a constant
+a open slot is not found within the current probe length it is added here. This bucket is a 
+accessed like a stack. removing items in the middle will reduce its height and new items are added
+at the back.
+
+In the semi dense variation of the algoritm the size of this bucket is maintained at a constant
 factor. In the sparse version the single bucket size is a logarithmically increasing number.
 
 Once the single bucket is full a rehash is performed on a new table with twice as many keys.
-In case of the sparse table a load factor of 0.9 is maintained
+In case of the sparse table a load factor of 0.9 is maintained.
 
 Some timing results with google dense hash compiled with TDM-MinGW 64 GCC 5.1
 -----------------------------------------------------------------------------
+
 These results are with the google sparse hash library and the maximum bits 
 randomness is only log2(10000000) ~ 23 bits
 

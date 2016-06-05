@@ -28,7 +28,7 @@ THE SOFTWARE.
 #include <memory>
 #include <string>
 #include <random>
-
+#include <iomanip>
 /// the rab-bit hash
 /// probably the worlds simplest working hashtable - only kiddingk
 /// it uses linear probing for the first level of fallback and then a overflow area or secondary hash
@@ -114,6 +114,7 @@ namespace rabbit{
 		size_type extent2;
 		size_type primary_bits;
 		size_type random_val;
+		size_type gate_bits;
 		_Config config;
 		_BinMapper(){
 		}
@@ -127,12 +128,19 @@ namespace rabbit{
 			std::mt19937 gen(rd());
 			std::uniform_int_distribution<long long> dis(1ll<<4, 1ll<<48);
 			this->random_val = dis(gen);
+			if(new_extent < (1ll<<24ll)){
+                this->gate_bits = (1ll<<24ll) - 1ll;
+            }else if(new_extent < (1ll<<32ll)){
+                this->gate_bits = (1ll<<32ll) - 1ll;
+            }else{
+                this->gate_bits = (1ll<<62ll) - 1ll;
+            }
 		}
 		inline size_type randomize(size_type other) const {
 			return (other ^ random_val) & this->extent1;
 		}
 		inline size_type operator()(size_type h_n) const {
-			size_type h = h_n;
+			size_type h = h_n & this->gate_bits;
 			h += (h>>this->primary_bits); ///
 			//h += (h>>(2*this->primary_bits));
 			//h ^= random_val;
@@ -174,7 +182,7 @@ namespace rabbit{
 	template<typename _Ht>
 	struct rabbit_hash{
 		size_t operator()(const _Ht& k) const{
-			return (unsigned long)(size_t) std::hash<_Ht>()(k); ///
+			return (size_t) std::hash<_Ht>()(k); ///
 		};
 	};
 	template<>
@@ -185,32 +193,32 @@ namespace rabbit{
 	};
 	template<>
 	struct rabbit_hash<unsigned long>{
-		unsigned long operator()(const unsigned long& k) const{
+		inline unsigned long operator()(const unsigned long& k) const{
 			return k;
 		};
 	};
 	template<>
 	struct rabbit_hash<unsigned int>{
-		unsigned int operator()(const unsigned int& k) const{
-			return (unsigned long)k;
+		inline unsigned int operator()(const unsigned int& k) const{
+			return k;
 		};
 	};
 	template<>
 	struct rabbit_hash<int>{
-		unsigned int long operator()(const int& k) const{
+		inline unsigned int operator()(const int& k) const{
 			return k;
 		};
 	};
 	template<>
 	struct rabbit_hash<unsigned long long>{
-		unsigned long long operator()(const unsigned long long& k) const{
-			return (unsigned long)k;
+		inline unsigned long long operator()(const unsigned long long& k) const{
+			return k;
 		};
 	};
 	template<>
 	struct rabbit_hash<long long>{
-		unsigned long long operator()(const long long& k) const{
-			return (unsigned long)k;
+		inline unsigned long long operator()(const long long& k) const{
+			return (unsigned  long)k;
 		};
 	};
 
@@ -266,7 +274,7 @@ namespace rabbit{
 			BITS_SIZE1 = BITS_SIZE-1;
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;
-			PROBES = 8;
+			PROBES = 16;
 			RAND_PROBES = 8;
 			MIN_EXTENT = 4; /// start size of the hash table
 			MAX_OVERFLOW_FACTOR = 8*32768; //BITS_SIZE*8/sizeof(_Bt);
@@ -320,7 +328,11 @@ namespace rabbit{
 		typedef _E key_compare;
 		typedef _H hasher;
 	protected:
-
+        struct overflow_stats{
+            size_type start_elements;
+            size_type end_elements;
+            overflow_stats() : start_elements(0),end_elements(0){}
+        };
 		struct _PairSegment{
         public:
             typedef std::pair<_K, _V> _ElPair;
@@ -463,6 +475,7 @@ namespace rabbit{
 			size_type elements;
 			size_type initial_probes;
 			size_type probes;
+			size_type rand_probes; /// used when there might be an attack
 			size_type last_modified;
 			size_type random_val;
 			/// the existence bit set is a factor of BITS_SIZE+1 less than the extent
@@ -473,6 +486,7 @@ namespace rabbit{
 
 			size_type overflow;
 			size_type overflow_elements;
+			overflow_stats stats;
 			_Mapper key_mapper;
 			_H hf;
 			_E eq_f;
@@ -674,6 +688,9 @@ namespace rabbit{
 			double get_resize_factor() const {
 				return key_mapper.resize_factor();
 			}
+			void set_rand_probes(size_type rand_probes){
+				this->rand_probes = rand_probes;
+			}
 			/// clears all data and resize the new data vector to the parameter
 			void resize_clear(size_type new_extent){
 				/// inverse of factor used to determine overflow list
@@ -688,9 +705,11 @@ namespace rabbit{
 					probes = config.log2(new_extent)*16; /// start probes
 					overflow = probes*8;
 				}else{
-					probes = config.PROBES;  /// start probes
-					overflow = get_extent()/config.MAX_OVERFLOW_FACTOR;
+					probes = config.log2(new_extent);  /// start probes config.PROBES; //
+					overflow = probes*2; //config.log2(new_extent)*64; // *16*new_extent/config.MAX_OVERFLOW_FACTOR
 				}
+				rand_probes = 0;
+				
 				initial_probes = probes;
 				//std::cout << "rehash with overflow:" << overflow  << std::endl;
 				elements = 0;
@@ -806,24 +825,26 @@ namespace rabbit{
 					++pos;
 				}
 				/// a randomization step to help mitigate attacks
-				size_type spot = randomize(h);
-				for(unsigned int i =0; i < config.RAND_PROBES;++i){
-					size_type rpos = spot+i;
-					if( rpos == get_extent() ){
-						break;
+				if(rand_probes){
+					size_type spot = randomize(h);
+					for(unsigned int i =0; i < rand_probes;++i){
+						size_type rpos = spot+i;
+						if( rpos == get_extent() ){
+							break;
+						}
+						_Bt rsi = get_segment_index(rpos);
+						_Segment& rs = get_segment(rpos);
+						if(!rs.is_exists(rsi)){
+							rs.toggle_exists(rsi);
+							//s.key(si)=k;
+							set_segment_key(rpos,k);
+							++elements;
+							set_overflows(h, true);/// set the original pos to overflow
+							keys_overflowed = true;
+							return create_segment_value(rpos);
+						}
+
 					}
-					_Bt rsi = get_segment_index(rpos);
-					_Segment& rs = get_segment(rpos);
-					if(!rs.is_exists(rsi)){
-						rs.toggle_exists(rsi);
-						//s.key(si)=k;
-						set_segment_key(rpos,k);
-						++elements;
-						set_overflows(h, true);/// set the original pos to overflow
-						keys_overflowed = true;
-						return create_segment_value(rpos);
-					}
-					
 				}
 
 				if(overflow_elements < end()){
@@ -837,6 +858,7 @@ namespace rabbit{
 						set_exists(pos, true);
 						set_segment_key(pos, k);
 						++elements;
+
 						last_modified = pos;
 						return create_segment_value(pos);
 					}
@@ -883,22 +905,24 @@ namespace rabbit{
 					}
 					++pos;
 				}
-				size_type spot = randomize(h);
-				for(unsigned int i =0; i < config.RAND_PROBES ;++i){
-					size_type rpos = spot+i;
-					if( rpos == get_extent() ){
-						break;
-					}
-					_Bt rsi = get_segment_index(rpos);
-					_Segment& rs = get_segment(rpos);
-					if(!rs.is_exists(rsi)){
-						rs.toggle_exists(rsi);
-						//s.key(si)=k;
-						set_segment_key(rpos,k);
-						++elements;
-						set_overflows(h, true);/// set the original pos to overflow
-						keys_overflowed = true;
-						return create_segment_value(rpos);
+				if(rand_probes){
+					size_type spot = randomize(h);
+					for(unsigned int i =0; i < rand_probes;++i){
+						size_type rpos = spot+i;
+						if( rpos == get_extent() ){
+							break;
+						}
+						_Bt rsi = get_segment_index(rpos);
+						_Segment& rs = get_segment(rpos);
+						if(!rs.is_exists(rsi)){
+							rs.toggle_exists(rsi);
+							//s.key(si)=k;
+							set_segment_key(rpos,k);
+							++elements;
+							set_overflows(h, true);/// set the original pos to overflow
+							keys_overflowed = true;
+							return create_segment_value(rpos);
+						}
 					}
 				}
 
@@ -929,6 +953,21 @@ namespace rabbit{
 					keys_overflowed = true;
 					set_exists(pos, true);
 					set_segment_key(pos, k);
+					size_type os = (overflow_elements - (get_extent()+initial_probes));
+					if(os == 1){
+                        stats.start_elements = elements;
+                        //std::cout << "overflow start: hash table size " << elements << " elements in over flow:" << os << std::endl;
+					}
+
+                    if(overflow_elements == end() && stats.start_elements){
+                        stats.end_elements = elements;
+                        size_type saved = stats.end_elements - stats.start_elements - os;
+                        double percent_saved = (100.0*((double)saved/(double)elements));
+
+                       // std::cout << "overflow end: hash table size " << elements << " elements in over flow:" << os << " saved : " << saved <<
+                       // std::endl <<  " percent saved " << std::setprecision(4) << percent_saved <<
+                       // std::endl;
+                    }
 
 					++elements;
 					return create_segment_value(pos);
@@ -1058,17 +1097,18 @@ namespace rabbit{
 
 				}
 				/// randomization step for attack mitigation
-				size_type spot = randomize(h);
-				for(unsigned int i =0; i < config.RAND_PROBES ;++i){
-					size_type rpos = spot+i;
-					if( rpos == get_extent() ){
-						break;
-					}
-					if(equal_key(rpos,k) && exists_(rpos)){
-						return rpos;
+				if(rand_probes){
+					size_type spot = randomize(h);
+					for(unsigned int i =0; i < rand_probes ;++i){
+						size_type rpos = spot+i;
+						if( rpos == get_extent() ){
+							break;
+						}
+						if(equal_key(rpos,k) && exists_(rpos)){
+							return rpos;
+						}
 					}
 				}
-
 				//if(overflowed_(h)){
 				for(pos=get_o_start(); pos < overflow_elements; ){
 					if(equal_key(pos,k) && exists_(pos) ) return pos;
@@ -1382,6 +1422,10 @@ namespace rabbit{
 				rehashed->set_sparse(current->is_sparse());
 				rehashed->resize_clear(new_extent);
 				rehashed->mf = (*this).current->mf;
+				if(current->load_factor() < 0.2){
+					//std::cout << " attack detected : using random probes" << std::endl;
+					rehashed->set_rand_probes(config.RAND_PROBES);
+				}
 				using namespace std;
 				while(true){
 					iterator e = end();
@@ -1515,6 +1559,11 @@ namespace rabbit{
 			create_current();
 			return (*this).current->at(k);
 		}
+
+        bool error(const _K& k){
+            _V *rv = current->subscript(k);
+            return rv==nullptr;
+        }
 
 		_V& operator[](const _K& k){
 			create_current();

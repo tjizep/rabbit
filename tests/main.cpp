@@ -383,7 +383,7 @@ int main(int argc, char **argv)
 
 	int ts = 10000000;
 	
-	if(false){
+	if(true){
 		//typedef std::string _K;
 		typedef unsigned long long _K;
 		
