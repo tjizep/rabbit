@@ -41,6 +41,50 @@ THE SOFTWARE.
 	#define RABBIT_NOINLINE_ __attribute__((noinline))
 #endif
 namespace rabbit{
+
+	/// a very basic version of std::pair which keeps references only
+
+	template
+	<	class _Ty1
+	,	class _Ty2
+	>
+	struct ref_pair{
+    // store references to a pair of values
+
+		typedef ref_pair<_Ty1, _Ty2> _Myt;
+		typedef _Ty1 first_type;
+		typedef _Ty2 second_type;
+
+		// construct from specified non const values
+		ref_pair(_Ty1& _Val1, _Ty2& _Val2)
+		:	first(_Val1)
+		,	second(_Val2)
+		{
+		}
+/// rely on the compiler default to do this
+        //ref_pair(_Myt& _Right)
+        //:	first(_Right.first)
+		//,	second(_Right.second)
+		//{
+		//}
+		_Myt& operator=(const _Myt& _Right){
+			first = _Right.first;
+			second = _Right.second;
+			return (*this);
+		}
+
+		operator std::pair<_Ty1,_Ty2> (){
+			return std::make_pair(first,second);
+		}
+
+        operator const std::pair<_Ty1,_Ty2> () const {
+			return std::make_pair(first,second);
+		}
+
+		_Ty1& first;	// the first stored value
+		_Ty2& second;	// the second stored value
+	};
+
 	template <class _Config>
 	struct _ModMapper{
 		typedef _Config config_type;
@@ -160,24 +204,6 @@ namespace rabbit{
 			assert(r > (double)extent);
 			return (size_type)r;
 		}
-	};
-	template<class _V>
-	class deref_ptr_proxy{
-    public:
-        const _V* inner;
-        deref_ptr_proxy(const _V& v):inner(&v){
-        }
-        deref_ptr_proxy():inner(nullptr){
-        }
-        deref_ptr_proxy(const deref_ptr_proxy& p) : inner(p.inner){
-        }
-
-	    inline operator  _V&() {
-	        return const_cast<_V&>(*inner);
-	    }
-	    inline operator const _V&() const {
-	        return *inner;
-	    }
 	};
 	template<typename _Ht>
 	struct rabbit_hash{
@@ -307,8 +333,10 @@ namespace rabbit{
 
 		typedef _V mapped_type;
 
-		typedef std::pair<deref_ptr_proxy<_K>,deref_ptr_proxy<_V>> _ElPair;
+		typedef ref_pair<_K,_V> _ElPair;
+		typedef ref_pair<const _K, const _V> _ConstElPair;
 		typedef _ElPair value_type;
+		typedef _ConstElPair const_value_type;
 		typedef typename _Traits::_Bt _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		typedef typename _Traits::size_type size_type;
 		typedef typename _Traits::rabbit_config rabbit_config;
@@ -333,67 +361,6 @@ namespace rabbit{
             size_type end_elements;
             overflow_stats() : start_elements(0),end_elements(0){}
         };
-		struct _PairSegment{
-        public:
-            typedef std::pair<_K, _V> _ElPair;
-		private:
-			_ElPair data[sizeof(_Bt)*8];
-		private:
-			void set_bit(_Bt& w, _Bt index, bool f){
-
-				#ifdef _MSC_VER
-				#pragma warning(disable:4804)
-				#endif
-				_Bt m = (_Bt)1ul << index;// the bit mask
-				w ^= (-f ^ w) & m;
-			}
-		public:
-			_Bt exists;
-
-
-			const _ElPair pair(_Bt ix) const {
-				return data[ix];
-			}
-
-			_ElPair& pair(_Bt ix) {
-				return data[ix];
-			}
-
-			const _K &key(_Bt ix) const {
-				return data[ix].first;
-			}
-
-			_K &key(_Bt ix) {
-				return data[ix].first;
-			}
-
-			const _V &value(_Bt ix) const {
-				return data[ix].second;
-			}
-
-			_V &value(_Bt ix) {
-				return data[ix].second;
-			}
-
-
-			bool is_exists(_Bt bit) const {
-				_Bt r = ((exists >> bit) & (_Bt)1ul);
-				return r!=0;
-			}
-
-			void set_exists(_Bt index, bool f){
-				set_bit(exists,index,f);
-			}
-
-			inline void toggle_exists(_Bt index){
-				exists ^= ((_Bt)1 << index);
-			}
-			_PairSegment(){
-				exists = 0;
-
-			}
-
-		} ;
 
 		struct _KeySegment{
 
@@ -596,7 +563,7 @@ namespace rabbit{
 
 			_ElPair get_segment_pair(size_type pos) {
 				//return clusters[get_segment_number(pos)].pair(get_segment_index(pos));
-				return std::make_pair(get_segment_key(pos),get_segment_value(pos));
+				return _ElPair(get_segment_key(pos),get_segment_value(pos));
 			}
 
 			_K & get_segment_key(size_type pos) {
@@ -709,7 +676,7 @@ namespace rabbit{
 					overflow = probes*2; //config.log2(new_extent)*64; // *16*new_extent/config.MAX_OVERFLOW_FACTOR
 				}
 				rand_probes = 0;
-				
+
 				initial_probes = probes;
 				//std::cout << "rehash with overflow:" << overflow  << std::endl;
 				elements = 0;
@@ -1175,7 +1142,7 @@ namespace rabbit{
 			const basic_unordered_map* h;
 			kernel_ptr hc;
 			size_type pos;
-			mutable _ElPair rr;
+			mutable char rdata[sizeof(_ElPair)];
 		private:
 			_Bt index;
 			_Bt exists;
@@ -1245,17 +1212,18 @@ namespace rabbit{
 			const _ElPair operator*() const {
 				return hc->get_segment_pair((*this).pos);
 			}
-			inline _ElPair& operator*() {
-			    rr = hc->get_segment_pair((*this).pos);
-				return rr;
+			inline _ElPair operator*() {
+			    return hc->get_segment_pair((*this).pos);
 			}
 			inline _ElPair* operator->() const {
-			    rr = const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos);
-				return &rr;
+			    /// can reconstruct multiple times on same memory because _ElPair is only references
+                _ElPair* ret = new ((void *)rdata) _ElPair(const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos));
+                return ret;
 			}
-			inline const _ElPair* operator->() {
-			    rr = hc->get_segment_pair((*this).pos);
-				return &rr;
+			inline const _ElPair *operator->() {
+                /// can reconstruct multiple times on same memory because _ElPair is only references
+                _ElPair* ret = new ((void *)rdata) _ElPair(const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos));
+                return ret;
 			}
 			inline bool operator==(const iterator& r) const {
 				return (pos == r.pos);
@@ -1272,7 +1240,7 @@ namespace rabbit{
 			mutable kernel_ptr hc;
 			_Bt index;
 			_Bt exists;
-			mutable _ElPair rr;
+			mutable char rdata[sizeof(_ElPair)];
 			void set_index(){
 				if(hc != nullptr){
 					const _Segment& s = hc->get_segment(pos);
@@ -1333,13 +1301,14 @@ namespace rabbit{
 			const_iterator operator++(int){
 				return (*this);
 			}
-			const _ElPair& operator*() const {
-			    rr = const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos);
-				return rr;
+			const _ElPair operator*() const {
+			    return const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos);
+
 			}
-			const _ElPair* operator->() const {
-			    rr = const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos);
-				return &rr;
+			const _ElPair *operator->() const {
+			    /// can reconstruct multiple times on same memory because _ElPair is only references
+                _ElPair* ret = new ((void *)rdata) _ElPair(const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos));
+                return ret;
 			}
 
 			bool operator==(const const_iterator& r) const {
