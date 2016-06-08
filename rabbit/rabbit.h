@@ -119,28 +119,9 @@ namespace rabbit{
 		double resize_factor() const {
 			return 1.3;
 		}
-		/// Truncated Linear Backoff in Rehasing after collisions
-		/// growth factor is calculated as a binary exponential
-		/// backoff (yes, analogous to the one used in network congestion control)
-		/// in evidence of hash collisions the the growth factor is exponentialy
-		/// decreased as memory becomes a scarce resource.
-		/// a factor between get_min_backoff() and get_max_backoff() is returned by this function
+
 		double recalc_growth_factor(size_type elements)  {
 			return 1.80;
-			double growth_factor = backoff;
-			bool linear = true;
-			if(linear){
-				double d = 0.81;
-				if(backoff - d > get_min_backoff()){
-					backoff -= d ;
-				}else backoff = get_min_backoff();
-			}else{
-				double backof_factor = 0.502;
-				backoff = get_min_backoff() + (( backoff - get_min_backoff() ) * backof_factor);
-
-			}
-
-			return growth_factor ;
 		}
 		inline size_type next_size(){
 			double r = recalc_growth_factor(this->extent) * this->extent;
@@ -669,11 +650,11 @@ namespace rabbit{
 				mf = 1.0;
 				assert(config.MAX_OVERFLOW_FACTOR > 0);
 				if(is_sparse()){
-					probes = config.log2(new_extent)*16; /// start probes
-					overflow = probes*8;
+					probes = config.log2(new_extent)*8; /// start probes
+					overflow = probes;
 				}else{
-					probes = config.log2(new_extent);  /// start probes config.PROBES; //
-					overflow = probes*2; //config.log2(new_extent)*64; // *16*new_extent/config.MAX_OVERFLOW_FACTOR
+					probes = config.log2(new_extent)-config.log2(config.MIN_EXTENT/2);  /// start probes config.PROBES; //
+					overflow = config.log2(new_extent); // *16*new_extent/config.MAX_OVERFLOW_FACTOR
 				}
 				rand_probes = 0;
 
@@ -770,6 +751,16 @@ namespace rabbit{
 				return eq_f(l, k) ;
 			}
 
+			inline size_type randomize(size_type v) const {
+				return key_mapper.randomize(v);
+			}
+
+            inline size_type hash_probe_incr(size_type i) const {
+                //if(is_sparse())
+                //return (i*i+i)>>1;
+                return 1;
+
+            }
 			/// when all inputs to this function is unique relative to current hash map(i.e. they dont exist in the hashmap)
 			/// and there where no erasures. for maximum fillrate in rehash
 			_V* unique_subscript_rest(const _K& k, size_type pos){
@@ -789,7 +780,7 @@ namespace rabbit{
 						last_modified = pos;
 						return create_segment_value(pos);
 					}
-					++pos;
+					pos += hash_probe_incr(i);
 				}
 				/// a randomization step to help mitigate attacks
 				if(rand_probes){
@@ -816,9 +807,7 @@ namespace rabbit{
 
 				if(overflow_elements < end()){
 					pos = overflow_elements++;
-					if(is_sparse()){
-						//++probes; // += config.log2(overflow_elements);
-					}
+
 					if(!exists_(pos)){
 						set_overflows(h,true);
 						keys_overflowed = true;
@@ -851,13 +840,11 @@ namespace rabbit{
 
 				return unique_subscript_rest(k, pos);
 			}
-			inline size_type randomize(size_type v) const {
-				return key_mapper.randomize(v);
-			}
+
 			_V* subscript_rest(const _K& k, size_type pos,size_type h) {
 				pos = h;
 
-				++pos;
+				pos += 1;
 				for(unsigned int i =0; i < probes && pos < get_extent();++i){
 					_Bt si = get_segment_index(pos);
 					_Segment& s = get_segment(pos);
@@ -870,7 +857,7 @@ namespace rabbit{
 						keys_overflowed = true;
 						return create_segment_value(pos);
 					}
-					++pos;
+					pos += hash_probe_incr(i);
 				}
 				if(rand_probes){
 					size_type spot = randomize(h);
@@ -898,9 +885,6 @@ namespace rabbit{
 				if(overflow_elements < end()){
 					if(!exists_(overflow_elements)){
 						at_empty = overflow_elements++;
-						if(is_sparse()){
-							//++probes; // += config.log2(overflow_elements);
-						}
 
 					}
 				}else if (removed){
@@ -1058,7 +1042,8 @@ namespace rabbit{
 						return pos;
 					}
 
-					++pos;
+					//++pos;
+					pos += hash_probe_incr(i);
 					i+=1;
 
 

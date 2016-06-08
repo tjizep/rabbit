@@ -381,7 +381,7 @@ void more_tests(){
 int main(int argc, char **argv)
 {
 
-	int ts = 10000000;
+	int ts = 100000000;
 	
 	if(true){
 		//typedef std::string _K;
@@ -394,7 +394,7 @@ int main(int argc, char **argv)
 		//test_sparse_hash<_K>(script,ts);
 		//test_std_hash<_K>(script,ts);
 		test_rabbit_hash<_K>(script,ts);
-		test_rabbit_sparse_hash<_K>(script,ts);
+		//test_rabbit_sparse_hash<_K>(script,ts);
 		//test_rabbit_hash_erase<_K>(ts);
 	}else{
 		google_times(ts);

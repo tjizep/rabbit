@@ -259,9 +259,9 @@ public:
 
 			h[script[j]] = (typename _MapT::mapped_type)j+1;
 			if(j % s == 0){
-				std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+				//std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
-				printf("%ld: %ld in hash, bench total %.4g secs, %.4g MB\n",(long)j,(long)h.size(),(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count())/(1000000.0),get_proc_mem_use()-mem_start);
+				//printf("%ld: %ld in hash, bench total %.4g secs, %.4g MB\n",(long)j,(long)h.size(),(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count())/(1000000.0),get_proc_mem_use()-mem_start);
 			}
 		}
 
@@ -275,9 +275,9 @@ public:
 				printf("ERROR: could not find %ld\n",(long int)k);
 			};
 			if(k % s == 0){
-				std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+				//std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
-				printf("%ld: bench read %.4g secs\n",(long)k,(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start_read).count())/(1000000.0),get_proc_mem_use()-mem_start);
+				//printf("%ld: bench read %.4g secs\n",(long)k,(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start_read).count())/(1000000.0),get_proc_mem_use()-mem_start);
 			}
 			if(false){
 				auto f = h.find(script[k]);
@@ -391,21 +391,25 @@ int main(int argc, char **argv)
 #ifdef _MSC_VER
 	::Sleep(1000);
 #endif
-	int ts = 10000000;
+	int ts = 90000000;
 
-	if(false){
+	if(true){
 		//typedef std::string _K;
-		typedef unsigned long long _K;
+		for(int ts = 100000; ts <= 90000000; ts+=5000000){
 
-		tester<_K>::_Script script;
-		tester<_K> t;
-		t.gen_random(ts, script);
-		test_dense_hash<_K>(script,ts);
-		//test_sparse_hash<_K>(script,ts);
-		//test_std_hash<_K>(script,ts);
-		test_rabbit_hash<_K>(script,ts);
-		test_rabbit_sparse_hash<_K>(script,ts);
-		//test_rabbit_hash_erase<_K>(ts/10);
+
+            typedef unsigned long long _K;
+
+            tester<_K>::_Script script;
+            tester<_K> t;
+            t.gen_random_narrow(ts, script);
+            test_dense_hash<_K>(script,ts);
+            //test_sparse_hash<_K>(script,ts);
+            //test_std_hash<_K>(script,ts);
+            test_rabbit_hash<_K>(script,ts);
+            //test_rabbit_sparse_hash<_K>(script,ts);
+            //test_rabbit_hash_erase<_K>(ts/10);
+		}
 	}else{
 		google_times(ts);
 	}
