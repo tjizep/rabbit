@@ -128,14 +128,14 @@ using GOOGLE_NAMESPACE::sparse_hash_map;
 static bool FLAGS_test_sparse_hash_map = false;
 static bool FLAGS_test_dense_hash_map = true;
 static bool FLAGS_test_rabbit_unordered_map = true;
-static bool FLAGS_test_rabbit_sparse_unordered_map = false;
+static bool FLAGS_test_rabbit_sparse_unordered_map = true;
 static bool FLAGS_test_unordered_map = false;
 static bool FLAGS_test_hash_map = false;
 static bool FLAGS_test_map = false;
 
 static bool FLAGS_test_4_bytes = true;
 static bool FLAGS_test_8_bytes = false;
-static bool FLAGS_test_16_bytes = true;
+static bool FLAGS_test_16_bytes = false;
 static bool FLAGS_test_256_bytes = false;
 
 static bool growth_only = false;
@@ -192,12 +192,15 @@ class EasyUseDenseHashMap<K*, V, H> : public dense_hash_map<K*,V,H> {
 template<typename K, typename V, typename H>
 class EasyUseRabbitUnorderedMap : public rabbit::unordered_map<K,V,H> {
 public:
+	EasyUseRabbitUnorderedMap(){
+        rabbit::unordered_map<K,V,H>::set_logarithmic(4);
+    }
 };
 template<typename K, typename V, typename H>
 class EasyUseRabbitSparseUnorderedMap : public rabbit::unordered_map<K,V,H> {
 public:
     EasyUseRabbitSparseUnorderedMap(){
-        rabbit::unordered_map<K,V,H>::set_sparse(true);
+        rabbit::unordered_map<K,V,H>::set_logarithmic(8);
     }
 };
 

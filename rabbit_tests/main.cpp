@@ -308,7 +308,7 @@ template<typename _T>
 void test_dense_hash(typename tester<_T>::_Script& script,size_t ts){
 #ifdef _HAS_GOOGLE_HASH_
 	printf("google dense hash test\n");
-	typedef ::google::dense_hash_map<_T,long,rabbit::rabbit_hash<_T>> _Map; //
+	typedef ::google::dense_hash_map<_T,long> _Map; //
 	_Map h;
 	_T c,c1;
 	conversion::to_t(-1l,c);
@@ -323,7 +323,7 @@ template<typename _T>
 void test_sparse_hash(typename tester<_T>::_Script& script,size_t ts){
 #ifdef _HAS_GOOGLE_HASH_
 	printf("google sparse hash test\n");
-	typedef ::google::sparse_hash_map<_T,long,rabbit::rabbit_hash<_T>> _Map;
+	typedef ::google::sparse_hash_map<_T,long> _Map;
 	_Map h;
 	tester<_T> t;
 	t.bench_hash_simple(h,script);
@@ -333,11 +333,11 @@ void test_sparse_hash(typename tester<_T>::_Script& script,size_t ts){
 template<typename _T>
 void test_rabbit_hash(typename tester<_T>::_Script& script,size_t ts){
 	printf("rabbit hash test\n");
-	typedef rabbit::unordered_map<_T,long,rabbit::rabbit_hash<_T>> _Map;
+	typedef rabbit::unordered_map<_T,long> _Map;
 	_Map h;
 
 	tester<_T> t;
-
+    h.set_logarithmic(1);
 	t.bench_hash_simple(h,script);
 
 }
@@ -346,7 +346,8 @@ void test_rabbit_sparse_hash(typename tester<_T>::_Script& script,size_t ts){
 	printf("rabbit sparse hash test\n");
 	typedef rabbit::unordered_map<_T,long,rabbit::rabbit_hash<_T>> _Map;
 	_Map h;
-    h.set_sparse(true);
+    //h.set_sparse(true);
+    h.set_logarithmic(8);
 	tester<_T> t;
 
 	t.bench_hash_simple(h,script);
@@ -391,25 +392,27 @@ int main(int argc, char **argv)
 #ifdef _MSC_VER
 	::Sleep(1000);
 #endif
-	int ts = 90000000;
+	int ts = 10000000;
 
 	if(true){
 		//typedef std::string _K;
-		for(int ts = 100000; ts <= 90000000; ts+=5000000){
+		//for(int ts = 100000; ts <= 90000000; ts+=5000000){
 
 
             typedef unsigned long long _K;
 
             tester<_K>::_Script script;
             tester<_K> t;
-            t.gen_random_narrow(ts, script);
+            t.gen_random(ts, script);
+
+            test_rabbit_hash<_K>(script,ts);
+            test_rabbit_sparse_hash<_K>(script,ts);
+            //test_rabbit_hash_erase<_K>(ts/10);
+
             test_dense_hash<_K>(script,ts);
             //test_sparse_hash<_K>(script,ts);
             //test_std_hash<_K>(script,ts);
-            test_rabbit_hash<_K>(script,ts);
-            //test_rabbit_sparse_hash<_K>(script,ts);
-            //test_rabbit_hash_erase<_K>(ts/10);
-		}
+		//}
 	}else{
 		google_times(ts);
 	}

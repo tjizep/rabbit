@@ -139,7 +139,7 @@ namespace rabbit{
 		size_type extent2;
 		size_type primary_bits;
 		size_type random_val;
-		size_type gate_bits;
+		unsigned long long gate_bits;
 		_Config config;
 		_BinMapper(){
 		}
@@ -153,23 +153,20 @@ namespace rabbit{
 			std::mt19937 gen(rd());
 			std::uniform_int_distribution<long long> dis(1ll<<4, 1ll<<48);
 			this->random_val = dis(gen);
-			if(new_extent < (1ll<<24ll)){
-                this->gate_bits = (1ll<<24ll) - 1ll;
-            }else if(new_extent < (1ll<<32ll)){
+			if(new_extent < (1ll<<32ll)){
                 this->gate_bits = (1ll<<32ll) - 1ll;
             }else{
                 this->gate_bits = (1ll<<62ll) - 1ll;
             }
 		}
 		inline size_type randomize(size_type other) const {
-			return (other ^ random_val) & this->extent1;
+		    return other + (random_val ^ (other>>this->primary_bits)); ///
+			//return (other ^ random_val) & this->extent1;
 		}
 		inline size_type operator()(size_type h_n) const {
 			size_type h = h_n & this->gate_bits;
-			h += (h>>this->primary_bits); ///
-			//h += (h>>(2*this->primary_bits));
-			//h ^= random_val;
-			return   h & this->extent1; //
+			h += (h>>this->primary_bits);
+            return  h & this->extent1; //
 
 		}
 		double resize_factor() const {
@@ -445,6 +442,7 @@ namespace rabbit{
 			_Allocator allocator;
 			_K empty_key;
 			bool sparse;
+			size_type logarithmic;
 
 			typename _Allocator::template rebind<_Segment>::other get_segment_allocator() {
 				return typename _Allocator::template rebind<_Segment>::other(allocator) ;
@@ -601,7 +599,11 @@ namespace rabbit{
 
 			inline size_type map_key(const _K& k) const {
 				size_type h = (size_type)_H()(k);
+				if(rand_probes){
+                    return key_mapper(randomize(h));
+				}
 				return key_mapper(h);
+
 			}
 
 			size_type get_e_size() const {
@@ -636,6 +638,12 @@ namespace rabbit{
 			double get_resize_factor() const {
 				return key_mapper.resize_factor();
 			}
+			size_type get_probes() const {
+				return this->probes;
+			}
+			void set_rand_probes(){
+				this->rand_probes = this->probes;
+			}
 			void set_rand_probes(size_type rand_probes){
 				this->rand_probes = rand_probes;
 			}
@@ -649,13 +657,14 @@ namespace rabbit{
 
 				mf = 1.0;
 				assert(config.MAX_OVERFLOW_FACTOR > 0);
-				if(is_sparse()){
-					probes = config.log2(new_extent)*8; /// start probes
-					overflow = probes;
+				if(is_logarithmic()){
+					probes = config.log2(new_extent)*logarithmic;
+					overflow = config.log2(new_extent)*logarithmic;
 				}else{
-					probes = config.log2(new_extent)-config.log2(config.MIN_EXTENT/2);  /// start probes config.PROBES; //
-					overflow = config.log2(new_extent); // *16*new_extent/config.MAX_OVERFLOW_FACTOR
+					probes = config.PROBES; //config.log2(new_extent); //-config.log2(config.MIN_EXTENT/2);  /// start probes config.PROBES; //
+					overflow = std::max<size_type>(config.PROBES,new_extent/config.MAX_OVERFLOW_FACTOR); //config.log2(new_extent); // *16*
 				}
+
 				rand_probes = 0;
 
 				initial_probes = probes;
@@ -691,15 +700,15 @@ namespace rabbit{
 			}
 
 			hash_kernel(const key_compare& compare,const allocator_type& allocator)
-			:	clusters(nullptr), values(nullptr), eq_f(compare), mf(1.0f), allocator(allocator),sparse(false){
+			:	clusters(nullptr), values(nullptr), eq_f(compare), mf(1.0f), allocator(allocator),sparse(false),logarithmic(0){
 				resize_clear(config.MIN_EXTENT);
 			}
 
-			hash_kernel() : clusters(nullptr), values(nullptr), mf(1.0f),sparse(false){
+			hash_kernel() : clusters(nullptr), values(nullptr), mf(1.0f),sparse(false),logarithmic(0){
 				resize_clear(config.MIN_EXTENT);
 			}
 
-			hash_kernel(const hash_kernel& right) : clusters(nullptr), values(nullptr), mf(1.0f),sparse(false) {
+			hash_kernel(const hash_kernel& right) : clusters(nullptr), values(nullptr), mf(1.0f),sparse(false),logarithmic(0) {
 				*this = right;
 			}
 
@@ -709,11 +718,19 @@ namespace rabbit{
 			inline size_type get_extent() const {
 				return key_mapper.extent;
 			}
-
-			void set_sparse(bool sparse){
+			void set_logarithmic(size_type loga){
+				logarithmic = loga;
+			}
+			size_type get_logarithmic() const {
+				return this->logarithmic;
+			}
+			bool is_logarithmic() const {
+				return this->logarithmic > 0;
+			}
+			void set_quadratic(bool sparse){
 				this->sparse = sparse;
 			}
-			bool is_sparse() const{
+			bool is_quadratic() const{
 				return this->sparse;
 			}
 			hash_kernel& operator=(const hash_kernel& right){
@@ -756,9 +773,9 @@ namespace rabbit{
 			}
 
             inline size_type hash_probe_incr(size_type i) const {
-                //if(is_sparse())
-                //return (i*i+i)>>1;
-                return 1;
+                if(is_quadratic())
+					return (i*i+i)>>1;
+				return 1;
 
             }
 			/// when all inputs to this function is unique relative to current hash map(i.e. they dont exist in the hashmap)
@@ -781,28 +798,6 @@ namespace rabbit{
 						return create_segment_value(pos);
 					}
 					pos += hash_probe_incr(i);
-				}
-				/// a randomization step to help mitigate attacks
-				if(rand_probes){
-					size_type spot = randomize(h);
-					for(unsigned int i =0; i < rand_probes;++i){
-						size_type rpos = spot+i;
-						if( rpos == get_extent() ){
-							break;
-						}
-						_Bt rsi = get_segment_index(rpos);
-						_Segment& rs = get_segment(rpos);
-						if(!rs.is_exists(rsi)){
-							rs.toggle_exists(rsi);
-							//s.key(si)=k;
-							set_segment_key(rpos,k);
-							++elements;
-							set_overflows(h, true);/// set the original pos to overflow
-							keys_overflowed = true;
-							return create_segment_value(rpos);
-						}
-
-					}
 				}
 
 				if(overflow_elements < end()){
@@ -858,26 +853,6 @@ namespace rabbit{
 						return create_segment_value(pos);
 					}
 					pos += hash_probe_incr(i);
-				}
-				if(rand_probes){
-					size_type spot = randomize(h);
-					for(unsigned int i =0; i < rand_probes;++i){
-						size_type rpos = spot+i;
-						if( rpos == get_extent() ){
-							break;
-						}
-						_Bt rsi = get_segment_index(rpos);
-						_Segment& rs = get_segment(rpos);
-						if(!rs.is_exists(rsi)){
-							rs.toggle_exists(rsi);
-							//s.key(si)=k;
-							set_segment_key(rpos,k);
-							++elements;
-							set_overflows(h, true);/// set the original pos to overflow
-							keys_overflowed = true;
-							return create_segment_value(rpos);
-						}
-					}
 				}
 
 				size_type at_empty = end();
@@ -1045,22 +1020,8 @@ namespace rabbit{
 					//++pos;
 					pos += hash_probe_incr(i);
 					i+=1;
-
-
 				}
 				/// randomization step for attack mitigation
-				if(rand_probes){
-					size_type spot = randomize(h);
-					for(unsigned int i =0; i < rand_probes ;++i){
-						size_type rpos = spot+i;
-						if( rpos == get_extent() ){
-							break;
-						}
-						if(equal_key(rpos,k) && exists_(rpos)){
-							return rpos;
-						}
-					}
-				}
 				//if(overflowed_(h)){
 				for(pos=get_o_start(); pos < overflow_elements; ){
 					if(equal_key(pos,k) && exists_(pos) ) return pos;
@@ -1088,11 +1049,6 @@ namespace rabbit{
 				}else{
 					if(equal_key(pos,k)) return pos;
 
-				}
-				_Bt index = get_segment_index(pos);
-				const _Segment& s = get_segment(pos);
-				if(!s.is_overflows(index)){
-					return end();
 				}
 
 				return find_rest(k,pos);
@@ -1371,23 +1327,31 @@ namespace rabbit{
 			typename hash_kernel::ptr rehashed = std::allocate_shared<hash_kernel>(alloc);
 			size_type extent = current->get_extent();
 			size_type new_extent = to;
+			size_type nrand_probes = 0;
+			hash_kernel * reh = rehashed.get();
+			hash_kernel * cur = current.get();
 			try{
 				//printf("lf: %.4g\n",(double)current->size()/(double)extent);
-				rehashed->set_sparse(current->is_sparse());
+				rehashed->set_quadratic(current->is_quadratic());
+				rehashed->set_logarithmic(current->get_logarithmic());
 				rehashed->resize_clear(new_extent);
 				rehashed->mf = (*this).current->mf;
 				if(current->load_factor() < 0.2){
-					//std::cout << " attack detected : using random probes" << std::endl;
-					rehashed->set_rand_probes(config.RAND_PROBES);
+					/// std::cout << "possible attack/bad hash detected : using random probes : " << current->get_probes() << std::endl;
+					nrand_probes = 1;
+					rehashed->set_rand_probes(nrand_probes);
 				}
 				using namespace std;
 				while(true){
 					iterator e = end();
 					size_type ctr = 0;
+					bool rerehashed = false;
+					//_K k;
 					for(iterator i = begin();i != e;++i){
-						_V* v = rehashed->unique_subscript(i.get_key());
+						//std::swap(k,(*i).first);
+						_V* v = rehashed->subscript((*i).first);
 						if(v != nullptr){
-							*v = i.get_value();
+							*v = i->second;
 							/// a cheap check to illuminate subtle bugs during development
 							if(++ctr != rehashed->elements){
 								cout << "iterations " << ctr << " elements " << rehashed->elements << " extent " << rehashed->get_extent() << endl;
@@ -1396,18 +1360,31 @@ namespace rabbit{
 								throw bad_alloc();
 							}
 						}else{
-
+						    //std::cout << "rehashing in rehash " << ctr << std::endl;
+						    rerehashed = true;
+                            new_extent = rehashed->key_mapper.next_size();
 							rehashed = std::allocate_shared<hash_kernel>(alloc);
-							new_extent = (size_type)(new_extent * recalc_growth_factor(rehashed->elements)) + 1;
 							rehashed->resize_clear(new_extent);
 							rehashed->mf = (*this).current->mf;
+							rehashed->set_rand_probes(nrand_probes);
+                           // i = begin(); // start over
+                            //ctr = 0;
 							break;
+
 						}
 					}
 					if(rehashed->elements == current->elements){
 						break;
+					}else if(!rerehashed){
+					    cout << "hash error: unequal key count - retry rehash " << endl;
+                        cout << "iterations " << ctr << " elements " << rehashed->elements << " extent " << rehashed->get_extent() << endl;
+                        cout << "new " << rehashed->elements << " current size:"  << current->elements << endl;
+                        throw bad_alloc();
 					}else{
-						rehashed->resize_clear(rehashed->get_extent());
+
+
+						//rehashed->resize_clear(rehashed->get_extent());
+						//break;
 					}
 
 				}
@@ -1574,9 +1551,13 @@ namespace rabbit{
 			if(current==nullptr)return false;
 			return this->current->is_sparse();
 		}
-		void set_sparse(bool sparse){
+		void set_quadratic(bool quadratic){
 			create_current();
-			this->current->set_sparse(sparse);
+			this->current->set_quadratic(quadratic);
+		}
+		void set_logarithmic(size_type logarithmic){
+			create_current();
+			this->current->set_logarithmic(logarithmic);
 		}
 	};
 
