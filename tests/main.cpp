@@ -346,7 +346,7 @@ void test_rabbit_sparse_hash(typename tester<_T>::_Script& script,size_t ts){
 	printf("rabbit sparse hash test\n");
 	typedef rabbit::unordered_map<_T,long,rabbit::rabbit_hash<_T>> _Map;
 	_Map h;
-    h.set_logarithmic(4);
+    h.set_logarithmic(16);
 	tester<_T> t;
 
 	t.bench_hash_simple(h,script);
@@ -402,9 +402,9 @@ int main(int argc, char **argv)
 
             tester<_K>::_Script script;
             tester<_K> t;
-            t.gen_random(ts, script);
+            t.gen_random_narrow(ts, script);
 
-            test_rabbit_hash<_K>(script,ts);
+            //test_rabbit_hash<_K>(script,ts);
             test_rabbit_sparse_hash<_K>(script,ts);
             //test_rabbit_hash_erase<_K>(ts/10);
 

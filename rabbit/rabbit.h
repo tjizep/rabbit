@@ -28,6 +28,7 @@ THE SOFTWARE.
 #include <memory>
 #include <string>
 #include <random>
+#include <limits>
 #include <iomanip>
 /// the rab-bit hash
 /// probably the worlds simplest working hashtable - only kiddingk
@@ -103,6 +104,9 @@ namespace rabbit{
 			srand ((unsigned int)time(NULL));
 			this->random_val = rand();
 		}
+		inline size_type nearest_larger(size_type any){
+			return any;
+		}
 		inline size_type randomize(size_type other) const {
 			return (other ^ random_val) % this->extent;
 		}
@@ -151,16 +155,20 @@ namespace rabbit{
 			this->primary_bits = extent2;
 			std::minstd_rand rd;
 			std::mt19937 gen(rd());
-			std::uniform_int_distribution<long long> dis(1ll<<4, 1ll<<48);
-			this->random_val = dis(gen);
+			std::uniform_int_distribution<size_type> dis(1ll<<4, std::numeric_limits<size_type>::max());
+			this->random_val = (size_type)dis(gen);
 			if(new_extent < (1ll<<32ll)){
                 this->gate_bits = (1ll<<32ll) - 1ll;
             }else{
                 this->gate_bits = (1ll<<62ll) - 1ll;
             }
 		}
+		inline size_type nearest_larger(size_type any){
+			size_type l2 = this->config.log2(any);
+			return (size_type)(2ll << (l2 + 1ll));
+		}
 		inline size_type randomize(size_type other) const {
-		    return other + (random_val ^ (other>>this->primary_bits)); ///
+		    return other + (other>>this->primary_bits); ///random_val ^
 			//return (other ^ random_val) & this->extent1;
 		}
 		inline size_type operator()(size_type h_n) const {
@@ -230,7 +238,7 @@ namespace rabbit{
 	public:
 		typedef unsigned long long int _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		/// if even more speed is desired but you'r willing to live with a 4 billion key limit then
-		/// typedef unsigned long size_type;
+		//typedef unsigned long size_type;
 		typedef std::size_t size_type;
 
 		size_type log2(size_type n){
@@ -278,7 +286,7 @@ namespace rabbit{
 			BITS_SIZE1 = BITS_SIZE-1;
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;
-			PROBES = 16;
+			PROBES = 32;
 			RAND_PROBES = 8;
 			MIN_EXTENT = 4; /// start size of the hash table
 			MAX_OVERFLOW_FACTOR = 8*32768; //BITS_SIZE*8/sizeof(_Bt);
@@ -599,9 +607,9 @@ namespace rabbit{
 
 			inline size_type map_key(const _K& k) const {
 				size_type h = (size_type)_H()(k);
-				if(rand_probes){
-                    return key_mapper(randomize(h));
-				}
+				//if(rand_probes){
+                //    return key_mapper(randomize(h));
+				//}
 				return key_mapper(h);
 
 			}
@@ -1316,7 +1324,7 @@ namespace rabbit{
 		}
 		void resize(size_type atleast){
 			create_current();
-			rehash((size_type)((double)atleast*current->get_resize_factor()));
+			rehash(current->key_mapper.nearest_larger(atleast));
 		}
 		void rehash(size_type to_){
 			create_current();

@@ -346,8 +346,7 @@ void test_rabbit_sparse_hash(typename tester<_T>::_Script& script,size_t ts){
 	printf("rabbit sparse hash test\n");
 	typedef rabbit::unordered_map<_T,long,rabbit::rabbit_hash<_T>> _Map;
 	_Map h;
-    //h.set_sparse(true);
-    h.set_logarithmic(8);
+    h.set_logarithmic(16);
 	tester<_T> t;
 
 	t.bench_hash_simple(h,script);
@@ -394,16 +393,16 @@ int main(int argc, char **argv)
 #endif
 	int ts = 10000000;
 
-	if(true){
+	if(false){
 		//typedef std::string _K;
 		//for(int ts = 100000; ts <= 90000000; ts+=5000000){
 
 
-            typedef unsigned long long _K;
+            typedef std::string _K;
 
             tester<_K>::_Script script;
             tester<_K> t;
-            t.gen_random(ts, script);
+            t.gen_random_narrow(ts, script);
 
             test_rabbit_hash<_K>(script,ts);
             test_rabbit_sparse_hash<_K>(script,ts);
