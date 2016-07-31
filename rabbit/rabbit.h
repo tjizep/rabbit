@@ -286,7 +286,7 @@ namespace rabbit{
 			BITS_SIZE1 = BITS_SIZE-1;
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;
-			PROBES = 32;
+			PROBES = 16;
 			RAND_PROBES = 8;
 			MIN_EXTENT = 4; /// start size of the hash table
 			MAX_OVERFLOW_FACTOR = 8*32768; //BITS_SIZE*8/sizeof(_Bt);
@@ -369,23 +369,18 @@ namespace rabbit{
 
 		public:
 
-			//inline const _K &key(_Bt ix) const {
-			//	return keys[ix];
-			//}
-
-			//inline _K &key(_Bt ix) {
-			//	return keys[ix];
-			//}
-
 			inline bool all_exists() const {
 				 return (exists == ~(_Bt)0);
 			}
+			
 			inline bool none_exists() const {
 				 return (exists == (_Bt)0);
 			}
+			
 			inline bool is_exists(_Bt bit) const {
 				return ((exists >> bit) & (_Bt)1ul);
 			}
+			
 			inline bool is_overflows(_Bt bit) const {
 				return ((overflows >> bit) & (_Bt)1ul);
 			}
@@ -393,11 +388,11 @@ namespace rabbit{
 			inline void set_exists(_Bt index, bool f){
 				set_bit(exists,index,f);
 			}
+			
 			inline void toggle_exists(_Bt index){
 				exists ^= ((_Bt)1 << index);
 			}
-
-
+			
 			void set_overflows(_Bt index, bool f){
 				set_bit(overflows,index,f);
 			}
@@ -411,8 +406,7 @@ namespace rabbit{
 				overflows = 0;
 				//overflowed = 0;
 			}
-
-		} ;
+		};
 		//typedef _PairSegment _Segment;
 		typedef _KeySegment _Segment;
 		/// the vector that will contain the segmented mapping pairs and flags
@@ -833,8 +827,7 @@ namespace rabbit{
 				_Segment &s = clusters[pos >> config.BITS_LOG2_SIZE];/// get_segment(pos)
 
 				if(!s.is_overflows(si) && !s.is_exists(si)){
-					s.toggle_exists(si);
-					//s.key(si) = k;
+					s.toggle_exists(si);					
 					set_segment_key(pos,k);
 					++elements;
 
@@ -1339,11 +1332,12 @@ namespace rabbit{
 			hash_kernel * reh = rehashed.get();
 			hash_kernel * cur = current.get();
 			try{
-				//printf("lf: %.4g\n",(double)current->size()/(double)extent);
+				
 				rehashed->set_quadratic(current->is_quadratic());
 				rehashed->set_logarithmic(current->get_logarithmic());
 				rehashed->resize_clear(new_extent);
 				rehashed->mf = (*this).current->mf;
+				//std::cout << " load factor " << current->load_factor() << std::endl;
 				if(current->load_factor() < 0.2){
 					/// std::cout << "possible attack/bad hash detected : using random probes : " << current->get_probes() << std::endl;
 					nrand_probes = 1;
@@ -1368,7 +1362,7 @@ namespace rabbit{
 								throw bad_alloc();
 							}
 						}else{
-						    //std::cout << "rehashing in rehash " << ctr << std::endl;
+						    //std::cout << "rehashing in rehash " << ctr << " of " << current->elements << std::endl;
 						    rerehashed = true;
                             new_extent = rehashed->key_mapper.next_size();
 							rehashed = std::allocate_shared<hash_kernel>(alloc);

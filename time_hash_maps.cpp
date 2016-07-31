@@ -193,7 +193,7 @@ template<typename K, typename V, typename H>
 class EasyUseRabbitUnorderedMap : public rabbit::unordered_map<K,V,H> {
 public:
 	EasyUseRabbitUnorderedMap(){
-        rabbit::unordered_map<K,V,H>::set_logarithmic(4);
+        rabbit::unordered_map<K,V,H>::set_logarithmic(1);
     }
 };
 template<typename K, typename V, typename H>

@@ -337,14 +337,14 @@ void test_rabbit_hash(typename tester<_T>::_Script& script,size_t ts){
 	_Map h;
 
 	tester<_T> t;
-    h.set_logarithmic(1);
+    //h.set_logarithmic(4);
 	t.bench_hash_simple(h,script);
 
 }
 template<typename _T>
 void test_rabbit_sparse_hash(typename tester<_T>::_Script& script,size_t ts){
 	printf("rabbit sparse hash test\n");
-	typedef rabbit::unordered_map<_T,long,rabbit::rabbit_hash<_T>> _Map;
+	typedef rabbit::unordered_map<_T,long> _Map;
 	_Map h;
     h.set_logarithmic(16);
 	tester<_T> t;
@@ -370,7 +370,7 @@ template<typename T>
 void test_std_hash(typename tester<T>::_Script& script,size_t ts){
 #ifdef _HAS_STD_HASH_
 	printf("std hash test\n");
-	typedef std::unordered_map<T,long,rabbit::rabbit_hash<T>> _Map;
+	typedef std::unordered_map<T,long> _Map;
 	_Map h;
 
 	tester<T> t;
@@ -393,19 +393,19 @@ int main(int argc, char **argv)
 #endif
 	int ts = 10000000;
 
-	if(false){
+	if(true){
 		//typedef std::string _K;
 		//for(int ts = 100000; ts <= 90000000; ts+=5000000){
 
-
+            //typedef long long _K;
             typedef std::string _K;
 
             tester<_K>::_Script script;
             tester<_K> t;
-            t.gen_random_narrow(ts, script);
+            t.gen_random(ts, script);
 
             test_rabbit_hash<_K>(script,ts);
-            test_rabbit_sparse_hash<_K>(script,ts);
+            //test_rabbit_sparse_hash<_K>(script,ts);
             //test_rabbit_hash_erase<_K>(ts/10);
 
             test_dense_hash<_K>(script,ts);
