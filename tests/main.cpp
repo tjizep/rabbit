@@ -6,6 +6,7 @@
 #include <map>
 #include <string>
 #include <sstream>
+#include <cmath>
 
 #define _HAS_GOOGLE_HASH_
 #ifdef _MSC_VER
@@ -133,6 +134,20 @@ public:
 	typedef std::vector<_InputField> _Script;
 
 
+	void gen_random_normal(size_t count, _Script& script){
+		double start = get_proc_mem_use();
+		std::minstd_rand rd;
+		std::mt19937 gen(rd());
+		
+		std::normal_distribution<> dis;
+		/// script creation is not benched
+		_InputField v;
+		for(size_t r = 0; r < count;++r){
+			conversion::to_t((long long)((double)10000000)*dis(gen)+1,v);			
+			script.push_back(v);
+		}
+		printf("memory used by script: %.4g MB\n", get_proc_mem_use()-start);
+	}
 
 	void gen_random(size_t count, _Script& script){
 		double start = get_proc_mem_use();
@@ -141,7 +156,7 @@ public:
 		std::uniform_int_distribution<long long> dis(1ll<<8, 1ll<<32);
 		/// script creation is not benched
 		_InputField v;
-		for(size_t r = 0; r < count;++r){
+		for(size_t r = 0; r < count;++r){			
 			conversion::to_t(dis(gen),v);
 			script.push_back(v);
 		}
@@ -397,19 +412,19 @@ int main(int argc, char **argv)
 #endif
 	int ts = 10000000;
 
-	if(true){
+	if(false){
 		//typedef std::string _K;
 		//for(int ts = 100000; ts <= 90000000; ts+=5000000){
 
-			//typedef long long _K;
-            typedef std::string _K;
+			typedef long long _K;
+            //typedef std::string _K;
 
             tester<_K>::_Script script;
             tester<_K> t;
-            t.gen_random_narrow(ts, script);
+            t.gen_random_normal(ts, script);
 
             test_rabbit_hash<_K>(script,ts);
-            test_rabbit_sparse_hash<_K>(script,ts);
+            //test_rabbit_sparse_hash<_K>(script,ts);
             //test_rabbit_hash_erase<_K>(ts/10);
 
             test_dense_hash<_K>(script,ts);

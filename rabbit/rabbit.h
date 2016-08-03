@@ -1051,6 +1051,11 @@ namespace rabbit{
 					if(equal_key(pos,k)) return pos;
 
 				}
+				_Bt index = get_segment_index(pos);
+				const _Segment& s = get_segment(pos);
+				if(!s.is_overflows(index)){
+					return end();
+				}
 
 				return find_rest(k,pos);
 			}
