@@ -398,7 +398,7 @@ void test_random(size_t ts) {
 
 	test_rabbit_hash<_K>(script, ts);
 	test_rabbit_sparse_hash<_K>(script, ts);
-	test_rabbit_hash_erase<_K>(ts/10);
+	//test_rabbit_hash_erase<_K>(ts/10);
 
 	test_dense_hash<_K>(script, ts);
 

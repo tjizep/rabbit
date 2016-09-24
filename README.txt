@@ -31,6 +31,10 @@ Disadvantages
 iterator * operator does not return a normal std::pair<K,V> its rather a std::pair<proxy<K>,proxy<V>>. 
 which may make certain type inferences impossible.
 
+If a rehash takes place during iteration (because of inserts durubg iteration) the iterator becomes 
+invalid. Best is to rehash to aproximate future size before starting iteration which will cause 
+inserts. Erases and updates are stable.
+
 Algorithm Descriprion
 ---------------------
 

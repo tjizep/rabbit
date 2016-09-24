@@ -1086,7 +1086,7 @@ namespace rabbit {
 		public:
 			struct iterator {
 				typedef hash_kernel* kernel_ptr;
-				const basic_unordered_map* h;
+				//const basic_unordered_map* h;
 				kernel_ptr hc;
 				size_type pos;
 				mutable char rdata[sizeof(_ElPair)];
@@ -1094,12 +1094,18 @@ namespace rabbit {
 				_Bt index;
 				_Bt exists;
 				_Bt bsize;
+				inline const kernel_ptr get_kernel() const {
+					return hc; // const_cast<basic_unordered_map*>(h)->current;
+				}
+				inline kernel_ptr get_kernel() {
+					return hc; // h->current;
+				}
 				void set_index() {
-					if (hc != nullptr) {
-						const _Segment& s = hc->get_segment(pos);
+					if (get_kernel() != nullptr) {
+						const _Segment& s = get_kernel()->get_segment(pos);
 						exists = s.exists;
-						index = hc->get_segment_index(pos);
-						bsize = hc->config.BITS_SIZE;
+						index = get_kernel()->get_segment_index(pos);
+						bsize = get_kernel()->config.BITS_SIZE;
 					}
 				}
 				void check_index() {
@@ -1117,7 +1123,7 @@ namespace rabbit {
 				iterator() {
 
 				}
-				iterator(const basic_unordered_map* h, size_type pos) : h(h), pos(pos) {
+				iterator(const basic_unordered_map* h, size_type pos) :  pos(pos) {
 					hc = h->current.get();
 					set_index();
 				}
@@ -1125,7 +1131,7 @@ namespace rabbit {
 					(*this) = r;
 				}
 				iterator& operator=(const iterator& r) {
-					h = r.h;
+					//h = r.h;
 					pos = r.pos;
 					hc = r.hc;
 					set_index();
@@ -1145,31 +1151,31 @@ namespace rabbit {
 					return t;
 				}
 				inline _V& get_value() {
-					return hc->get_segment_value((*this).pos);
+					return get_kernel()->get_segment_value((*this).pos);
 				}
 				inline const _V& get_value() const {
-					return hc->get_segment_value((*this).pos);
+					return get_kernel()->get_segment_value((*this).pos);
 				}
 				inline _K& get_key() {
-					return hc->get_segment_key((*this).pos);
+					return get_kernel()->get_segment_key((*this).pos);
 				}
 				inline const _K& get_key() const {
-					return hc->get_segment_key((*this).pos);
+					return get_kernel()->get_segment_key((*this).pos);
 				}
 				const _ElPair operator*() const {
-					return hc->get_segment_pair((*this).pos);
+					return get_kernel()->get_segment_pair((*this).pos);
 				}
 				inline _ElPair operator*() {
-					return hc->get_segment_pair((*this).pos);
+					return get_kernel()->get_segment_pair((*this).pos);
 				}
 				inline _ElPair* operator->() const {
 					/// can reconstruct multiple times on same memory because _ElPair is only references
-					_ElPair* ret = new ((void *)rdata) _ElPair(const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos));
+					_ElPair* ret = new ((void *)rdata) _ElPair(get_kernel()->get_segment_pair(pos));
 					return ret;
 				}
 				inline const _ElPair *operator->() {
 					/// can reconstruct multiple times on same memory because _ElPair is only references
-					_ElPair* ret = new ((void *)rdata) _ElPair(const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos));
+					_ElPair* ret = new ((void *)rdata) _ElPair(get_kernel()->get_segment_pair(pos));
 					return ret;
 				}
 				inline bool operator==(const iterator& r) const {
@@ -1183,16 +1189,22 @@ namespace rabbit {
 			struct const_iterator {
 			private:
 				typedef hash_kernel* kernel_ptr;
-				const basic_unordered_map* h;
+				//const basic_unordered_map* h;
 				mutable kernel_ptr hc;
 				_Bt index;
 				_Bt exists;
 				mutable char rdata[sizeof(_ElPair)];
+				inline const kernel_ptr get_kernel() const {
+					return hc;// const_cast<basic_unordered_map*>(h)->current;
+				}
+				inline kernel_ptr get_kernel() {
+					return hc; // h->current;
+				}
 				void set_index() {
-					if (hc != nullptr) {
-						const _Segment& s = hc->get_segment(pos);
+					if (get_kernel() != nullptr) {
+						const _Segment& s = get_kernel()->get_segment(pos);
 						exists = s.exists;
-						index = hc->get_segment_index(pos);
+						index = get_kernel()->get_segment_index(pos);
 					}
 				}
 				void check_index() {
@@ -1201,7 +1213,7 @@ namespace rabbit {
 				void increment() {
 					++pos;
 					++index;
-					if (index == hc->config.BITS_SIZE) {
+					if (index == get_kernel()->config.BITS_SIZE) {
 						set_index();
 					}
 
@@ -1212,7 +1224,7 @@ namespace rabbit {
 				const_iterator() {
 
 				}
-				const_iterator(const basic_unordered_map* h, size_type pos) : h(h), pos(pos) {
+				const_iterator(const basic_unordered_map* h, size_type pos) : pos(pos) {
 					hc = h->current.get();
 					set_index();
 				}
@@ -1221,7 +1233,7 @@ namespace rabbit {
 				}
 
 				const_iterator& operator=(const iterator& r) {
-					h = r.h;
+					//h = r.h;
 					pos = r.pos;
 					hc = r.hc;
 					set_index();
@@ -1229,7 +1241,7 @@ namespace rabbit {
 				}
 
 				const_iterator& operator=(const const_iterator& r) {
-					h = r.h;
+					//h = r.h;
 					pos = r.pos;
 					hc = r.hc;
 					index = r.index;
@@ -1249,12 +1261,12 @@ namespace rabbit {
 					return (*this);
 				}
 				const _ElPair operator*() const {
-					return const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos);
+					return get_kernel()->get_segment_pair(pos);
 
 				}
 				const _ElPair *operator->() const {
 					/// can reconstruct multiple times on same memory because _ElPair is only references
-					_ElPair* ret = new ((void *)rdata) _ElPair(const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos));
+					_ElPair* ret = new ((void *)rdata) _ElPair(get_kernel()->get_segment_pair(pos));
 					return ret;
 				}
 
