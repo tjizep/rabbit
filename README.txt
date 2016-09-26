@@ -35,8 +35,6 @@ If a rehash takes place during iteration (because of inserts during iteration) t
 invalid. Best is to rehash to aproximate future size before starting iteration which will cause 
 inserts. Erases and updates are stable. 
 
-NOTE: After some testing the std::unordered_map shipping with visual studio also have issues with this 
-(see iterate_rehash_test in main.cpp so we'll leave it for now)
 
 Algorithm Descriprion
 ---------------------
