@@ -128,14 +128,37 @@ public:
 	}
 	typedef _T _InputField;
 	typedef std::vector<_InputField> _Script;
-
+	void iterate_rehash_test() {
+		typedef rabbit::unordered_map<long, long> _Map;
+		typedef std::unordered_map<long, long> _control;
+		_Map map;
+		_control control;
+		long first = 100;
+		long COUNT = 100;
+		for (int k = first; k < first + COUNT; ++k) {
+			map[k] = 1;
+		}
+		first += COUNT;
+		for (auto i = map.begin(); i != map.end(); ++i) {
+			control[i->first] = control[i->second];
+			if (i->first > COUNT/2) {
+				for (int k = first; k < first + COUNT; ++k) {
+					map[k] = 1;
+				}
+				first += COUNT;
+			}
+		}
+		if (control.size() != COUNT) {
+			std::cout << "failed iterate rehash test" << std::endl;
+		}
+	}
 
 
 	void gen_random(size_t count, _Script& script) {
 		double start = get_proc_mem_use();
 		std::minstd_rand rd;
 		std::mt19937 gen(rd());
-		std::uniform_int_distribution<long long> dis(1ll << 8, 1ll << 63);
+		std::uniform_int_distribution<long long> dis(1ll << 8, 1ll << 62);
 		/// script creation is not benched
 		_InputField v;
 		for (size_t r = 0; r < count; ++r) {
@@ -385,6 +408,8 @@ extern int google_times(int iters);
 //extern int unique_running_insertion();
 //extern int unique_scattered_lookup();
 void more_tests() {
+	//tester<long> test;
+	//test.iterate_rehash_test();
 	//unique_scattered_lookup();
 	//unique_running_insertion();
 }
@@ -408,9 +433,11 @@ int main(int argc, char **argv)
 #ifdef _MSC_VER
 	::Sleep(1000);
 #endif
+	more_tests();
+
 	size_t ts = 10000000;
-	test_random(ts);
-	google_times(ts);
-	//more_tests();
+	//test_random(ts);
+	google_times((int)ts);
+	
 	return 0;
 }

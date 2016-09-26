@@ -31,9 +31,12 @@ Disadvantages
 iterator * operator does not return a normal std::pair<K,V> its rather a std::pair<proxy<K>,proxy<V>>. 
 which may make certain type inferences impossible.
 
-If a rehash takes place during iteration (because of inserts durubg iteration) the iterator becomes 
+If a rehash takes place during iteration (because of inserts during iteration) the iterator becomes 
 invalid. Best is to rehash to aproximate future size before starting iteration which will cause 
-inserts. Erases and updates are stable.
+inserts. Erases and updates are stable. 
+
+NOTE: After some testing the std::unordered_map shipping with visual studio also have issues with this 
+(see iterate_rehash_test in main.cpp so we'll leave it for now)
 
 Algorithm Descriprion
 ---------------------

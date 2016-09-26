@@ -44,7 +44,8 @@ THE SOFTWARE.
 namespace rabbit {
 
 	/// a very basic version of std::pair which keeps references only
-
+	struct end_iterator {
+	};
 	template
 		<	class _Ty1
 		, class _Ty2
@@ -342,6 +343,9 @@ namespace rabbit {
 			typedef _E key_equal;
 			typedef _E key_compare;
 			typedef _H hasher;
+			typedef _V* _RV;
+
+			static const size_type end_pos = std::numeric_limits<size_type>::max();
 		protected:
 			struct overflow_stats {
 				size_type start_elements;
@@ -402,10 +406,10 @@ namespace rabbit {
 					exists = 0;
 					overflows = 0;
 				}
+
 				_KeySegment() {
 					exists = 0;
-					overflows = 0;
-					//overflowed = 0;
+					overflows = 0;					
 				}
 			};
 			//typedef _PairSegment _Segment;
@@ -431,6 +435,7 @@ namespace rabbit {
 				_Keys keys;
 				///_Values values;
 				_V* values;
+				_RV* ref_values;
 
 				size_type overflow;
 				size_type overflow_elements;
@@ -446,13 +451,20 @@ namespace rabbit {
 				_K empty_key;
 				bool sparse;
 				size_type logarithmic;
+				size_type iterators_away;
 
 				typename _Allocator::template rebind<_Segment>::other get_segment_allocator() {
 					return typename _Allocator::template rebind<_Segment>::other(allocator);
 				}
+				
 				typename _Allocator::template rebind<_V>::other get_value_allocator() {
 					return typename _Allocator::template rebind<_V>::other(allocator);
 				}
+
+				typename _Allocator::template rebind<_RV>::other get_ref_value_allocator() {
+					return typename _Allocator::template rebind<_RV>::other(allocator);
+				}
+
 				/// the minimum load factor
 				float load_factor() const {
 					return (float)((double)elements / (double)bucket_count());
@@ -520,7 +532,11 @@ namespace rabbit {
 				_Bt get_segment_index(size_type pos) const {
 					return (_Bt)(pos & (config.BITS_SIZE1));
 				}
-
+				void set_rvalue(size_type pos, _RV value) {
+					if (this->ref_values != nullptr) {
+						this->ref_values[pos] = value;
+					}
+				}
 				_Segment &get_segment(size_type pos) {
 					return clusters[pos >> config.BITS_LOG2_SIZE];
 				}
@@ -531,35 +547,32 @@ namespace rabbit {
 
 				const _ElPair get_segment_pair(size_type pos) const {
 					return std::make_pair(get_segment_key(pos), get_segment_value(pos));
-					//return clusters[get_segment_number(pos)].pair(get_segment_index(pos));
+					
 				}
 
 				const _K & get_segment_key(size_type pos) const {
-					//return get_segment(pos).key(get_segment_index(pos));
 					return keys[pos];
 				}
 
-				const _V & get_segment_value(size_type pos) const {
-					//return get_segment(pos).value(get_segment_index(pos));
-					return values[pos];
-				}
-
-
 				_ElPair get_segment_pair(size_type pos) {
-					//return clusters[get_segment_number(pos)].pair(get_segment_index(pos));
 					return _ElPair(get_segment_key(pos), get_segment_value(pos));
 				}
 
 				_K & get_segment_key(size_type pos) {
-					//return get_segment(pos).key(get_segment_index(pos));
 					return keys[pos];
 				}
+				const _V & get_segment_value(size_type pos) const {
+					if (this->ref_values)
+						return *(ref_values[pos]);
+					return values[pos];
+				}
+
 				_V & get_segment_value(size_type pos) {
-					//return get_segment(pos).value(get_segment_index(pos));
+					if (this->ref_values)
+						return *(ref_values[pos]);
 					return values[pos];
 				}
 				void set_segment_key(size_type pos, const _K &k) {
-					//get_segment(pos).key(get_segment_index(pos)) = k;
 					keys[pos] = k;
 				}
 				void destroy_segment_value(size_type pos) {
@@ -576,7 +589,6 @@ namespace rabbit {
 					return r;
 				}
 				void set_segment_value(size_type pos, const _V &v) {
-					//get_segment(pos).value(get_segment_index(pos)) = v;
 					values[pos] = v;
 				}
 
@@ -598,7 +610,6 @@ namespace rabbit {
 				}
 
 				inline bool overflowed_(size_type pos) const {
-					//return get_segment(pos).is_overflowed(get_segment_index(pos));
 					return false;
 				}
 
@@ -617,9 +628,9 @@ namespace rabbit {
 				size_type get_e_size() const {
 					return (size_type)(get_data_size() / config.BITS_SIZE) + 1;
 				}
+				
 				void clear_data() {
 					if (values) {
-
 						for (size_type pos = 0; pos < get_data_size(); ++pos) {
 							if (exists_(pos)) {
 								get_value_allocator().destroy(&values[pos]);
@@ -627,12 +638,24 @@ namespace rabbit {
 						}
 					}
 				}
-				void free_data() {
+				
+				void free_values() {
 					if (values) {
-
 						clear_data();
 						get_value_allocator().deallocate(values, get_data_size());
+						values = nullptr;
 					}
+				}
+				void free_ref_values() {
+					if (ref_values) {
+						
+						get_ref_value_allocator().deallocate(ref_values, get_data_size());
+						ref_values = nullptr;
+					}
+				}
+				void free_data() {
+					free_values();
+					free_ref_values();
 					if (clusters) {
 						size_type esize = get_e_size();
 						for (size_type c = 0; c < esize; ++c) {
@@ -654,6 +677,16 @@ namespace rabbit {
 				}
 				void set_rand_probes(size_type rand_probes) {
 					this->rand_probes = rand_probes;
+				}
+				_RV* create_rvalues() {
+					return get_ref_value_allocator().allocate(get_data_size());
+				}
+				void set_rvalues(_RV* values) {
+					if (values != nullptr) {
+						this->ref_values = values;
+						free_values();
+					}
+					
 				}
 				/// clears all data and resize the new data vector to the parameter
 				void resize_clear(size_type new_extent) {
@@ -709,15 +742,15 @@ namespace rabbit {
 				}
 
 				hash_kernel(const key_compare& compare, const allocator_type& allocator)
-					: clusters(nullptr), values(nullptr), eq_f(compare), mf(1.0f), allocator(allocator), sparse(false), logarithmic(0) {
+					: clusters(nullptr), values(nullptr), ref_values(nullptr), eq_f(compare), mf(1.0f), allocator(allocator), sparse(false), logarithmic(0) {
 					resize_clear(config.MIN_EXTENT);
 				}
 
-				hash_kernel() : clusters(nullptr), values(nullptr), mf(1.0f), sparse(false), logarithmic(0) {
+				hash_kernel() : clusters(nullptr), values(nullptr), ref_values(nullptr), mf(1.0f), sparse(false), logarithmic(0) {
 					resize_clear(config.MIN_EXTENT);
 				}
 
-				hash_kernel(const hash_kernel& right) : clusters(nullptr), values(nullptr), mf(1.0f), sparse(false), logarithmic(0) {
+				hash_kernel(const hash_kernel& right) : clusters(nullptr), values(nullptr), ref_values(nullptr), mf(1.0f), sparse(false), logarithmic(0) {
 					*this = right;
 				}
 
@@ -753,9 +786,18 @@ namespace rabbit {
 					size_type esize = get_e_size();
 
 					clusters = get_segment_allocator().allocate(esize);
-					values = get_value_allocator().allocate(get_data_size());
+					if (right.ref_values != nullptr) {
+						ref_values = get_ref_value_allocator().allocate(get_data_size());
+						std::copy(ref_values, right.ref_values, right.ref_values + right.get_data_size());
+					} else {
+						values = get_value_allocator().allocate(get_data_size());
+						std::copy(values, right.values, right.values + right.get_data_size());
+					}
+						
+					
 					keys = right.keys;
-					std::copy(values, right.values, right.values + right.get_data_size());
+					
+					
 					std::copy(clusters, right.clusters, right.clusters + esize);
 
 					return *this;
@@ -766,8 +808,7 @@ namespace rabbit {
 				}
 				inline bool segment_equal_key_exists(size_type pos, const _K& k) const {
 					_Bt index = get_segment_index(pos);
-					const _Segment& s = get_segment(pos);
-					//return  eq_f(s.key(index), k) && s.is_exists(index) ;
+					const _Segment& s = get_segment(pos);					
 					return  eq_f(get_segment_key(pos), k) && s.is_exists(index);
 
 				}
@@ -783,7 +824,7 @@ namespace rabbit {
 
 				inline size_type hash_probe_incr(size_type i) const {
 					if (is_quadratic())
-						return (i*i + i) >> 1;
+						return i*i;
 					return 1;
 
 				}
@@ -1083,7 +1124,11 @@ namespace rabbit {
 				}
 				typedef std::shared_ptr<hash_kernel> ptr;
 			}; /// hash_kernel
+			typedef std::shared_ptr<hash_kernel> _KernelPtr;
+			typedef std::vector<_KernelPtr> _Kernels;
+			_Kernels versions;
 		public:
+			
 			struct iterator {
 				typedef hash_kernel* kernel_ptr;
 				//const basic_unordered_map* h;
@@ -1101,7 +1146,7 @@ namespace rabbit {
 					return hc; // h->current;
 				}
 				void set_index() {
-					if (get_kernel() != nullptr) {
+					if (get_kernel() != nullptr && !is_end(*this)) {
 						const _Segment& s = get_kernel()->get_segment(pos);
 						exists = s.exists;
 						index = get_kernel()->get_segment_index(pos);
@@ -1120,21 +1165,33 @@ namespace rabbit {
 
 				}
 			public:
-				iterator() {
-
+				iterator() : hc(nullptr){ //, pos(0)
+					
 				}
-				iterator(const basic_unordered_map* h, size_type pos) :  pos(pos) {
+				
+				iterator(const end_iterator&) : hc(nullptr), pos(end_pos) {
+				}
+				iterator(const basic_unordered_map* h, size_type pos) :  pos(pos) {					
 					hc = h->current.get();
+					//if (this->hc != nullptr) hc->iterators_away++;
 					set_index();
 				}
-				iterator(const iterator& r) {
+								
+				iterator(const iterator& r) : hc(nullptr) {					
 					(*this) = r;
 				}
+				
+				//~iterator() {					
+					//if (this->hc != nullptr) hc->iterators_away--;
+				//}
+
 				iterator& operator=(const iterator& r) {
-					//h = r.h;
+					//if(this->hc != nullptr) hc->iterators_away--;
 					pos = r.pos;
 					hc = r.hc;
+					//if (this->hc != nullptr) hc->iterators_away++;
 					set_index();
+
 					return (*this);
 				}
 				iterator& operator++() {
@@ -1179,10 +1236,32 @@ namespace rabbit {
 					return ret;
 				}
 				inline bool operator==(const iterator& r) const {
+					if (r.pos == end_pos) return is_end();
 					return (pos == r.pos);
 				}
 				bool operator!=(const iterator& r) const {
+					if (r.pos == end_pos) return !is_end();
 					return (pos != r.pos);
+				}
+				inline bool operator==(const end_iterator& r) const {
+					return is_end();					
+				}
+				bool operator!=(const end_iterator& r) const {
+					return !is_end();
+					
+				}
+				bool is_end(const iterator& r) const {
+					if (hc == nullptr) return pos == end_pos;
+					return r.pos >= get_kernel()->end();
+				}
+				bool is_end() const {
+					return is_end(*this);
+				}
+				size_type get_pos() const {
+					return pos;
+				}
+				void set_rvalue(_RV value) {
+					get_kernel()->set_rvalue(pos, value);
 				}
 			};
 
@@ -1221,29 +1300,39 @@ namespace rabbit {
 			public:
 				size_type pos;
 
-				const_iterator() {
+				const_iterator() : hc(nullptr){
+					
+				}
+				
+				~const_iterator() {
+					if (hc != nullptr) hc->iterators_away--;
 
 				}
 				const_iterator(const basic_unordered_map* h, size_type pos) : pos(pos) {
 					hc = h->current.get();
+					//hc->iterators_away++;
 					set_index();
 				}
-				const_iterator(const iterator& r) {
+				const_iterator(const iterator& r) : hc(nullptr){
 					(*this) = r;
 				}
 
 				const_iterator& operator=(const iterator& r) {
-					//h = r.h;
+					if (hc != nullptr) hc->iterators_away--;
+					
 					pos = r.pos;
 					hc = r.hc;
+					if (hc != nullptr) hc->iterators_away++;
 					set_index();
 					return (*this);
 				}
 
 				const_iterator& operator=(const const_iterator& r) {
-					//h = r.h;
+					if (hc != nullptr) hc->iterators_away--;
+					
 					pos = r.pos;
 					hc = r.hc;
+					if (hc != nullptr) hc->iterators_away++;
 					index = r.index;
 					return (*this);
 				}
@@ -1270,12 +1359,25 @@ namespace rabbit {
 					return ret;
 				}
 
-				bool operator==(const const_iterator& r) const {
+				inline bool operator==(const const_iterator& r) const {
+					if (r.pos == end_pos) return is_end();
 					return (pos == r.pos);
 				}
 				bool operator!=(const const_iterator& r) const {
+					if (r.pos == end_pos) return !is_end();
 					return (pos != r.pos);
 				}
+				bool is_end(const const_iterator& r) const {
+					if (hc == nullptr) return false;
+					return r.pos >= get_kernel()->end();
+				}
+				bool is_end() const {
+					return is_end(*this);
+				}
+				size_type get_pos() const {
+					return pos;
+				}
+				
 			};
 
 		protected:
@@ -1293,6 +1395,18 @@ namespace rabbit {
 				rehash(to);
 			}
 			void set_current(typename hash_kernel::ptr c) {
+
+				if (current!= nullptr && current->iterators_away) {
+					versions.push_back(current);
+				}
+				else {
+					while (!versions.empty() && versions.back()->iterators_away == 0) {
+						typename hash_kernel::ptr cur = versions.back();
+						if (cur->iterators_away == 0) {
+							versions.pop_back();
+						}
+					}
+				}
 				current = c;
 			}
 
@@ -1361,16 +1475,27 @@ namespace rabbit {
 						rehashed->set_rand_probes(nrand_probes);
 					}
 					using namespace std;
+					_RV* rvalues = nullptr;
+					bool iterators_away = (this->current != nullptr) ? this->current->iterators_away > 0 : false;
+
+					if (iterators_away) {
+						rvalues = this->current->create_rvalues();
+					}
+
 					while (true) {
 						iterator e = end();
 						size_type ctr = 0;
 						bool rerehashed = false;
+					
 						//_K k;
 						for (iterator i = begin(); i != e; ++i) {
 							//std::swap(k,(*i).first);
-							_V* v = rehashed->subscript((*i).first);
-							if (v != nullptr) {
+							_RV v = rehashed->subscript((*i).first);
+							if (v != nullptr) {								
 								*v = i->second;
+								if (iterators_away) {
+									rvalues[i.get_pos()] = v;
+								}
 								/// a cheap check to illuminate subtle bugs during development
 								if (++ctr != rehashed->elements) {
 									cout << "iterations " << ctr << " elements " << rehashed->elements << " extent " << rehashed->get_extent() << endl;
@@ -1378,6 +1503,7 @@ namespace rabbit {
 									cout << "new " << rehashed->elements << " current size:" << current->elements << endl;
 									throw bad_alloc();
 								}
+
 							}
 							else {
 								//std::cout << "rehashing in rehash " << ctr << " of " << current->elements << std::endl;
@@ -1409,6 +1535,9 @@ namespace rabbit {
 							//break;
 						}
 
+					}/// for
+					if (rvalues) {
+						this->current->set_rvalues(rvalues);
 					}
 
 				}
@@ -1554,17 +1683,15 @@ namespace rabbit {
 				if (current == nullptr)return iterator(this, size_type());
 				return iterator(this, current->begin());
 			}
-			iterator end() const {
-				if (current == nullptr)return iterator(this, size_type());
-				return iterator(this, current->end());
+			end_iterator end() const {
+				return end_iterator(); // iterator(end_pos);
 			}
 			const_iterator cbegin() const {
 				if (current == nullptr)return const_iterator(this, size_type());
 				return const_iterator(this, current->begin());
 			}
 			const_iterator cend() const {
-				if (current == nullptr)return iterator(this, size_type());
-				return const_iterator(this, current->end());
+				return iterator(end_pos);
 			}
 			size_type size() const {
 				if (current == nullptr)return size_type();
