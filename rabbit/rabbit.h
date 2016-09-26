@@ -1131,8 +1131,8 @@ namespace rabbit {
 			
 			struct iterator {
 				typedef hash_kernel* kernel_ptr;
-				//const basic_unordered_map* h;
-				kernel_ptr hc;
+				const basic_unordered_map* h;
+				//kernel_ptr hc;
 				size_type pos;
 				mutable char rdata[sizeof(_ElPair)];
 			private:
@@ -1140,13 +1140,16 @@ namespace rabbit {
 				_Bt exists;
 				_Bt bsize;
 				inline const kernel_ptr get_kernel() const {
-					return hc; // const_cast<basic_unordered_map*>(h)->current;
+					//return hc; // 
+					return const_cast<basic_unordered_map*>(h)->current.get();
+					
 				}
 				inline kernel_ptr get_kernel() {
-					return hc; // h->current;
+					//return hc; // h->current;
+					return h->current.get();
 				}
 				void set_index() {
-					if (get_kernel() != nullptr && !is_end(*this)) {
+					if (h != nullptr && !is_end(*this)) {
 						const _Segment& s = get_kernel()->get_segment(pos);
 						exists = s.exists;
 						index = get_kernel()->get_segment_index(pos);
@@ -1165,14 +1168,14 @@ namespace rabbit {
 
 				}
 			public:
-				iterator() : hc(nullptr){ //, pos(0)
+				iterator() : h(nullptr){ //, pos(0)
 					
 				}
 				
-				iterator(const end_iterator&) : hc(nullptr), pos(end_pos) {
+				iterator(const end_iterator&) : h(nullptr), pos(end_pos) {
 				}
 				iterator(const basic_unordered_map* h, size_type pos) :  pos(pos) {					
-					hc = h->current.get();
+					this->h = h; //c = h->current.get();
 					//if (this->hc != nullptr) hc->iterators_away++;
 					set_index();
 				}
@@ -1188,7 +1191,8 @@ namespace rabbit {
 				iterator& operator=(const iterator& r) {
 					//if(this->hc != nullptr) hc->iterators_away--;
 					pos = r.pos;
-					hc = r.hc;
+					//hc = r.hc;
+					h = r.h;
 					//if (this->hc != nullptr) hc->iterators_away++;
 					set_index();
 
@@ -1251,7 +1255,7 @@ namespace rabbit {
 					
 				}
 				bool is_end(const iterator& r) const {
-					if (hc == nullptr) return pos == end_pos;
+					if (h == nullptr) return pos == end_pos;
 					return r.pos >= get_kernel()->end();
 				}
 				bool is_end() const {
@@ -1268,16 +1272,18 @@ namespace rabbit {
 			struct const_iterator {
 			private:
 				typedef hash_kernel* kernel_ptr;
-				//const basic_unordered_map* h;
-				mutable kernel_ptr hc;
+				const basic_unordered_map* h;
+				//mutable kernel_ptr hc;
 				_Bt index;
 				_Bt exists;
 				mutable char rdata[sizeof(_ElPair)];
 				inline const kernel_ptr get_kernel() const {
-					return hc;// const_cast<basic_unordered_map*>(h)->current;
+					//return hc;// ;
+					return const_cast<basic_unordered_map*>(h)->current.get();
 				}
 				inline kernel_ptr get_kernel() {
-					return hc; // h->current;
+					//return hc; // h->current;
+					return const_cast<basic_unordered_map*>(h)->current.get();
 				}
 				void set_index() {
 					if (get_kernel() != nullptr) {
@@ -1300,39 +1306,40 @@ namespace rabbit {
 			public:
 				size_type pos;
 
-				const_iterator() : hc(nullptr){
+				const_iterator() : h(nullptr){
 					
 				}
 				
 				~const_iterator() {
-					if (hc != nullptr) hc->iterators_away--;
+					//if (hc != nullptr) hc->iterators_away--;
 
 				}
 				const_iterator(const basic_unordered_map* h, size_type pos) : pos(pos) {
-					hc = h->current.get();
+					this->h = h; // ->current.get();
 					//hc->iterators_away++;
 					set_index();
 				}
-				const_iterator(const iterator& r) : hc(nullptr){
+				const_iterator(const iterator& r) : h(nullptr){
 					(*this) = r;
 				}
 
 				const_iterator& operator=(const iterator& r) {
-					if (hc != nullptr) hc->iterators_away--;
+					//if (hc != nullptr) hc->iterators_away--;
 					
 					pos = r.pos;
-					hc = r.hc;
-					if (hc != nullptr) hc->iterators_away++;
+					h = r.h;
+					//hc = r.hc;
+					//if (hc != nullptr) hc->iterators_away++;
 					set_index();
 					return (*this);
 				}
 
 				const_iterator& operator=(const const_iterator& r) {
-					if (hc != nullptr) hc->iterators_away--;
+					//if (hc != nullptr) hc->iterators_away--;
 					
 					pos = r.pos;
-					hc = r.hc;
-					if (hc != nullptr) hc->iterators_away++;
+					h = r.h;
+					//if (hc != nullptr) hc->iterators_away++;
 					index = r.index;
 					return (*this);
 				}
@@ -1368,7 +1375,7 @@ namespace rabbit {
 					return (pos != r.pos);
 				}
 				bool is_end(const const_iterator& r) const {
-					if (hc == nullptr) return false;
+					if (h == nullptr) return false;
 					return r.pos >= get_kernel()->end();
 				}
 				bool is_end() const {
@@ -1395,18 +1402,20 @@ namespace rabbit {
 				rehash(to);
 			}
 			void set_current(typename hash_kernel::ptr c) {
-
-				if (current!= nullptr && current->iterators_away) {
-					versions.push_back(current);
-				}
-				else {
-					while (!versions.empty() && versions.back()->iterators_away == 0) {
-						typename hash_kernel::ptr cur = versions.back();
-						if (cur->iterators_away == 0) {
-							versions.pop_back();
+				if (false) {
+					if (current != nullptr && current->iterators_away) {
+						versions.push_back(current);
+					}
+					else {
+						while (!versions.empty() && versions.back()->iterators_away == 0) {
+							typename hash_kernel::ptr cur = versions.back();
+							if (cur->iterators_away == 0) {
+								versions.pop_back();
+							}
 						}
 					}
 				}
+				
 				current = c;
 			}
 
@@ -1479,7 +1488,7 @@ namespace rabbit {
 					bool iterators_away = (this->current != nullptr) ? this->current->iterators_away > 0 : false;
 
 					if (iterators_away) {
-						rvalues = this->current->create_rvalues();
+						//rvalues = this->current->create_rvalues();
 					}
 
 					while (true) {
@@ -1494,7 +1503,7 @@ namespace rabbit {
 							if (v != nullptr) {								
 								*v = i->second;
 								if (iterators_away) {
-									rvalues[i.get_pos()] = v;
+									//rvalues[i.get_pos()] = v;
 								}
 								/// a cheap check to illuminate subtle bugs during development
 								if (++ctr != rehashed->elements) {
@@ -1537,7 +1546,7 @@ namespace rabbit {
 
 					}/// for
 					if (rvalues) {
-						this->current->set_rvalues(rvalues);
+						//this->current->set_rvalues(rvalues);
 					}
 
 				}
