@@ -435,8 +435,7 @@ namespace rabbit {
 				_Keys keys;
 				///_Values values;
 				_V* values;
-				_RV* ref_values;
-
+				
 				size_type overflow;
 				size_type overflow_elements;
 				overflow_stats stats;
@@ -451,18 +450,13 @@ namespace rabbit {
 				_K empty_key;
 				bool sparse;
 				size_type logarithmic;
-				size_type iterators_away;
-
+				
 				typename _Allocator::template rebind<_Segment>::other get_segment_allocator() {
 					return typename _Allocator::template rebind<_Segment>::other(allocator);
 				}
 				
 				typename _Allocator::template rebind<_V>::other get_value_allocator() {
 					return typename _Allocator::template rebind<_V>::other(allocator);
-				}
-
-				typename _Allocator::template rebind<_RV>::other get_ref_value_allocator() {
-					return typename _Allocator::template rebind<_RV>::other(allocator);
 				}
 
 				/// the minimum load factor
@@ -532,11 +526,7 @@ namespace rabbit {
 				_Bt get_segment_index(size_type pos) const {
 					return (_Bt)(pos & (config.BITS_SIZE1));
 				}
-				void set_rvalue(size_type pos, _RV value) {
-					if (this->ref_values != nullptr) {
-						this->ref_values[pos] = value;
-					}
-				}
+				
 				_Segment &get_segment(size_type pos) {
 					return clusters[pos >> config.BITS_LOG2_SIZE];
 				}
@@ -562,14 +552,10 @@ namespace rabbit {
 					return keys[pos];
 				}
 				const _V & get_segment_value(size_type pos) const {
-					if (this->ref_values)
-						return *(ref_values[pos]);
 					return values[pos];
 				}
 
 				_V & get_segment_value(size_type pos) {
-					if (this->ref_values)
-						return *(ref_values[pos]);
 					return values[pos];
 				}
 				void set_segment_key(size_type pos, const _K &k) {
@@ -646,16 +632,8 @@ namespace rabbit {
 						values = nullptr;
 					}
 				}
-				void free_ref_values() {
-					if (ref_values) {
-						
-						get_ref_value_allocator().deallocate(ref_values, get_data_size());
-						ref_values = nullptr;
-					}
-				}
 				void free_data() {
 					free_values();
-					free_ref_values();
 					if (clusters) {
 						size_type esize = get_e_size();
 						for (size_type c = 0; c < esize; ++c) {
@@ -678,16 +656,7 @@ namespace rabbit {
 				void set_rand_probes(size_type rand_probes) {
 					this->rand_probes = rand_probes;
 				}
-				_RV* create_rvalues() {
-					return get_ref_value_allocator().allocate(get_data_size());
-				}
-				void set_rvalues(_RV* values) {
-					if (values != nullptr) {
-						this->ref_values = values;
-						free_values();
-					}
-					
-				}
+								
 				/// clears all data and resize the new data vector to the parameter
 				void resize_clear(size_type new_extent) {
 					/// inverse of factor used to determine overflow list
@@ -742,15 +711,15 @@ namespace rabbit {
 				}
 
 				hash_kernel(const key_compare& compare, const allocator_type& allocator)
-					: clusters(nullptr), values(nullptr), ref_values(nullptr), eq_f(compare), mf(1.0f), allocator(allocator), sparse(false), logarithmic(0) {
+					: clusters(nullptr), values(nullptr), eq_f(compare), mf(1.0f), allocator(allocator), sparse(false), logarithmic(0) {
 					resize_clear(config.MIN_EXTENT);
 				}
 
-				hash_kernel() : clusters(nullptr), values(nullptr), ref_values(nullptr), mf(1.0f), sparse(false), logarithmic(0) {
+				hash_kernel() : clusters(nullptr), values(nullptr), mf(1.0f), sparse(false), logarithmic(0) {
 					resize_clear(config.MIN_EXTENT);
 				}
 
-				hash_kernel(const hash_kernel& right) : clusters(nullptr), values(nullptr), ref_values(nullptr), mf(1.0f), sparse(false), logarithmic(0) {
+				hash_kernel(const hash_kernel& right) : clusters(nullptr), values(nullptr), mf(1.0f), sparse(false), logarithmic(0) {
 					*this = right;
 				}
 
@@ -786,18 +755,10 @@ namespace rabbit {
 					size_type esize = get_e_size();
 
 					clusters = get_segment_allocator().allocate(esize);
-					if (right.ref_values != nullptr) {
-						ref_values = get_ref_value_allocator().allocate(get_data_size());
-						std::copy(ref_values, right.ref_values, right.ref_values + right.get_data_size());
-					} else {
-						values = get_value_allocator().allocate(get_data_size());
-						std::copy(values, right.values, right.values + right.get_data_size());
-					}
-						
+					values = get_value_allocator().allocate(get_data_size());
 					
+					std::copy(values, right.values, right.values + right.get_data_size());
 					keys = right.keys;
-					
-					
 					std::copy(clusters, right.clusters, right.clusters + esize);
 
 					return *this;
@@ -1132,7 +1093,7 @@ namespace rabbit {
 			struct iterator {
 				typedef hash_kernel* kernel_ptr;
 				const basic_unordered_map* h;
-				//kernel_ptr hc;
+				//kernel_ptr h;
 				size_type pos;
 				mutable char rdata[sizeof(_ElPair)];
 			private:
@@ -1140,16 +1101,16 @@ namespace rabbit {
 				_Bt exists;
 				_Bt bsize;
 				inline const kernel_ptr get_kernel() const {
-					//return hc; // 
+					//return h; // 
 					return const_cast<basic_unordered_map*>(h)->current.get();
 					
 				}
 				inline kernel_ptr get_kernel() {
-					//return hc; // h->current;
+					//return h; // h->current;
 					return h->current.get();
 				}
 				void set_index() {
-					if (h != nullptr && !is_end(*this)) {
+					if (h != nullptr ) {//&& !is_end(*this)
 						const _Segment& s = get_kernel()->get_segment(pos);
 						exists = s.exists;
 						index = get_kernel()->get_segment_index(pos);
@@ -1175,8 +1136,8 @@ namespace rabbit {
 				iterator(const end_iterator&) : h(nullptr), pos(end_pos) {
 				}
 				iterator(const basic_unordered_map* h, size_type pos) :  pos(pos) {					
-					this->h = h; //c = h->current.get();
-					//if (this->hc != nullptr) hc->iterators_away++;
+					this->h = h;
+					//this->h = h->current.get();
 					set_index();
 				}
 								
@@ -1184,25 +1145,24 @@ namespace rabbit {
 					(*this) = r;
 				}
 				
-				//~iterator() {					
-					//if (this->hc != nullptr) hc->iterators_away--;
+				//~iterator() {										
 				//}
 
 				iterator& operator=(const iterator& r) {
-					//if(this->hc != nullptr) hc->iterators_away--;
 					pos = r.pos;
-					//hc = r.hc;
 					h = r.h;
-					//if (this->hc != nullptr) hc->iterators_away++;
 					set_index();
 
 					return (*this);
 				}
-				iterator& operator++() {
-					increment();
-					while ((exists & (((_Bt)1) << index)) == (_Bt)0) {
+				inline iterator& operator++() {
+					do {
 						increment();
-					}
+					} while ((exists & (((_Bt)1) << index)) == (_Bt)0);
+					//increment();
+					//while ((exists & (((_Bt)1) << index)) == (_Bt)0) {
+					//	increment();
+					//}
 
 					return (*this);
 				}
@@ -1264,26 +1224,25 @@ namespace rabbit {
 				size_type get_pos() const {
 					return pos;
 				}
-				void set_rvalue(_RV value) {
-					get_kernel()->set_rvalue(pos, value);
-				}
+				
 			};
 
 			struct const_iterator {
 			private:
 				typedef hash_kernel* kernel_ptr;
 				const basic_unordered_map* h;
-				//mutable kernel_ptr hc;
+				//mutable kernel_ptr h;
 				_Bt index;
 				_Bt exists;
 				mutable char rdata[sizeof(_ElPair)];
 				inline const kernel_ptr get_kernel() const {
-					//return hc;// ;
-					return const_cast<basic_unordered_map*>(h)->current.get();
+					//return h;
+					return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
 				}
 				inline kernel_ptr get_kernel() {
-					//return hc; // h->current;
-					return const_cast<basic_unordered_map*>(h)->current.get();
+					//return h; 
+					//return h->current;
+					return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
 				}
 				void set_index() {
 					if (get_kernel() != nullptr) {
@@ -1310,13 +1269,11 @@ namespace rabbit {
 					
 				}
 				
-				~const_iterator() {
-					//if (hc != nullptr) hc->iterators_away--;
-
-				}
+				//~const_iterator() {
+					
+				//}
 				const_iterator(const basic_unordered_map* h, size_type pos) : pos(pos) {
 					this->h = h; // ->current.get();
-					//hc->iterators_away++;
 					set_index();
 				}
 				const_iterator(const iterator& r) : h(nullptr){
@@ -1324,22 +1281,15 @@ namespace rabbit {
 				}
 
 				const_iterator& operator=(const iterator& r) {
-					//if (hc != nullptr) hc->iterators_away--;
-					
 					pos = r.pos;
-					h = r.h;
-					//hc = r.hc;
-					//if (hc != nullptr) hc->iterators_away++;
+					h = r.h;					
 					set_index();
 					return (*this);
 				}
 
 				const_iterator& operator=(const const_iterator& r) {
-					//if (hc != nullptr) hc->iterators_away--;
-					
 					pos = r.pos;
 					h = r.h;
-					//if (hc != nullptr) hc->iterators_away++;
 					index = r.index;
 					return (*this);
 				}
@@ -1402,24 +1352,13 @@ namespace rabbit {
 				rehash(to);
 			}
 			void set_current(typename hash_kernel::ptr c) {
-				if (false) {
-					if (current != nullptr && current->iterators_away) {
-						versions.push_back(current);
-					}
-					else {
-						while (!versions.empty() && versions.back()->iterators_away == 0) {
-							typename hash_kernel::ptr cur = versions.back();
-							if (cur->iterators_away == 0) {
-								versions.pop_back();
-							}
-						}
-					}
-				}
 				
 				current = c;
+				pcurrent = current.get();
 			}
 
 			typename hash_kernel::ptr current;
+			typename hash_kernel* pcurrent;
 			inline void create_current() {
 				if (current == nullptr)
 
@@ -1484,13 +1423,8 @@ namespace rabbit {
 						rehashed->set_rand_probes(nrand_probes);
 					}
 					using namespace std;
-					_RV* rvalues = nullptr;
-					bool iterators_away = (this->current != nullptr) ? this->current->iterators_away > 0 : false;
-
-					if (iterators_away) {
-						//rvalues = this->current->create_rvalues();
-					}
-
+					
+					
 					while (true) {
 						iterator e = end();
 						size_type ctr = 0;
@@ -1502,9 +1436,6 @@ namespace rabbit {
 							_RV v = rehashed->subscript((*i).first);
 							if (v != nullptr) {								
 								*v = i->second;
-								if (iterators_away) {
-									//rvalues[i.get_pos()] = v;
-								}
 								/// a cheap check to illuminate subtle bugs during development
 								if (++ctr != rehashed->elements) {
 									cout << "iterations " << ctr << " elements " << rehashed->elements << " extent " << rehashed->get_extent() << endl;
@@ -1539,16 +1470,12 @@ namespace rabbit {
 						}
 						else {
 
-
 							//rehashed->resize_clear(rehashed->get_extent());
 							//break;
 						}
 
 					}/// for
-					if (rvalues) {
-						//this->current->set_rvalues(rvalues);
-					}
-
+					
 				}
 				catch (std::bad_alloc &e) {
 					std::cout << "bad allocation: rehash failed in temp phase :" << new_extent << std::endl;

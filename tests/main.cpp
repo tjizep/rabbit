@@ -141,7 +141,7 @@ public:
 		first += COUNT;
 		for (auto i = map.begin(); i != map.end(); ++i) {
 			control[i->first] = control[i->second];
-			if (i->first > COUNT/2) {
+			if (i->first > COUNT/2 && first < COUNT * 4) {
 				for (int k = first; k < first + COUNT; ++k) {
 					map[k] = 1;
 				}
@@ -149,7 +149,7 @@ public:
 			}
 		}
 		if (control.size() != COUNT) {
-			std::cout << "failed iterate rehash test" << std::endl;
+			std::cout << " iterate rehash test" << std::endl;
 		}
 	}
 
@@ -408,8 +408,8 @@ extern int google_times(int iters);
 //extern int unique_running_insertion();
 //extern int unique_scattered_lookup();
 void more_tests() {
-	//tester<long> test;
-	//test.iterate_rehash_test();
+	tester<long> test;
+	test.iterate_rehash_test();
 	//unique_scattered_lookup();
 	//unique_running_insertion();
 }
@@ -436,7 +436,7 @@ int main(int argc, char **argv)
 	more_tests();
 
 	size_t ts = 10000000;
-	//test_random(ts);
+	test_random(ts);
 	google_times((int)ts);
 	
 	return 0;
