@@ -409,7 +409,7 @@ namespace rabbit {
 
 				_KeySegment() {
 					exists = 0;
-					overflows = 0;					
+					overflows = 0;
 				}
 			};
 			//typedef _PairSegment _Segment;
@@ -435,7 +435,7 @@ namespace rabbit {
 				_Keys keys;
 				///_Values values;
 				_V* values;
-				
+
 				size_type overflow;
 				size_type overflow_elements;
 				overflow_stats stats;
@@ -450,11 +450,11 @@ namespace rabbit {
 				_K empty_key;
 				bool sparse;
 				size_type logarithmic;
-				
+
 				typename _Allocator::template rebind<_Segment>::other get_segment_allocator() {
 					return typename _Allocator::template rebind<_Segment>::other(allocator);
 				}
-				
+
 				typename _Allocator::template rebind<_V>::other get_value_allocator() {
 					return typename _Allocator::template rebind<_V>::other(allocator);
 				}
@@ -526,7 +526,7 @@ namespace rabbit {
 				_Bt get_segment_index(size_type pos) const {
 					return (_Bt)(pos & (config.BITS_SIZE1));
 				}
-				
+
 				_Segment &get_segment(size_type pos) {
 					return clusters[pos >> config.BITS_LOG2_SIZE];
 				}
@@ -537,7 +537,7 @@ namespace rabbit {
 
 				const _ElPair get_segment_pair(size_type pos) const {
 					return std::make_pair(get_segment_key(pos), get_segment_value(pos));
-					
+
 				}
 
 				const _K & get_segment_key(size_type pos) const {
@@ -614,7 +614,7 @@ namespace rabbit {
 				size_type get_e_size() const {
 					return (size_type)(get_data_size() / config.BITS_SIZE) + 1;
 				}
-				
+
 				void clear_data() {
 					if (values) {
 						for (size_type pos = 0; pos < get_data_size(); ++pos) {
@@ -624,7 +624,7 @@ namespace rabbit {
 						}
 					}
 				}
-				
+
 				void free_values() {
 					if (values) {
 						clear_data();
@@ -656,7 +656,7 @@ namespace rabbit {
 				void set_rand_probes(size_type rand_probes) {
 					this->rand_probes = rand_probes;
 				}
-								
+
 				/// clears all data and resize the new data vector to the parameter
 				void resize_clear(size_type new_extent) {
 					/// inverse of factor used to determine overflow list
@@ -756,7 +756,7 @@ namespace rabbit {
 
 					clusters = get_segment_allocator().allocate(esize);
 					values = get_value_allocator().allocate(get_data_size());
-					
+
 					std::copy(values, right.values, right.values + right.get_data_size());
 					keys = right.keys;
 					std::copy(clusters, right.clusters, right.clusters + esize);
@@ -769,7 +769,7 @@ namespace rabbit {
 				}
 				inline bool segment_equal_key_exists(size_type pos, const _K& k) const {
 					_Bt index = get_segment_index(pos);
-					const _Segment& s = get_segment(pos);					
+					const _Segment& s = get_segment(pos);
 					return  eq_f(get_segment_key(pos), k) && s.is_exists(index);
 
 				}
@@ -1089,7 +1089,7 @@ namespace rabbit {
 			typedef std::vector<_KernelPtr> _Kernels;
 			_Kernels versions;
 		public:
-			
+
 			struct iterator {
 				typedef hash_kernel* kernel_ptr;
 				const basic_unordered_map* h;
@@ -1101,9 +1101,9 @@ namespace rabbit {
 				_Bt exists;
 				_Bt bsize;
 				inline const kernel_ptr get_kernel() const {
-					//return h; // 
+					//return h; //
 					return const_cast<basic_unordered_map*>(h)->current.get();
-					
+
 				}
 				inline kernel_ptr get_kernel() {
 					//return h; // h->current;
@@ -1130,22 +1130,22 @@ namespace rabbit {
 				}
 			public:
 				iterator() : h(nullptr){ //, pos(0)
-					
+
 				}
-				
+
 				iterator(const end_iterator&) : h(nullptr), pos(end_pos) {
 				}
-				iterator(const basic_unordered_map* h, size_type pos) :  pos(pos) {					
+				iterator(const basic_unordered_map* h, size_type pos) :  pos(pos) {
 					this->h = h;
 					//this->h = h->current.get();
 					set_index();
 				}
-								
-				iterator(const iterator& r) : hc(nullptr) {					
+
+				iterator(const iterator& r) {
 					(*this) = r;
 				}
-				
-				//~iterator() {										
+
+				//~iterator() {
 				//}
 
 				iterator& operator=(const iterator& r) {
@@ -1208,11 +1208,11 @@ namespace rabbit {
 					return (pos != r.pos);
 				}
 				inline bool operator==(const end_iterator& r) const {
-					return is_end();					
+					return is_end();
 				}
 				bool operator!=(const end_iterator& r) const {
 					return !is_end();
-					
+
 				}
 				bool is_end(const iterator& r) const {
 					if (h == nullptr) return pos == end_pos;
@@ -1224,7 +1224,7 @@ namespace rabbit {
 				size_type get_pos() const {
 					return pos;
 				}
-				
+
 			};
 
 			struct const_iterator {
@@ -1240,7 +1240,7 @@ namespace rabbit {
 					return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
 				}
 				inline kernel_ptr get_kernel() {
-					//return h; 
+					//return h;
 					//return h->current;
 					return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
 				}
@@ -1266,11 +1266,12 @@ namespace rabbit {
 				size_type pos;
 
 				const_iterator() : h(nullptr){
-					
+
 				}
-				
+                const_iterator(const end_iterator&) : h(nullptr), pos(end_pos) {
+				}
 				//~const_iterator() {
-					
+
 				//}
 				const_iterator(const basic_unordered_map* h, size_type pos) : pos(pos) {
 					this->h = h; // ->current.get();
@@ -1282,7 +1283,7 @@ namespace rabbit {
 
 				const_iterator& operator=(const iterator& r) {
 					pos = r.pos;
-					h = r.h;					
+					h = r.h;
 					set_index();
 					return (*this);
 				}
@@ -1334,7 +1335,7 @@ namespace rabbit {
 				size_type get_pos() const {
 					return pos;
 				}
-				
+
 			};
 
 		protected:
@@ -1352,13 +1353,13 @@ namespace rabbit {
 				rehash(to);
 			}
 			void set_current(typename hash_kernel::ptr c) {
-				
+
 				current = c;
 				pcurrent = current.get();
 			}
 
 			typename hash_kernel::ptr current;
-			typename hash_kernel* pcurrent;
+			hash_kernel* pcurrent;
 			inline void create_current() {
 				if (current == nullptr)
 
@@ -1423,18 +1424,18 @@ namespace rabbit {
 						rehashed->set_rand_probes(nrand_probes);
 					}
 					using namespace std;
-					
-					
+
+
 					while (true) {
 						iterator e = end();
 						size_type ctr = 0;
 						bool rerehashed = false;
-					
+
 						//_K k;
 						for (iterator i = begin(); i != e; ++i) {
 							//std::swap(k,(*i).first);
 							_RV v = rehashed->subscript((*i).first);
-							if (v != nullptr) {								
+							if (v != nullptr) {
 								*v = i->second;
 								/// a cheap check to illuminate subtle bugs during development
 								if (++ctr != rehashed->elements) {
@@ -1475,7 +1476,7 @@ namespace rabbit {
 						}
 
 					}/// for
-					
+
 				}
 				catch (std::bad_alloc &e) {
 					std::cout << "bad allocation: rehash failed in temp phase :" << new_extent << std::endl;
