@@ -22,7 +22,7 @@ Advantages:
 2. Strong guarantees for hash table size in sparse mode
    i.e. Sparse version of hash table is nearly always smaller(90% of the time) than google sparse hash
    even though it has a step shaped memory use curve
-3. Std api compatible with stl however only deviation is iterator cannot modify values in table
+3. Std api compatible with stl 
 4. sparseness can be dialled in dynamically when need arises - only effective after rehash
 
 Disadvantages
