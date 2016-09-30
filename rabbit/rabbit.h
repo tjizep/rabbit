@@ -1092,25 +1092,22 @@ namespace rabbit {
 
 			struct iterator {
 				typedef hash_kernel* kernel_ptr;
-				const basic_unordered_map* h;
-				//kernel_ptr h;
+				const basic_unordered_map* h;				
 				size_type pos;
 				mutable char rdata[sizeof(_ElPair)];
 			private:
 				_Bt index;
 				_Bt exists;
 				_Bt bsize;
-				inline const kernel_ptr get_kernel() const {
-					//return h; //
+				inline const kernel_ptr get_kernel() const {					
 					return const_cast<basic_unordered_map*>(h)->current.get();
 
 				}
-				inline kernel_ptr get_kernel() {
-					//return h; // h->current;
+				inline kernel_ptr get_kernel() {					
 					return h->current.get();
 				}
 				void set_index() {
-					if (h != nullptr ) {//&& !is_end(*this)
+					if (h != nullptr && !is_end(*this)) {//
 						const _Segment& s = get_kernel()->get_segment(pos);
 						exists = s.exists;
 						index = get_kernel()->get_segment_index(pos);
@@ -1129,15 +1126,13 @@ namespace rabbit {
 
 				}
 			public:
-				iterator() : h(nullptr){ //, pos(0)
-
+				iterator() : h(nullptr), pos(0) { 
 				}
 
 				iterator(const end_iterator&) : h(nullptr), pos(end_pos) {
 				}
 				iterator(const basic_unordered_map* h, size_type pos) :  pos(pos) {
-					this->h = h;
-					//this->h = h->current.get();
+					this->h = h;					
 					set_index();
 				}
 
@@ -1236,16 +1231,15 @@ namespace rabbit {
 				_Bt exists;
 				mutable char rdata[sizeof(_ElPair)];
 				inline const kernel_ptr get_kernel() const {
-					//return h;
+				
 					return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
 				}
 				inline kernel_ptr get_kernel() {
-					//return h;
-					//return h->current;
+				
 					return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
 				}
 				void set_index() {
-					if (get_kernel() != nullptr) {
+					if (get_kernel() != nullptr) { ///  && !is_end(*this)
 						const _Segment& s = get_kernel()->get_segment(pos);
 						exists = s.exists;
 						index = get_kernel()->get_segment_index(pos);
@@ -1296,10 +1290,13 @@ namespace rabbit {
 				}
 
 				const_iterator& operator++() {
-					increment();
-					while ((exists & (((_Bt)1) << index)) == (_Bt)0) {
+					do {
 						increment();
-					}
+					} while ((exists & (((_Bt)1) << index)) == (_Bt)0);
+					//increment();
+					//while ((exists & (((_Bt)1) << index)) == (_Bt)0) {
+					//	increment();
+					//}
 
 
 					return (*this);

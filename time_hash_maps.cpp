@@ -136,7 +136,7 @@ static bool FLAGS_test_map = false;
 static bool FLAGS_test_4_bytes = false;
 static bool FLAGS_test_8_bytes = true;
 static bool FLAGS_test_16_bytes = false;
-static bool FLAGS_test_256_bytes = false;
+static bool FLAGS_test_256_bytes = true;
 
 static bool growth_only = false;
 
@@ -202,7 +202,7 @@ class EasyUseRabbitUnorderedMap : public rabbit::unordered_map<K,V,H>
 public:
     EasyUseRabbitUnorderedMap()
     {
-        rabbit::unordered_map<K,V,H>::set_logarithmic(0);
+        rabbit::unordered_map<K,V,H>::set_logarithmic(1);
     }
 };
 template<typename K, typename V, typename H>
