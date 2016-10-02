@@ -476,7 +476,7 @@ namespace rabbit {
 				size_type bucket_size(size_type n) const {
 					size_type pos = n;
 					if (!overflows_(pos)) {
-						if (exists_(pos))
+						if (exists_(pos) && map_key(get_segment_key(pos)) == n)
 							return 1;
 						else return 0;
 					}
@@ -1099,12 +1099,12 @@ namespace rabbit {
 				_Bt index;
 				_Bt exists;
 				_Bt bsize;
-				inline const kernel_ptr get_kernel() const {					
-					return const_cast<basic_unordered_map*>(h)->current.get();
+				const kernel_ptr get_kernel() const {					
+					return h->pcurrent;
 
 				}
-				inline kernel_ptr get_kernel() {					
-					return h->current.get();
+				kernel_ptr get_kernel() {					
+					return h->pcurrent;
 				}
 				void set_index() {
 					if (h != nullptr && !is_end(*this)) {//
@@ -1154,11 +1154,6 @@ namespace rabbit {
 					do {
 						increment();
 					} while ((exists & (((_Bt)1) << index)) == (_Bt)0);
-					//increment();
-					//while ((exists & (((_Bt)1) << index)) == (_Bt)0) {
-					//	increment();
-					//}
-
 					return (*this);
 				}
 				iterator operator++(int) {
@@ -1232,14 +1227,14 @@ namespace rabbit {
 				mutable char rdata[sizeof(_ElPair)];
 				inline const kernel_ptr get_kernel() const {
 				
-					return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
+					return h->pcurrent; // current.get();
 				}
 				inline kernel_ptr get_kernel() {
 				
 					return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
 				}
 				void set_index() {
-					if (get_kernel() != nullptr) { ///  && !is_end(*this)
+					if (get_kernel() != nullptr && !is_end(*this)) { ///  
 						const _Segment& s = get_kernel()->get_segment(pos);
 						exists = s.exists;
 						index = get_kernel()->get_segment_index(pos);
@@ -1341,18 +1336,14 @@ namespace rabbit {
 			key_compare key_c;
 			allocator_type alloc;
 
-			double recalc_growth_factor(size_type elements) {
-				return 1.8;
-			}
-
 			void rehash() {
 				size_type to = current->key_mapper.next_size();
 				rehash(to);
 			}
-			void set_current(typename hash_kernel::ptr c) {
 
-				current = c;
-				pcurrent = current.get();
+			void set_current(typename hash_kernel::ptr c) {				
+				pcurrent = c.get();
+				current = c;				
 			}
 
 			typename hash_kernel::ptr current;
