@@ -346,3 +346,62 @@
 	<sparsehash/internal/hashtable-common.h>
 	<sparsehash/internal/libc_allocator_with_realloc.h>
 
+1476436623 source:c:\devcpp\cpp_all\rabbit\time_hash_maps.cpp
+	<functional>
+	<rabbit/unordered_map>
+	<unordered_map>
+	<sparsehash/internal/sparseconfig.h>
+	<config.h>
+	<inttypes.h>
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<time.h>
+	<sys/time.h>
+	<sys/resource.h>
+	<sys/utsname.h>
+	<map>
+	<algorithm>
+	<vector>
+	<sparsehash/type_traits.h>
+	<sparsehash/dense_hash_map>
+	<sparsehash/sparse_hash_map>
+	<google/malloc_extension.h>
+	<Windows.h>
+	<Psapi.h>
+
+1474395088 c:\devcpp\cpp_all\rabbit\rabbit\unordered_map
+	<rabbit/rabbit.h>
+
+1476436623 c:\devcpp\cpp_all\rabbit\rabbit\rabbit.h
+	<stdio.h>
+	<stdlib.h>
+	<iostream>
+	<vector>
+	<chrono>
+	<assert.h>
+	<memory>
+	<string>
+	<random>
+	<limits>
+	<iomanip>
+
+1476436717 source:c:\devcpp\cpp_all\rabbit\rabbit_tests\main.cpp
+	<stdlib.h>
+	<stdio.h>
+	<random>
+	<algorithm>
+	<unordered_map>
+	<map>
+	<string>
+	<sstream>
+	<functional>
+	<sparsehash/internal/sparseconfig.h>
+	<rabbit/unordered_map>
+	<sparsehash/type_traits.h>
+	<sparsehash/dense_hash_map>
+	<sparsehash/sparse_hash_map>
+	<rabbit/unordered_map>
+	<Windows.h>
+	<Psapi.h>
+

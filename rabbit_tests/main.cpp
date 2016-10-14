@@ -87,9 +87,13 @@ namespace conversion{
 		out = (float)in;
 	}
 };
+static const int64_t SEED = 0;
+static std::mt19937_64 generator(SEED);
 template< typename _T>
 class tester{
 public:
+    typedef long long _ValueType;
+
 	template<typename _MapT>
 	void test_hash(int count){
 
@@ -149,12 +153,16 @@ public:
 		double start = get_proc_mem_use();
 		/// script creation is not benched
 		_InputField v;
-
-		for(size_t r = 0; r < count;++r){
-			conversion::to_t(r,v);
-			script.push_back(v);
-		}
-		std::random_shuffle(script.begin(), script.end());
+        _Script random_ints(count);
+        std::iota(random_ints.begin(), random_ints.end(), 0);
+        std::shuffle(random_ints.begin(), random_ints.end(),generator);
+        //std::random_shuffle(random_ints.begin(), random_ints.end());
+		///for(size_t r = 0; r < count;++r){
+		///	conversion::to_t(r,v);
+		///	script.push_back(v);
+		///}
+		//std::random_shuffle(script.begin(), script.end());
+		script.swap(random_ints);
 		printf("memory used by script: %.4g MB\n", get_proc_mem_use()-start);
 	}
 	template<typename _MapT>
@@ -308,7 +316,7 @@ template<typename _T>
 void test_dense_hash(typename tester<_T>::_Script& script,size_t ts){
 #ifdef _HAS_GOOGLE_HASH_
 	printf("google dense hash test\n");
-	typedef ::google::dense_hash_map<_T,long> _Map; //
+	typedef ::google::dense_hash_map<_T,typename tester<_T>::_ValueType> _Map; //
 	_Map h;
 	_T c,c1;
 	conversion::to_t(-1l,c);
@@ -323,7 +331,7 @@ template<typename _T>
 void test_sparse_hash(typename tester<_T>::_Script& script,size_t ts){
 #ifdef _HAS_GOOGLE_HASH_
 	printf("google sparse hash test\n");
-	typedef ::google::sparse_hash_map<_T,long> _Map;
+	typedef ::google::sparse_hash_map<_T,typename tester<_T>::_ValueType> _Map;
 	_Map h;
 	tester<_T> t;
 	t.bench_hash_simple(h,script);
@@ -333,7 +341,7 @@ void test_sparse_hash(typename tester<_T>::_Script& script,size_t ts){
 template<typename _T>
 void test_rabbit_hash(typename tester<_T>::_Script& script,size_t ts){
 	printf("rabbit hash test\n");
-	typedef rabbit::unordered_map<_T,long> _Map;
+	typedef rabbit::unordered_map<_T,typename tester<_T>::_ValueType> _Map;
 	_Map h;
 
 	tester<_T> t;
@@ -344,7 +352,7 @@ void test_rabbit_hash(typename tester<_T>::_Script& script,size_t ts){
 template<typename _T>
 void test_rabbit_sparse_hash(typename tester<_T>::_Script& script,size_t ts){
 	printf("rabbit sparse hash test\n");
-	typedef rabbit::unordered_map<_T,long> _Map;
+	typedef rabbit::unordered_map<_T,typename tester<_T>::_ValueType> _Map;
 	_Map h;
     h.set_logarithmic(4);
 	tester<_T> t;
@@ -355,7 +363,7 @@ void test_rabbit_sparse_hash(typename tester<_T>::_Script& script,size_t ts){
 template<typename T>
 void test_rabbit_hash_erase(size_t ts){
 	printf("rabbit hash test\n");
-	typedef rabbit::unordered_map<T,long> _Map;
+	typedef rabbit::unordered_map<T,typename tester<T>::_ValueType> _Map;
 	_Map h;
 
 	typename tester<T>::_Script script;
@@ -370,7 +378,7 @@ template<typename T>
 void test_std_hash(typename tester<T>::_Script& script,size_t ts){
 #ifdef _HAS_STD_HASH_
 	printf("std hash test\n");
-	typedef std::unordered_map<T,long> _Map;
+	typedef std::unordered_map<T,typename tester<T>::_ValueType> _Map;
 	_Map h;
 
 	tester<T> t;
@@ -392,7 +400,7 @@ void test_random(size_t ts){
 
     tester<_K>::_Script script;
     tester<_K> t;
-    t.gen_random(ts, script);
+    t.gen_random_narrow(ts, script);
 
     test_rabbit_hash<_K>(script,ts);
     test_rabbit_sparse_hash<_K>(script,ts);
@@ -406,9 +414,9 @@ int main(int argc, char **argv)
 #ifdef _MSC_VER
 	::Sleep(1000);
 #endif
-	size_t ts = 10000000;
-
-    google_times(ts);
+	size_t ts = 40000000;
+    test_random(ts);
+    //google_times(ts);
 	//more_tests();
 	return 0;
 }
