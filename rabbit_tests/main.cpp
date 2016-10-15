@@ -175,8 +175,8 @@ public:
 		size_t hs = h.size();
 		long errors = 0;
 		for (size_t k = 0; k < count / 2; ++k) {
-
-			if (h.count(script[k]) != 0) {
+            auto f = h.find(script[k]);
+			if (f != h.end() && f->second == k+1) {
 				if (!h.erase(script[k])) {
 					printf("ERROR: could not erase %ld\n", (long int)k);
 					++errors;
