@@ -345,18 +345,16 @@ void test_rabbit_hash(typename tester<_T>::_Script& script,size_t ts){
 	_Map h;
 
 	tester<_T> t;
-    h.set_logarithmic(1);
+    //h.set_logarithmic(1);
 	t.bench_hash_simple(h,script);
 
 }
 template<typename _T>
 void test_rabbit_sparse_hash(typename tester<_T>::_Script& script,size_t ts){
 	printf("rabbit sparse hash test\n");
-	typedef rabbit::unordered_map<_T,typename tester<_T>::_ValueType> _Map;
+	typedef rabbit::sparse_unordered_map<_T,typename tester<_T>::_ValueType> _Map;
 	_Map h;
-    h.set_logarithmic(4);
 	tester<_T> t;
-
 	t.bench_hash_simple(h,script);
 
 }
@@ -400,7 +398,7 @@ void test_random(size_t ts){
 
     tester<_K>::_Script script;
     tester<_K> t;
-    t.gen_random_narrow(ts, script);
+    t.gen_random(ts, script);
 
     test_rabbit_hash<_K>(script,ts);
     test_rabbit_sparse_hash<_K>(script,ts);
@@ -414,7 +412,7 @@ int main(int argc, char **argv)
 #ifdef _MSC_VER
 	::Sleep(1000);
 #endif
-	size_t ts = 40000000;
+	size_t ts = 10000000;
     test_random(ts);
     //google_times(ts);
 	//more_tests();

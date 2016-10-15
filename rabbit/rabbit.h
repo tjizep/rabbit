@@ -87,53 +87,6 @@ namespace rabbit {
 		_Ty2& second;	// the second stored value
 	};
 
-	template <class _Config>
-	struct _ModMapper {
-		typedef _Config config_type;
-		typedef typename config_type::size_type size_type;
-		size_type extent;
-		size_type random_val;
-		double backoff;
-		_Config config;
-		_ModMapper() {
-		}
-		_ModMapper(size_type new_extent, const _Config& config) {
-			this->backoff = get_max_backoff();
-			this->config = config;
-
-			this->extent = new_extent;
-			srand((unsigned int)time(NULL));
-			this->random_val = rand();
-		}
-		inline size_type nearest_larger(size_type any) {
-			return any;
-		}
-		inline size_type randomize(size_type other) const {
-			return (other ^ random_val) % this->extent;
-		}
-		inline size_type operator()(size_type h) const {
-
-			return h % this->extent;
-		}
-		double get_min_backoff() const {
-			return 2;
-		}
-		double get_max_backoff() const {
-			return 8;
-		}
-		double resize_factor() const {
-			return 1.3;
-		}
-
-		double recalc_growth_factor(size_type elements) {
-			return 1.80;
-		}
-		inline size_type next_size() {
-			double r = recalc_growth_factor(this->extent) * this->extent;
-			assert(r > (double)extent);
-			return (size_type)r;
-		}
-	};
 
 	template <class _Config>
 	struct _BinMapper {
@@ -235,7 +188,7 @@ namespace rabbit {
 			return (unsigned  long)k;
 		};
 	};
-
+    template<int logarithmic = 0>
 	class basic_config {
 	public:
 		typedef unsigned long long int _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
@@ -255,9 +208,9 @@ namespace rabbit {
 		_Bt BITS_SIZE;
 		_Bt BITS_SIZE1;
 		_Bt ALL_BITS_SET;
+		_Bt LOGARITHMIC;
 		/// maximum probes per access
 		size_type PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
-		size_type RAND_PROBES;
 		size_type BITS_LOG2_SIZE;
 		/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
 		///	hash randomizer available
@@ -276,9 +229,9 @@ namespace rabbit {
 			BITS_LOG2_SIZE = right.BITS_LOG2_SIZE;
 			ALL_BITS_SET = right.ALL_BITS_SET;
 			PROBES = right.PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
-			RAND_PROBES = right.RAND_PROBES;
 			MIN_EXTENT = right.MIN_EXTENT;
 			MAX_OVERFLOW_FACTOR = right.MAX_OVERFLOW_FACTOR;
+			LOGARITHMIC = right.LOGARITHMIC;
 			return *this;
 		}
 
@@ -288,10 +241,10 @@ namespace rabbit {
 			BITS_SIZE1 = BITS_SIZE - 1;
 			BITS_LOG2_SIZE = (size_type)log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;
-			PROBES = 16;
-			RAND_PROBES = 8;
+			PROBES = 12;
 			MIN_EXTENT = 4; /// start size of the hash table
-			MAX_OVERFLOW_FACTOR = 8 * 32768; //BITS_SIZE*8/sizeof(_Bt);
+			MAX_OVERFLOW_FACTOR = 1<<17;
+			LOGARITHMIC = logarithmic;
 
 		}
 	};
@@ -303,8 +256,8 @@ namespace rabbit {
 		typedef ptrdiff_t difference_type;
 		typedef _InMapper _Mapper;
 	};
-	typedef basic_traits<_BinMapper<basic_config> > default_traits;
-	typedef basic_traits<_ModMapper<basic_config> > sparse_traits;
+	typedef basic_traits<_BinMapper<basic_config<>> > default_traits;
+	typedef basic_traits<_BinMapper<basic_config<4>> > sparse_traits;
 
 
 	template
@@ -358,9 +311,7 @@ namespace rabbit {
 			public:
 				_Bt overflows;
 				_Bt exists;
-				//_Bt overflowed;
-			private:
-				//_K keys[sizeof(_Bt)*8];
+
 			private:
 				void set_bit(_Bt& w, _Bt index, bool f) {
 
@@ -448,7 +399,7 @@ namespace rabbit {
 				bool keys_overflowed;
 				_Allocator allocator;
 				_K empty_key;
-				bool sparse;
+				//bool sparse;
 				size_type logarithmic;
 
 				typename _Allocator::template rebind<_Segment>::other get_segment_allocator() {
@@ -711,15 +662,15 @@ namespace rabbit {
 				}
 
 				hash_kernel(const key_compare& compare, const allocator_type& allocator)
-					: clusters(nullptr), values(nullptr), eq_f(compare), mf(1.0f), allocator(allocator), sparse(false), logarithmic(0) {
+					: clusters(nullptr), values(nullptr), eq_f(compare), mf(1.0f), allocator(allocator), logarithmic(config.LOGARITHMIC) {
 					resize_clear(config.MIN_EXTENT);
 				}
 
-				hash_kernel() : clusters(nullptr), values(nullptr), mf(1.0f), sparse(false), logarithmic(0) {
+				hash_kernel() : clusters(nullptr), values(nullptr), mf(1.0f), logarithmic(config.LOGARITHMIC) {
 					resize_clear(config.MIN_EXTENT);
 				}
 
-				hash_kernel(const hash_kernel& right) : clusters(nullptr), values(nullptr), mf(1.0f), sparse(false), logarithmic(0) {
+				hash_kernel(const hash_kernel& right) : clusters(nullptr), values(nullptr), mf(1.0f), logarithmic(config.LOGARITHMIC) {
 					*this = right;
 				}
 
@@ -737,12 +688,6 @@ namespace rabbit {
 				}
 				bool is_logarithmic() const {
 					return this->logarithmic > 0;
-				}
-				void set_quadratic(bool sparse) {
-					this->sparse = sparse;
-				}
-				bool is_quadratic() const {
-					return this->sparse;
 				}
 				hash_kernel& operator=(const hash_kernel& right) {
 					config = right.config;
@@ -784,8 +729,6 @@ namespace rabbit {
 				}
 
 				inline size_type hash_probe_incr(size_type i) const {
-					if (is_quadratic())
-						return i*i;
 					return 1;
 
 				}
@@ -834,7 +777,7 @@ namespace rabbit {
 					_Bt si = get_segment_index(pos);
 					_Segment &s = clusters[pos >> config.BITS_LOG2_SIZE];/// get_segment(pos)
 
-					if (!s.is_overflows(si) && !s.is_exists(si)) {
+					if (!s.is_exists(si)) { //!s.is_overflows(si)
 						s.toggle_exists(si);
 						set_segment_key(pos, k);
 						++elements;
@@ -913,19 +856,18 @@ namespace rabbit {
 					size_type pos = map_key(k);
 					_Bt si = get_segment_index(pos);
 					_Segment& s = get_segment(pos);
-					bool key_overflows = s.is_overflows(si);
 					bool key_exists = s.is_exists(si);
 					//key_overflows = s.is_overflows(si);
-					if (!key_overflows && !s.is_exists(si)) {
+					if (!key_exists) { //!key_overflows &&
 						s.toggle_exists(si);
 						set_segment_key(pos, k);
 						++elements;
 						return create_segment_value(pos);
 					}
-					else if (s.is_exists(si) && equal_key(pos, k)) {
+					else if (key_exists && equal_key(pos, k)) {
 						return &(get_segment_value(pos));
 					}
-
+                    bool key_overflows = s.is_overflows(si);
 					size_type h = pos;
 					if (key_overflows) {
 						pos = find_rest(k, h);
@@ -1092,18 +1034,18 @@ namespace rabbit {
 
 			struct iterator {
 				typedef hash_kernel* kernel_ptr;
-				const basic_unordered_map* h;				
+				const basic_unordered_map* h;
 				size_type pos;
 				mutable char rdata[sizeof(_ElPair)];
 			private:
 				_Bt index;
 				_Bt exists;
 				_Bt bsize;
-				const kernel_ptr get_kernel() const {					
+				const kernel_ptr get_kernel() const {
 					return h->pcurrent;
 
 				}
-				kernel_ptr get_kernel() {					
+				kernel_ptr get_kernel() {
 					return h->pcurrent;
 				}
 				void set_index() {
@@ -1126,13 +1068,13 @@ namespace rabbit {
 
 				}
 			public:
-				iterator() : h(nullptr), pos(0) { 
+				iterator() : h(nullptr), pos(0) {
 				}
 
 				iterator(const end_iterator&) : h(nullptr), pos(end_pos) {
 				}
 				iterator(const basic_unordered_map* h, size_type pos) :  pos(pos) {
-					this->h = h;					
+					this->h = h;
 					set_index();
 				}
 
@@ -1226,15 +1168,15 @@ namespace rabbit {
 				_Bt exists;
 				mutable char rdata[sizeof(_ElPair)];
 				inline const kernel_ptr get_kernel() const {
-				
+
 					return h->pcurrent; // current.get();
 				}
 				inline kernel_ptr get_kernel() {
-				
+
 					return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
 				}
 				void set_index() {
-					if (get_kernel() != nullptr && !is_end(*this)) { ///  
+					if (get_kernel() != nullptr && !is_end(*this)) { ///
 						const _Segment& s = get_kernel()->get_segment(pos);
 						exists = s.exists;
 						index = get_kernel()->get_segment_index(pos);
@@ -1341,9 +1283,9 @@ namespace rabbit {
 				rehash(to);
 			}
 
-			void set_current(typename hash_kernel::ptr c) {				
+			void set_current(typename hash_kernel::ptr c) {
 				pcurrent = c.get();
-				current = c;				
+				current = c;
 			}
 
 			typename hash_kernel::ptr current;
@@ -1401,7 +1343,6 @@ namespace rabbit {
 				hash_kernel * cur = current.get();
 				try {
 
-					rehashed->set_quadratic(current->is_quadratic());
 					rehashed->set_logarithmic(current->get_logarithmic());
 					rehashed->resize_clear(new_extent);
 					rehashed->mf = (*this).current->mf;
@@ -1422,7 +1363,7 @@ namespace rabbit {
 						//_K k;
 						for (iterator i = begin(); i != e; ++i) {
 							//std::swap(k,(*i).first);
-							_RV v = rehashed->subscript((*i).first);
+							_RV v = rehashed->unique_subscript((*i).first);
 							if (v != nullptr) {
 								*v = i->second;
 								/// a cheap check to illuminate subtle bugs during development
@@ -1458,7 +1399,7 @@ namespace rabbit {
 							throw bad_alloc();
 						}
 						else {
-
+                            cout << "re-rehashing iterations " << ctr << " elements " << rehashed->elements << " extent " << rehashed->get_extent() << endl;
 							//rehashed->resize_clear(rehashed->get_extent());
 							//break;
 						}
@@ -1621,14 +1562,6 @@ namespace rabbit {
 			size_type size() const {
 				if (current == nullptr)return size_type();
 				return current->size();
-			}
-			bool is_sparse() const {
-				if (current == nullptr)return false;
-				return this->current->is_sparse();
-			}
-			void set_quadratic(bool quadratic) {
-				create_current();
-				this->current->set_quadratic(quadratic);
 			}
 			void set_logarithmic(size_type logarithmic) {
 				create_current();
@@ -1874,7 +1807,9 @@ namespace rabbit {
 		typedef typename _Base::iterator local_iterator;
 		typedef typename _Base::const_iterator const_local_iterator;
 		sparse_unordered_map() {
+
 		}
+
 		~sparse_unordered_map() {
 		}
 	};
