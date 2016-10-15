@@ -42,96 +42,8 @@ THE SOFTWARE.
 	#define RABBIT_NOINLINE_ __attribute__((noinline))
 #endif
 namespace rabbit{
-
-	/// a very basic version of std::pair which keeps references only
-
-	template
-	<	class _Ty1
-	,	class _Ty2
-	>
-	struct ref_pair{
-    // store references to a pair of values
-
-		typedef ref_pair<_Ty1, _Ty2> _Myt;
-		typedef _Ty1 first_type;
-		typedef _Ty2 second_type;
-
-		// construct from specified non const values
-		ref_pair(_Ty1& _Val1, _Ty2& _Val2)
-		:	first(_Val1)
-		,	second(_Val2)
-		{
-		}
-/// rely on the compiler default to do this
-        //ref_pair(_Myt& _Right)
-        //:	first(_Right.first)
-		//,	second(_Right.second)
-		//{
-		//}
-		_Myt& operator=(const _Myt& _Right){
-			first = _Right.first;
-			second = _Right.second;
-			return (*this);
-		}
-
-		operator std::pair<_Ty1,_Ty2> (){
-			return std::make_pair(first,second);
-		}
-
-        operator const std::pair<_Ty1,_Ty2> () const {
-			return std::make_pair(first,second);
-		}
-
-		_Ty1& first;	// the first stored value
-		_Ty2& second;	// the second stored value
-	};
-
-	template <class _Config>
-	struct _ModMapper{
-		typedef _Config config_type;
-		typedef typename config_type::size_type size_type;
-		size_type extent;
-		size_type random_val;
-		double backoff;
-		_Config config;
-		_ModMapper(){
-		}
-		_ModMapper(size_type new_extent, const _Config& config){
-			this->backoff = get_max_backoff();
-			this->config = config;
-
-			this->extent = new_extent;
-			srand ((unsigned int)time(NULL));
-			this->random_val = rand();
-		}
-		inline size_type nearest_larger(size_type any){
-			return any;
-		}
-		inline size_type randomize(size_type other) const {
-			return (other ^ random_val) % this->extent;
-		}
-		inline size_type operator()(size_type h) const {
-
-			return h % this->extent;
-		}
-		double get_min_backoff() const {
-			return 2;
-		}
-		double get_max_backoff() const {
-			return 8;
-		}
-		double resize_factor() const {
-			return 1.3;
-		}
-
-		double recalc_growth_factor(size_type elements)  {
-			return 1.80;
-		}
-		inline size_type next_size(){
-			double r = recalc_growth_factor(this->extent) * this->extent;
-			assert(r > (double)extent);
-			return (size_type)r;
-		}
+    /// the end iterator optimization
+    struct end_iterator {
 	};
 
 	template <class _Config>
@@ -165,7 +77,7 @@ namespace rabbit{
 		}
 		inline size_type nearest_larger(size_type any){
 			size_type l2 = this->config.log2(any);
-			return (size_type)(2ll << (l2 + 1ll));
+			return (size_type)(2ll << l2);
 		}
 		inline size_type randomize(size_type other) const {
 		    size_type r = other>>this->primary_bits;
@@ -234,6 +146,7 @@ namespace rabbit{
 		};
 	};
 
+    template<int logarithmic = 0>
 	class basic_config{
 	public:
 		typedef unsigned long long int _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
@@ -253,9 +166,9 @@ namespace rabbit{
 		_Bt BITS_SIZE ;
 		_Bt BITS_SIZE1 ;
 		_Bt ALL_BITS_SET ;
+		_Bt LOGARITHMIC ;
 		/// maximum probes per access
 		size_type PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
-		size_type RAND_PROBES;
 		size_type BITS_LOG2_SIZE;
 		/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
 		///	hash randomizer available
@@ -274,9 +187,9 @@ namespace rabbit{
 			BITS_LOG2_SIZE = right.BITS_LOG2_SIZE;
 			ALL_BITS_SET = right.ALL_BITS_SET;
 			PROBES = right.PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
-			RAND_PROBES = right.RAND_PROBES;
 			MIN_EXTENT = right.MIN_EXTENT;
 			MAX_OVERFLOW_FACTOR = right.MAX_OVERFLOW_FACTOR;
+			LOGARITHMIC = right.LOGARITHMIC;
 			return *this;
 		}
 
@@ -286,11 +199,10 @@ namespace rabbit{
 			BITS_SIZE1 = BITS_SIZE-1;
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;
-			PROBES = 16;
-			RAND_PROBES = 8;
+			PROBES = 12;
 			MIN_EXTENT = 4; /// start size of the hash table
-			MAX_OVERFLOW_FACTOR = 8*32768; //BITS_SIZE*8/sizeof(_Bt);
-
+			MAX_OVERFLOW_FACTOR = 1<<17; //BITS_SIZE*8/sizeof(_Bt);
+            LOGARITHMIC = logarithmic;
 		}
 	};
 	template<class _InMapper>
@@ -301,8 +213,8 @@ namespace rabbit{
 		typedef ptrdiff_t difference_type;
 		typedef _InMapper _Mapper;
 	};
-	typedef basic_traits<_BinMapper<basic_config> > default_traits;
-	typedef basic_traits<_ModMapper<basic_config> > sparse_traits;
+	typedef basic_traits<_BinMapper<basic_config<0> > > default_traits;
+	typedef basic_traits<_BinMapper<basic_config<4> > > sparse_traits;
 
 
     template
@@ -341,6 +253,8 @@ namespace rabbit{
 		typedef _E key_equal;
 		typedef _E key_compare;
 		typedef _H hasher;
+
+		static const size_type end_pos = std::numeric_limits<size_type>::max();
 	protected:
         struct overflow_stats{
             size_type start_elements;
@@ -444,7 +358,6 @@ namespace rabbit{
 			bool keys_overflowed;
 			_Allocator allocator;
 			_K empty_key;
-			bool sparse;
 			size_type logarithmic;
 
 			typename _Allocator::template rebind<_Segment>::other get_segment_allocator() {
@@ -469,11 +382,11 @@ namespace rabbit{
 			/// mainly to satisfy stl conventions
 			size_type bucket_size ( size_type n ) const{
 				size_type pos = n;
-				if(!overflows_(pos)) {
-					if(exists_(pos))
-						return 1;
-					else return 0;
-				}
+				if (!overflows_(pos)) {
+                    if (exists_(pos) && map_key(get_segment_key(pos)) == n)
+                        return 1;
+                    else return 0;
+                }
 				size_type m = pos + probes;
 				size_type r = 0;
 				for(; pos < m;++pos){
@@ -530,26 +443,22 @@ namespace rabbit{
 			const _ElPair &get_segment_pair(size_type pos) const {
 				//return get_segment_key(pos);
 				return keys[pos];
-				//return std::make_pair(get_segment_key(pos),get_segment_value(pos));
-				//return clusters[get_segment_number(pos)].pair(get_segment_index(pos));
+
 			}
 
 			const _K & get_segment_key(size_type pos) const {
 				return keys[pos].first;
-				//return get_segment(pos).key(get_segment_index(pos));
-				//return keys[pos];
+
 			}
 
 			const _V & get_segment_value(size_type pos) const {
-				//return get_segment(pos).value(get_segment_index(pos));
-				//return values[pos];
+
 				return keys[pos].second;
 			}
 
 
 			_ElPair& get_segment_pair(size_type pos) {
-				//return clusters[get_segment_number(pos)].pair(get_segment_index(pos));
-				//return _ElPair(get_segment_key(pos),get_segment_value(pos));
+
 				return keys[pos]; // get_segment_key(pos);
 			}
 
@@ -558,20 +467,18 @@ namespace rabbit{
 				return keys[pos].first;
 			}
 			_V & get_segment_value(size_type pos) {
-				//return get_segment(pos).value(get_segment_index(pos));
-				//return values[pos];
+
 				return keys[pos].second;
 			}
 			void set_segment_key(size_type pos, const _K &k) {
-				//get_segment(pos).key(get_segment_index(pos)) = k;
+
 				keys[pos].first = k;
 			}
 			void destroy_segment_value(size_type pos){
-				//values[pos].second.~_V();
+
 				keys[pos].second.~_V();
 			}
 			_V* create_segment_value(size_type pos, const _V &v) {
-				//_V* r = &values[pos];
 				_V* r = &(keys[pos]).second;
 				new (r) _V(v);
 				return r;
@@ -606,7 +513,6 @@ namespace rabbit{
 			}
 
 			inline bool overflowed_(size_type pos) const {
-				//return get_segment(pos).is_overflowed(get_segment_index(pos));
 				return false;
 			}
 
@@ -716,15 +622,15 @@ namespace rabbit{
 			}
 
 			hash_kernel(const key_compare& compare,const allocator_type& allocator)
-			:	clusters(nullptr), values(nullptr), eq_f(compare), mf(1.0f), allocator(allocator),sparse(false),logarithmic(0){
+			:	clusters(nullptr), values(nullptr), eq_f(compare), mf(1.0f), allocator(allocator),logarithmic(config.LOGARITHMIC){
 				resize_clear(config.MIN_EXTENT);
 			}
 
-			hash_kernel() : clusters(nullptr), values(nullptr), mf(1.0f),sparse(false),logarithmic(0){
+			hash_kernel() : clusters(nullptr), values(nullptr), mf(1.0f),logarithmic(config.LOGARITHMIC){
 				resize_clear(config.MIN_EXTENT);
 			}
 
-			hash_kernel(const hash_kernel& right) : clusters(nullptr), values(nullptr), mf(1.0f),sparse(false),logarithmic(0) {
+			hash_kernel(const hash_kernel& right) : clusters(nullptr), values(nullptr), mf(1.0f),logarithmic(config.LOGARITHMIC) {
 				*this = right;
 			}
 
@@ -742,12 +648,6 @@ namespace rabbit{
 			}
 			bool is_logarithmic() const {
 				return this->logarithmic > 0;
-			}
-			void set_quadratic(bool sparse){
-				this->sparse = sparse;
-			}
-			bool is_quadratic() const{
-				return this->sparse;
 			}
 			hash_kernel& operator=(const hash_kernel& right){
 				config = right.config;
@@ -789,8 +689,6 @@ namespace rabbit{
 			}
 
             inline size_type hash_probe_incr(size_type i) const {
-                if(is_quadratic())
-					return (i*i+i)>>1;
 				return 1;
 
             }
@@ -917,18 +815,18 @@ namespace rabbit{
 				size_type pos = map_key(k);
 				_Bt si = get_segment_index(pos);
 				_Segment& s = get_segment(pos);
-				bool key_overflows = s.is_overflows(si);
+				
 				bool key_exists = s.is_exists(si);
 				//key_overflows = s.is_overflows(si);
-				if(!key_overflows && !s.is_exists(si)){
+				if(!key_exists){
 					s.toggle_exists(si);
 					set_segment_key(pos,k);
 					++elements;
 					return create_segment_value(pos);
-				}else if(s.is_exists(si) && equal_key(pos,k)){
+				}else if(key_exists && equal_key(pos,k)){
 					return &(get_segment_value(pos));
 				}
-
+				bool key_overflows = s.is_overflows(si);
 				size_type h = pos;
 				if(key_overflows){
 					pos = find_rest(k,h);
@@ -1086,190 +984,233 @@ namespace rabbit{
 			typedef std::shared_ptr<hash_kernel> ptr;
 		}; /// hash_kernel
 		public:
-		struct iterator{
-			typedef hash_kernel* kernel_ptr;
-			const basic_unordered_map* h;
-			kernel_ptr hc;
-			size_type pos;
-			//mutable char rdata[sizeof(_ElPair)];
-		private:
-			_Bt index;
-			_Bt exists;
-			_Bt bsize;
-			void set_index(){
-				if(hc != nullptr){
-					const _Segment& s = hc->get_segment(pos);
-					exists = s.exists;
-					index = hc->get_segment_index(pos);
-					bsize =  hc->config.BITS_SIZE;
-				}
-			}
-			void check_index(){
 
-			}
-			void increment(){
-				++pos;
-				++index;
-				if(index == bsize){
-					set_index();
-				}
+        struct iterator {
+            typedef hash_kernel* kernel_ptr;
+            const basic_unordered_map* h;
+            size_type pos;
+        private:
+            _Bt index;
+            _Bt exists;
+            _Bt bsize;
+            const kernel_ptr get_kernel() const {
+                return h->pcurrent;
+            }
+            kernel_ptr get_kernel() {
+                return h->pcurrent;
+            }
+            void set_index() {
+                if (h != nullptr && !is_end(*this)) {//
+                    const _Segment& s = get_kernel()->get_segment(pos);
+                    exists = s.exists;
+                    index = get_kernel()->get_segment_index(pos);
+                    bsize = get_kernel()->config.BITS_SIZE;
+                }
+            }
+            void check_index() {
 
-			}
-		public:
-			iterator(){
+            }
+            void increment() {
+                ++pos;
+                ++index;
+                if (index == bsize) {
+                    set_index();
+                }
 
-			}
-			iterator(const basic_unordered_map* h, size_type pos): h(h),pos(pos){
-				 hc = h->current.get();
-				 set_index();
-			}
-			iterator(const iterator& r){
-				(*this) = r;
-			}
-			iterator& operator=(const iterator& r){
-				h = r.h;
-				pos = r.pos;
-				hc = r.hc;
-				set_index();
-				return (*this);
-			}
-			iterator& operator++(){
-				increment();
-				while( ( exists & (((_Bt)1)<<index) ) == (_Bt)0){
-					increment();
-				}
+            }
+        public:
+            iterator() : h(nullptr), pos(0) {
+            }
 
-				return (*this);
-			}
-			iterator operator++(int){
-				iterator t = (*this);
-				++(*this);
-				return t;
-			}
-			inline _V& get_value(){
-				return hc->get_segment_value((*this).pos);
+            iterator(const end_iterator&) : h(nullptr), pos(end_pos) {
+            }
+            iterator(const basic_unordered_map* h, size_type pos) :  pos(pos) {
+                this->h = h;
+                set_index();
+            }
+
+            iterator(const iterator& r) {
+                (*this) = r;
+            }
+
+            //~iterator() {
+            //}
+
+            iterator& operator=(const iterator& r) {
+                pos = r.pos;
+                h = r.h;
+                set_index();
+
+                return (*this);
+            }
+            inline iterator& operator++() {
+                do {
+                    increment();
+                } while ((exists & (((_Bt)1) << index)) == (_Bt)0);
+                return (*this);
+            }
+            iterator operator++(int) {
+                iterator t = (*this);
+                ++(*this);
+                return t;
+            }
+            inline _V& get_value(){
+				return get_kernel()->get_segment_value((*this).pos);
 			}
 			inline const _V& get_value() const {
-				return hc->get_segment_value((*this).pos);
+				return get_kernel()->get_segment_value((*this).pos);
 			}
 			inline _K& get_key() {
-				return hc->get_segment_key((*this).pos);
+				return get_kernel()->get_segment_key((*this).pos);
 			}
 			inline const _K& get_key() const {
-				return hc->get_segment_key((*this).pos);
+				return get_kernel()->get_segment_key((*this).pos);
 			}
 			const _ElPair operator*() const {
-				return hc->get_segment_pair((*this).pos);
+				return get_kernel()->get_segment_pair((*this).pos);
 			}
 			inline _ElPair operator*() {
-			    return hc->get_segment_pair((*this).pos);
+			    return get_kernel()->get_segment_pair((*this).pos);
 			}
 			inline _ElPair* operator->() const {
-			    /// can reconstruct multiple times on same memory because _ElPair is only references
-                //_ElPair* ret = new ((void *)rdata) _ElPair(const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos));
-				_ElPair* ret = &(const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos));
+			    _ElPair* ret = &(get_kernel()->get_segment_pair(pos));
 				return ret;
 			}
 			inline const _ElPair *operator->() {
-                /// can reconstruct multiple times on same memory because _ElPair is only references
-                //_ElPair* ret = new ((void *)rdata) _ElPair(const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos));
-				_ElPair* ret = &(const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos));
+                _ElPair* ret = &(get_kernel()->get_segment_pair(pos));
 				return ret;
 			}
-			inline bool operator==(const iterator& r) const {
-				return (pos == r.pos);
-			}
-			bool operator!=(const iterator& r) const {
-				return (pos != r.pos);
-			}
-		};
+            inline bool operator==(const iterator& r) const {
+                if (r.pos == end_pos) return is_end();
+                return (pos == r.pos);
+            }
+            bool operator!=(const iterator& r) const {
+                if (r.pos == end_pos) return !is_end();
+                return (pos != r.pos);
+            }
+            inline bool operator==(const end_iterator& r) const {
+                return is_end();
+            }
+            bool operator!=(const end_iterator& r) const {
+                return !is_end();
 
-		struct const_iterator{
-		private:
-			typedef hash_kernel* kernel_ptr;
-			const basic_unordered_map* h;
-			mutable kernel_ptr hc;
-			_Bt index;
-			_Bt exists;
-			mutable char rdata[sizeof(_ElPair)];
-			void set_index(){
-				if(hc != nullptr){
-					const _Segment& s = hc->get_segment(pos);
-					exists = s.exists;
-					index = hc->get_segment_index(pos);
-				}
-			}
-			void check_index(){
+            }
+            bool is_end(const iterator& r) const {
+                if (h == nullptr) return pos == end_pos;
+                return r.pos >= get_kernel()->end();
+            }
+            bool is_end() const {
+                return is_end(*this);
+            }
+            size_type get_pos() const {
+                return pos;
+            }
 
-			}
-			void increment(){
-				++pos;
-				++index;
-				if(index == hc->config.BITS_SIZE){
-					set_index();
-				}
+        };
 
-			}
-		public:
-			size_type pos;
+        struct const_iterator {
+        private:
+            typedef hash_kernel* kernel_ptr;
+            const basic_unordered_map* h;
+            //mutable kernel_ptr h;
+            _Bt index;
+            _Bt exists;
+            inline const kernel_ptr get_kernel() const {
 
-			const_iterator(){
+                return h->pcurrent; // current.get();
+            }
+            inline kernel_ptr get_kernel() {
 
-			}
-			const_iterator(const basic_unordered_map* h, size_type pos): h(h),pos(pos){
-				 hc = h->current.get();
-				 set_index();
-			}
-			const_iterator(const iterator& r){
-				(*this) = r;
-			}
+                return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
+            }
+            void set_index() {
+                if (get_kernel() != nullptr && !is_end(*this)) { ///
+                    const _Segment& s = get_kernel()->get_segment(pos);
+                    exists = s.exists;
+                    index = get_kernel()->get_segment_index(pos);
+                }
+            }
+            void check_index() {
 
-			const_iterator& operator=(const iterator& r){
-				h = r.h;
-				pos = r.pos;
-				hc = r.hc;
-				set_index();
-				return (*this);
-			}
+            }
+            void increment() {
+                ++pos;
+                ++index;
+                if (index == get_kernel()->config.BITS_SIZE) {
+                    set_index();
+                }
 
-			const_iterator& operator=(const const_iterator& r){
-				h = r.h;
-				pos = r.pos;
-				hc = r.hc;
-				index = r.index;
-				return (*this);
-			}
+            }
+        public:
+            size_type pos;
 
-			const_iterator& operator++(){
-				increment();
-				while( (exists & (((_Bt)1)<<index)) == (_Bt)0){
-					increment();
-				}
+            const_iterator() : h(nullptr){
 
+            }
+            const_iterator(const end_iterator&) : h(nullptr), pos(end_pos) {
+            }
+            //~const_iterator() {
 
-				return (*this);
-			}
-			const_iterator operator++(int){
-				return (*this);
-			}
-			const _ElPair& operator*() const {
-			    return const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos);
+            //}
+            const_iterator(const basic_unordered_map* h, size_type pos) : pos(pos) {
+                this->h = h; // ->current.get();
+                set_index();
+            }
+            const_iterator(const iterator& r) : h(nullptr){
+                (*this) = r;
+            }
 
+            const_iterator& operator=(const iterator& r) {
+                pos = r.pos;
+                h = r.h;
+                set_index();
+                return (*this);
+            }
+
+            const_iterator& operator=(const const_iterator& r) {
+                pos = r.pos;
+                h = r.h;
+                index = r.index;
+                return (*this);
+            }
+
+            const_iterator& operator++() {
+                do {
+                    increment();
+                } while ((exists & (((_Bt)1) << index)) == (_Bt)0);
+                return (*this);
+            }
+            const_iterator operator++(int) {
+                return (*this);
+            }
+            const _ElPair& operator*() const {
+			    return get_kernel()->get_segment_pair(pos);
 			}
 			const _ElPair *operator->() const {
-			    /// can reconstruct multiple times on same memory because _ElPair is only references
-                ///_ElPair* ret = new ((void *)rdata) _ElPair(const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos));
-				_ElPair* ret = &(const_cast<basic_unordered_map*>(h)->current->get_segment_pair(pos));
+			  	_ElPair* ret = &(get_kernel()->get_segment_pair(pos));
 				return ret;
 			}
 
-			bool operator==(const const_iterator& r) const {
-				return (pos == r.pos);
-			}
-			bool operator!=(const const_iterator& r) const {
-				return (pos != r.pos);
-			}
-		};
+            inline bool operator==(const const_iterator& r) const {
+                if (r.pos == end_pos) return is_end();
+                return (pos == r.pos);
+            }
+            bool operator!=(const const_iterator& r) const {
+                if (r.pos == end_pos) return !is_end();
+                return (pos != r.pos);
+            }
+            bool is_end(const const_iterator& r) const {
+                if (h == nullptr) return false;
+                return r.pos >= get_kernel()->end();
+            }
+            bool is_end() const {
+                return is_end(*this);
+            }
+            size_type get_pos() const {
+                return pos;
+            }
+
+        };
 
 	protected:
 		/// the default config for each hash instance
@@ -1287,9 +1228,11 @@ namespace rabbit{
 		}
 		void set_current(typename hash_kernel::ptr c){
 			current = c;
+			pcurrent = c.get();
 		}
 
 		typename hash_kernel::ptr current;
+		hash_kernel* pcurrent;
 		inline void create_current(){
 			if(current==nullptr)
 
@@ -1342,13 +1285,11 @@ namespace rabbit{
 			hash_kernel * reh = rehashed.get();
 			hash_kernel * cur = current.get();
 			try{
-
-				rehashed->set_quadratic(current->is_quadratic());
-				rehashed->set_logarithmic(current->get_logarithmic());
+               rehashed->set_logarithmic(current->get_logarithmic());
 				rehashed->resize_clear(new_extent);
 				rehashed->mf = (*this).current->mf;
 				//std::cout << " load factor " << current->load_factor() << std::endl;
-				if(current->load_factor() < 0.2){
+				if(current->load_factor() < 0.3){
 					/// std::cout << "possible attack/bad hash detected : using random probes : " << current->get_probes() << std::endl;
 					nrand_probes = 1;
 					rehashed->set_rand_probes(nrand_probes);
@@ -1543,10 +1484,9 @@ namespace rabbit{
 			if(current==nullptr)return iterator(this,size_type());
 			return iterator(this, current->begin());
 		}
-		iterator end() const {
-			if(current==nullptr)return iterator(this,size_type());
-			return iterator(this, current->end());
-		}
+		end_iterator end() const {
+            return end_iterator(); // iterator(end_pos);
+        }
 		const_iterator cbegin() const {
 			if(current==nullptr)return const_iterator(this,size_type());
 			return const_iterator(this, current->begin());

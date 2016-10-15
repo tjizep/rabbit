@@ -268,7 +268,7 @@ namespace rabbit {
 		, class _Allocator = std::allocator<_K>
 		, class _Traits = default_traits
 		>
-		class basic_unordered_map {
+		class basic_unordered_set {
 		public:
 			typedef _K key_type;
 
@@ -1034,7 +1034,7 @@ namespace rabbit {
 
 			struct iterator {
 				typedef hash_kernel* kernel_ptr;
-				const basic_unordered_map* h;
+				const basic_unordered_set* h;
 				size_type pos;
 				mutable char rdata[sizeof(_ElPair)];
 			private:
@@ -1073,7 +1073,7 @@ namespace rabbit {
 
 				iterator(const end_iterator&) : h(nullptr), pos(end_pos) {
 				}
-				iterator(const basic_unordered_map* h, size_type pos) :  pos(pos) {
+				iterator(const basic_unordered_set* h, size_type pos) :  pos(pos) {
 					this->h = h;
 					set_index();
 				}
@@ -1162,7 +1162,7 @@ namespace rabbit {
 			struct const_iterator {
 			private:
 				typedef hash_kernel* kernel_ptr;
-				const basic_unordered_map* h;
+				const basic_unordered_set* h;
 				//mutable kernel_ptr h;
 				_Bt index;
 				_Bt exists;
@@ -1173,7 +1173,7 @@ namespace rabbit {
 				}
 				inline kernel_ptr get_kernel() {
 
-					return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
+					return const_cast<basic_unordered_set*>(h)->pcurrent; // current.get();
 				}
 				void set_index() {
 					if (get_kernel() != nullptr && !is_end(*this)) { ///
@@ -1204,7 +1204,7 @@ namespace rabbit {
 				//~const_iterator() {
 
 				//}
-				const_iterator(const basic_unordered_map* h, size_type pos) : pos(pos) {
+				const_iterator(const basic_unordered_set* h, size_type pos) : pos(pos) {
 					this->h = h; // ->current.get();
 					set_index();
 				}
@@ -1399,7 +1399,7 @@ namespace rabbit {
 							throw bad_alloc();
 						}
 						else {
-                            cout << "re-rehashing iterations " << ctr << " elements " << rehashed->elements << " extent " << rehashed->get_extent() << endl;
+                            //cout << "re-rehashing iterations " << ctr << " elements " << rehashed->elements << " extent " << rehashed->get_extent() << endl;
 							//rehashed->resize_clear(rehashed->get_extent());
 							//break;
 						}
@@ -1427,34 +1427,34 @@ namespace rabbit {
 				set_current(std::allocate_shared<hash_kernel>(allocator, compare, allocator));
 			}
 
-			basic_unordered_map() :current(nullptr) {
+			basic_unordered_set() :current(nullptr) {
 				//
 			}
 
-			basic_unordered_map(const key_compare& compare, const allocator_type& allocator) : key_c(compare), alloc(allocator) {
+			basic_unordered_set(const key_compare& compare, const allocator_type& allocator) : key_c(compare), alloc(allocator) {
 
 			}
 
-			basic_unordered_map(const basic_unordered_map& right) {
+			basic_unordered_set(const basic_unordered_set& right) {
 				*this = right;
 			}
 
-			~basic_unordered_map() {
+			~basic_unordered_set() {
 
 			}
 
-			void swap(basic_unordered_map& with) {
+			void swap(basic_unordered_set& with) {
 				typename hash_kernel::ptr t = with.current;
 				with.set_current(this->current);
 				this->set_current(t);
 			}
 
-			void move(basic_unordered_map& from) {
+			void move(basic_unordered_set& from) {
 				(*this).current = from.current;
 				from.current = nullptr;
 			}
 
-			basic_unordered_map& operator=(const basic_unordered_map& right) {
+			basic_unordered_set& operator=(const basic_unordered_set& right) {
 				(*this).set_current(std::allocate_shared<hash_kernel>(alloc));
 				(*this).reserve(right.size());
 				const_iterator e = right.end();
@@ -1569,256 +1569,11 @@ namespace rabbit {
 			}
 	};
 
-	/// the stl compatible unordered map interface
-	template
-		<	class _Kty
-		, class _Ty
-		, class _Hasher = rabbit_hash<_Kty>
-		, class _Keyeq = std::equal_to<_Kty>
-		, class _Alloc = std::allocator<std::pair<const _Kty, _Ty> >
-		, class _Traits = default_traits
-		>
-		class unordered_map : public basic_unordered_map<_Kty, _Ty, _Hasher, _Keyeq, _Alloc, _Traits>
-	{	// hash table of {key, mapped} values, unique keys
-	public:
-		typedef basic_unordered_map<_Kty, _Ty, _Hasher, _Keyeq, _Alloc, _Traits> _Base;
-
-		typedef unordered_map<_Kty, _Ty, _Hasher, _Keyeq, _Alloc, _Traits> _Myt;
-
-		typedef _Hasher hasher;
-		typedef _Kty key_type;
-		typedef _Ty mapped_type;
-		typedef _Keyeq key_equal;
-		typedef typename _Base::key_compare key_compare;
-
-		//	typedef typename _Base::value_compare value_compare;
-		typedef typename _Base::allocator_type allocator_type;
-		typedef typename _Base::size_type size_type;
-		typedef typename _Base::difference_type difference_type;
-		typedef typename _Base::pointer pointer;
-		typedef typename _Base::const_pointer const_pointer;
-		typedef typename _Base::reference reference;
-		typedef typename _Base::const_reference const_reference;
-		typedef typename _Base::iterator iterator;
-		typedef typename _Base::const_iterator const_iterator;
-		//	typedef typename _Base::reverse_iterator reverse_iterator;
-		//	typedef typename _Base::const_reverse_iterator
-		//		const_reverse_iterator;
-		typedef typename _Base::value_type value_type;
-
-		typedef typename _Base::iterator local_iterator;
-		typedef typename _Base::const_iterator const_local_iterator;
-
-		unordered_map()
-			: _Base(key_compare(), allocator_type())
-		{	// construct empty map from defaults
-		}
-
-		explicit unordered_map(const allocator_type& a)
-			: _Base(key_compare(), a)
-		{	// construct empty map from defaults, allocator
-		}
-
-		unordered_map(const _Myt& _Right)
-			: _Base(_Right)
-		{	// construct map by copying _Right
-		}
-
-		//unordered_map(const _Myt& _Right, const allocator_type& _Al)
-		//	: _Base(_Right, _Al)
-		//	{	// construct map by copying _Right, allocator
-		//	}
-
-		explicit unordered_map(size_type _Buckets)
-			: _Base(key_compare(), allocator_type())
-		{	// construct empty map from defaults, ignore initial size
-			this->rehash(_Buckets);
-		}
-
-		unordered_map(size_type _Buckets, const hasher& _Hasharg)
-			: _Base(key_compare(_Hasharg), allocator_type())
-		{	// construct empty map from hasher
-			this->rehash(_Buckets);
-		}
-
-		unordered_map
-		(size_type _Buckets
-			, const hasher& _Hasharg
-			, const _Keyeq& _Keyeqarg
-		)
-			: _Base(key_compare(_Hasharg, _Keyeqarg), allocator_type())
-		{	// construct empty map from hasher and equality comparator
-			this->rehash(_Buckets);
-		}
-
-		unordered_map
-		(size_type _Buckets
-			, const hasher& _Hasharg
-			, const _Keyeq& _Keyeqarg
-			, const allocator_type& a
-		)
-			: _Base(key_compare(_Hasharg, _Keyeqarg), a)
-		{	// construct empty map from hasher and equality comparator
-			this->rehash(_Buckets);
-		}
-
-		template<class _Iter>
-		unordered_map
-		(_Iter _First
-			, _Iter _Last
-		)
-			: _Base(key_compare(), allocator_type())
-		{	// construct map from sequence, defaults
-			_Base::insert(_First, _Last);
-		}
-
-		template<class _Iter>
-		unordered_map
-		(_Iter _First
-			, _Iter _Last
-			, size_type _Buckets
-		)
-			: _Base(key_compare(), allocator_type())
-		{	// construct map from sequence, ignore initial size
-			this->rehash(_Buckets);
-			_Base::insert(_First, _Last);
-		}
-
-		template<class _Iter>
-		unordered_map
-		(_Iter _First
-			, _Iter _Last
-			, size_type _Buckets
-			, const hasher& _Hasharg
-		)
-			: _Base(key_compare(_Hasharg), allocator_type())
-		{
-			this->rehash(_Buckets);
-			_Base::insert(_First, _Last);
-		}
-
-		template<class _Iter>
-		unordered_map
-		(_Iter _First
-			, _Iter _Last
-			, size_type _Buckets
-			, const hasher& _Hasharg
-			, const _Keyeq& _Keyeqarg
-		)
-			: _Base(key_compare(_Hasharg, _Keyeqarg), allocator_type())
-		{
-			this->rehash(_Buckets);
-			_Base::insert(_First, _Last);
-		}
-
-		template<class _Iter>
-		unordered_map
-		(_Iter _First
-			, _Iter _Last
-			, size_type _Buckets
-			, const hasher& _Hasharg
-			, const _Keyeq& _Keyeqarg
-			, const allocator_type& _Al
-		)
-			: _Base(key_compare(_Hasharg, _Keyeqarg), _Al)
-		{
-			this->rehash(_Buckets);
-			_Base::insert(_First, _Last);
-		}
-
-		_Myt& operator=(const _Myt& _Right) {	// assign by copying _Right
-			_Base::operator=(_Right);
-			return (*this);
-		}
-
-		unordered_map(_Myt&& from)
-		{
-			_Base::move(from);
-		}
-
-		unordered_map(_Myt&& from, const allocator_type& _Al)
-			: _Base(key_compare(), _Al)
-		{	// construct map by moving _Right, allocator
-			_Base::move(from);
-		}
-
-		_Myt& operator=(_Myt&& from) {	// assign by moving _Right
-			_Base::move(from);
-			return (*this);
-		}
-		const mapped_type& at(const key_type& k) const {
-			return _Base::at(k);
-		}
-
-		mapped_type& at(const key_type& k) {
-			return _Base::at(k);
-		}
-
-		mapped_type& operator[](const key_type& k) {
-			// find element matching _Keyval or insert with default mapped
-			return _Base::operator[](k);
-		}
-
-		// find element matching _Keyval or insert with default mapped
-		mapped_type& operator[](key_type&& k) {
-			return (*this)[k];
-		}
-
-		void swap(_Myt& _Right) {	// exchange contents with non-movable _Right
-			_Base::swap(_Right);
-		}
-
-
-
-	};
-	template
-		<	class _Kty
-		, class _Ty
-		, class _Hasher = rabbit_hash<_Kty>
-		, class _Keyeq = std::equal_to<_Kty>
-		, class _Alloc = std::allocator<std::pair<const _Kty, _Ty> >
-		, class _Traits = sparse_traits
-		>
-		class sparse_unordered_map : public unordered_map<_Kty, _Ty, _Hasher, _Keyeq, _Alloc, _Traits>
-	{
-	public:
-		typedef _Hasher hasher;
-		typedef _Kty key_type;
-		typedef _Ty mapped_type;
-		typedef _Keyeq key_equal;
-		typedef unordered_map<_Kty, _Ty, _Hasher, _Keyeq, _Alloc, _Traits> _Base;
-		typedef typename _Base::key_compare key_compare;
-
-		//	typedef typename _Base::value_compare value_compare;
-		typedef typename _Base::allocator_type allocator_type;
-		typedef typename _Base::size_type size_type;
-		typedef typename _Base::difference_type difference_type;
-		typedef typename _Base::pointer pointer;
-		typedef typename _Base::const_pointer const_pointer;
-		typedef typename _Base::reference reference;
-		typedef typename _Base::const_reference const_reference;
-		typedef typename _Base::iterator iterator;
-		typedef typename _Base::const_iterator const_iterator;
-		//	typedef typename _Base::reverse_iterator reverse_iterator;
-		//	typedef typename _Base::const_reverse_iterator
-		//		const_reverse_iterator;
-		typedef typename _Base::value_type value_type;
-
-		typedef typename _Base::iterator local_iterator;
-		typedef typename _Base::const_iterator const_local_iterator;
-		sparse_unordered_map() {
-
-		}
-
-		~sparse_unordered_map() {
-		}
-	};
-
 	/// the unordered set
 	template <typename _K, typename _H = rabbit_hash<_K>>
-	class unordered_set : public basic_unordered_map<_K, char, _H> {
+	class unordered_set : public basic_unordered_set<_K, char, _H> {
 	protected:
-		typedef basic_unordered_map<_K, char, _H> _Container;
+		typedef basic_unordered_set<_K, char, _H> _Container;
 	public:
 
 
