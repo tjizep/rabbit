@@ -43,8 +43,6 @@ THE SOFTWARE.
 #endif
 namespace rabbit{
     /// the end iterator optimization
-    struct end_iterator {
-	};
 
 	template <class _Config>
 	struct _BinMapper{
@@ -254,7 +252,6 @@ namespace rabbit{
 		typedef _E key_compare;
 		typedef _H hasher;
 
-		static const size_type end_pos = std::numeric_limits<size_type>::max();
 	protected:
         struct overflow_stats{
             size_type start_elements;
@@ -815,10 +812,10 @@ namespace rabbit{
 				size_type pos = map_key(k);
 				_Bt si = get_segment_index(pos);
 				_Segment& s = get_segment(pos);
-				
+
 				bool key_exists = s.is_exists(si);
-				//key_overflows = s.is_overflows(si);
-				if(!key_exists){
+				bool key_overflows = s.is_overflows(si);
+				if(!key_exists && !key_overflows){
 					s.toggle_exists(si);
 					set_segment_key(pos,k);
 					++elements;
@@ -826,7 +823,6 @@ namespace rabbit{
 				}else if(key_exists && equal_key(pos,k)){
 					return &(get_segment_value(pos));
 				}
-				bool key_overflows = s.is_overflows(si);
 				size_type h = pos;
 				if(key_overflows){
 					pos = find_rest(k,h);
@@ -1000,7 +996,7 @@ namespace rabbit{
                 return h->pcurrent;
             }
             void set_index() {
-                if (h != nullptr && !is_end(*this)) {//
+                if (get_kernel() != nullptr) {//
                     const _Segment& s = get_kernel()->get_segment(pos);
                     exists = s.exists;
                     index = get_kernel()->get_segment_index(pos);
@@ -1022,8 +1018,6 @@ namespace rabbit{
             iterator() : h(nullptr), pos(0) {
             }
 
-            iterator(const end_iterator&) : h(nullptr), pos(end_pos) {
-            }
             iterator(const basic_unordered_map* h, size_type pos) :  pos(pos) {
                 this->h = h;
                 set_index();
@@ -1081,27 +1075,14 @@ namespace rabbit{
 				return ret;
 			}
             inline bool operator==(const iterator& r) const {
-                if (r.pos == end_pos) return is_end();
+
                 return (pos == r.pos);
             }
             bool operator!=(const iterator& r) const {
-                if (r.pos == end_pos) return !is_end();
+
                 return (pos != r.pos);
             }
-            inline bool operator==(const end_iterator& r) const {
-                return is_end();
-            }
-            bool operator!=(const end_iterator& r) const {
-                return !is_end();
 
-            }
-            bool is_end(const iterator& r) const {
-                if (h == nullptr) return pos == end_pos;
-                return r.pos >= get_kernel()->end();
-            }
-            bool is_end() const {
-                return is_end(*this);
-            }
             size_type get_pos() const {
                 return pos;
             }
@@ -1116,15 +1097,15 @@ namespace rabbit{
             _Bt index;
             _Bt exists;
             inline const kernel_ptr get_kernel() const {
-
+				if(h==nullptr) return nullptr;
                 return h->pcurrent; // current.get();
             }
             inline kernel_ptr get_kernel() {
-
+				if(h==nullptr) return nullptr;
                 return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
             }
             void set_index() {
-                if (get_kernel() != nullptr && !is_end(*this)) { ///
+                if (get_kernel() != nullptr) { ///
                     const _Segment& s = get_kernel()->get_segment(pos);
                     exists = s.exists;
                     index = get_kernel()->get_segment_index(pos);
@@ -1146,8 +1127,6 @@ namespace rabbit{
 
             const_iterator() : h(nullptr){
 
-            }
-            const_iterator(const end_iterator&) : h(nullptr), pos(end_pos) {
             }
             //~const_iterator() {
 
@@ -1192,20 +1171,14 @@ namespace rabbit{
 			}
 
             inline bool operator==(const const_iterator& r) const {
-                if (r.pos == end_pos) return is_end();
+
                 return (pos == r.pos);
             }
             bool operator!=(const const_iterator& r) const {
-                if (r.pos == end_pos) return !is_end();
+
                 return (pos != r.pos);
             }
-            bool is_end(const const_iterator& r) const {
-                if (h == nullptr) return false;
-                return r.pos >= get_kernel()->end();
-            }
-            bool is_end() const {
-                return is_end(*this);
-            }
+
             size_type get_pos() const {
                 return pos;
             }
@@ -1354,6 +1327,7 @@ namespace rabbit{
 		void clear(){
 			if(current!=nullptr)
 				current->clear();
+			pcurrent = nullptr;
 			current = nullptr;
 			///set_current(std::allocate_shared<hash_kernel>(alloc));
 		}
@@ -1362,11 +1336,11 @@ namespace rabbit{
 			set_current(std::allocate_shared<hash_kernel>(allocator,compare, allocator));
 		}
 
-		basic_unordered_map() :current(nullptr) {
+		basic_unordered_map() :current(nullptr),pcurrent(nullptr){
 			//
 		}
 
-		basic_unordered_map(const key_compare& compare,const allocator_type& allocator) : key_c(compare),alloc(allocator){
+		basic_unordered_map(const key_compare& compare,const allocator_type& allocator) : key_c(compare),alloc(allocator),pcurrent(nullptr){
 
 		}
 
@@ -1481,11 +1455,12 @@ namespace rabbit{
 			return iterator(this, current->find(k));
 		}
 		iterator begin() const {
-			if(current==nullptr)return iterator(this,size_type());
+			if(current==nullptr) return iterator(this,size_type());
 			return iterator(this, current->begin());
 		}
-		end_iterator end() const {
-            return end_iterator(); // iterator(end_pos);
+		iterator end() const {
+			if(current==nullptr) return iterator(this,size_type());
+			return iterator(this, current->end());
         }
 		const_iterator cbegin() const {
 			if(current==nullptr)return const_iterator(this,size_type());
