@@ -26,7 +26,10 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\rabbit\rabbit.h">
+    <ClInclude Include="..\..\rabbit\rabbit_map.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\rabbit\rabbit_set.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

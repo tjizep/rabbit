@@ -156,7 +156,8 @@
     <ClCompile Include="..\..\time_hash_maps.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\rabbit\rabbit.h" />
+    <ClInclude Include="..\..\rabbit\rabbit_map.h" />
+    <ClInclude Include="..\..\rabbit\rabbit_set.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

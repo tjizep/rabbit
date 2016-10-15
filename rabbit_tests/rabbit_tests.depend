@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1476533306 source:c:\dev\cpp_all\rabbit\rabbit_tests\main.cpp
+1476546394 source:c:\dev\cpp_all\rabbit\rabbit_tests\main.cpp
 	<stdlib.h>
 	<stdio.h>
 	<random>
@@ -11,6 +11,7 @@
 	<functional>
 	<sparsehash/internal/sparseconfig.h>
 	<rabbit/unordered_map>
+	<rabbit/unordered_set>
 	<sparsehash/type_traits.h>
 	<sparsehash/dense_hash_map>
 	<sparsehash/sparse_hash_map>
@@ -20,10 +21,10 @@
 
 1430471197 c:\dev\cpp_all\repo\sparsehash-2.0.2\src\windows\sparsehash\internal\sparseconfig.h
 
-1425932106 c:\dev\cpp_all\rabbit\rabbit\unordered_map
-	<rabbit/rabbit.h>
+1476541189 c:\dev\cpp_all\rabbit\rabbit\unordered_map
+	<rabbit/rabbit_map.h>
 
-1476533328 c:\dev\cpp_all\rabbit\rabbit\rabbit.h
+1476539852 c:\dev\cpp_all\rabbit\rabbit\rabbit.h
 	<stdio.h>
 	<stdlib.h>
 	<iostream>
@@ -404,4 +405,46 @@
 	<rabbit/unordered_map>
 	<Windows.h>
 	<Psapi.h>
+
+1476540758 c:\dev\cpp_all\rabbit\rabbit\rabbit_uni.h
+	<stdio.h>
+	<stdlib.h>
+	<iostream>
+	<vector>
+	<chrono>
+	<assert.h>
+	<memory>
+	<string>
+	<random>
+	<limits>
+	<iomanip>
+
+1476548544 c:\dev\cpp_all\rabbit\rabbit\rabbit_map.h
+	<stdio.h>
+	<stdlib.h>
+	<iostream>
+	<vector>
+	<chrono>
+	<assert.h>
+	<memory>
+	<string>
+	<random>
+	<limits>
+	<iomanip>
+
+1476541194 c:\dev\cpp_all\rabbit\rabbit\unordered_set
+	<rabbit/rabbit_set.h>
+
+1476541389 c:\dev\cpp_all\rabbit\rabbit\rabbit_set.h
+	<stdio.h>
+	<stdlib.h>
+	<iostream>
+	<vector>
+	<chrono>
+	<assert.h>
+	<memory>
+	<string>
+	<random>
+	<limits>
+	<iomanip>
 
