@@ -1,5 +1,5 @@
-# rabbit v 1.1 r11
-stl compatible hashtable (rabbit::unordered_map)
+# rabbit v 1.1 r1
+stl compatible hashtable (rabbit::unordered_map or rabbit::sparse_unordered_map)
 
 Using:
 ------------------------------------------------------------------
@@ -13,12 +13,18 @@ void rabbits(){
 		/// xyz
 	}
 	...
+	rabbit::sparse_unordered_map<int,int> sparse_int_map;
+	int_map.insert(0,1);
+	if(int_map[0] == 1){
+		/// xyz
+	}
 }
 
 Advantages:
 -----------
 
-1. Very Fast and Small when set_sparse(false)(default) or just Fast and Very Small when set_logarithmic(>=4)
+1. Very Fast and sometimes small or just Fast and Very Small when set_logarithmic(>=4)
+   you can also use rabbit::sparse_unordered_map to get the same effect
 2. Strong guarantees for hash table size in sparse mode
    i.e. Sparse version of hash table is nearly always smaller(90% of the time) than google sparse hash
    even though it has a step shaped memory use curve
@@ -29,7 +35,8 @@ Disadvantages
 -------------
 
 If a rehash takes place during iteration (because of inserts during iteration) the iterator becomes 
-invalid. Best is to rehash to aproximate future size before starting iteration which will cause 
+invalid. It wont crash but it might skip previously added elements. 
+Best is to rehash to aproximate future size before starting iteration which will cause 
 inserts. Erases and updates are stable. 
 
 Algorithm Descriprion
@@ -65,6 +72,12 @@ In the semi dense variation of the algoritm the size of this bucket is maintaine
 factor. In the sparse version the single bucket size is a logarithmically increasing number.
 
 Once the single bucket is full a rehash is performed on a new table with twice as many keys.
-In case of the sparse table a load factor of 0.9 is maintained.
+In case of the sparse table a load factor of ~0.75 is maintained.
 
 
+Note
+----
+
+The previous version stored keys and values separately which reduced memory use when 
+sizeof(key)+sizeof(value) < sizeof(std::pair<key,value>). This behaviour isn't 
+available anymore as the penalty for random read access is usually too high. 

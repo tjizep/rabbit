@@ -360,7 +360,6 @@ void test_rabbit_sparse_hash(typename tester<_T>::_Script& script, size_t ts) {
 	typedef rabbit::sparse_unordered_map<_T, typename tester<_T>::_ValueType> _Map;
 	_Map h;
 	tester<_T> t;
-	h.set_logarithmic(4);
 	t.bench_hash_simple(h, script);
 
 }

@@ -264,9 +264,6 @@ namespace rabbit{
 		public:
 			_Bt overflows;
 			_Bt exists;
-			//_Bt overflowed;
-		private:
-			//_K keys[sizeof(_Bt)*8];
 		private:
 			void set_bit(_Bt& w, _Bt index, bool f){
 
@@ -315,17 +312,13 @@ namespace rabbit{
 			_KeySegment(){
 				exists = 0;
 				overflows = 0;
-				//overflowed = 0;
 			}
 		};
-		//typedef _PairSegment _Segment;
+
 		typedef _KeySegment _Segment;
 		/// the vector that will contain the segmented mapping pairs and flags
-
 		typedef std::vector<_Segment, _Allocator> _Segments;
-		//typedef std::vector<_K, _Allocator> _Keys;
 		typedef std::vector<_ElPair, _Allocator> _Keys;
-		//typedef std::vector<_V, _Allocator> _Values;
 
 		struct hash_kernel{
 
@@ -336,7 +329,6 @@ namespace rabbit{
 			size_type probes;
 			size_type rand_probes; /// used when there might be an attack
 			size_type last_modified;
-			size_type random_val;
 			/// the existence bit set is a factor of BITS_SIZE+1 less than the extent
 			_Segment* clusters;///a.k.a. pages
 			_Keys keys;
@@ -350,7 +342,6 @@ namespace rabbit{
 			float mf;
 			size_type buckets;
 			size_type removed;
-			bool keys_overflowed;
 			_Allocator allocator;
 			_K empty_key;
 			size_type logarithmic;
@@ -468,14 +459,8 @@ namespace rabbit{
 				keys[pos].second = _V();
 			}
 
-			_V* create_segment_value_DEP(size_type pos, const _V &v) {
-				_V* r = &(keys[pos]).second;
-				*r = v;
-				return r;
-			}
-
 			_V* create_segment_value(size_type pos) {
-				_V* r = &(keys[pos]).second;
+				_V* r = &(keys[pos].second);
 				return r;
 			}
 
@@ -580,7 +565,6 @@ namespace rabbit{
 				elements = 0;
 				removed = 0;
 				empty_key = _K();
-				keys_overflowed = false;
 				overflow_elements = get_o_start();
 				size_type esize = get_e_size();
 				keys.resize(get_data_size());
@@ -641,12 +625,9 @@ namespace rabbit{
 				mf = right.mf;
 				elements = right.elements;
 				size_type esize = get_e_size();
-
 				clusters = get_segment_allocator().allocate(esize);
 				keys = right.keys;
-				//std::copy(values, right.values, right.values+right.get_data_size());
 				std::copy(clusters, right.clusters, right.clusters+esize);
-
 				return *this;
 			}
 			inline bool raw_equal_key(size_type pos,const _K& k) const {
@@ -656,7 +637,6 @@ namespace rabbit{
 			inline bool segment_equal_key_exists(size_type pos,const _K& k) const {
 				_Bt index = get_segment_index(pos);
 				const _Segment& s = get_segment(pos);
-				//return  eq_f(s.key(index), k) && s.is_exists(index) ;
 				return  eq_f(get_segment_key(pos), k) && s.is_exists(index) ;
 
 			}
@@ -684,7 +664,6 @@ namespace rabbit{
 						set_segment_key(pos,k);
 						++elements;
 						set_overflows(origin, true);
-						keys_overflowed = true;
 						return create_segment_value(pos);
 					}
 					pos += hash_probe_incr(i);
@@ -711,7 +690,6 @@ namespace rabbit{
 				pos = at_empty;
 				if(pos != end()){
 					set_overflows(origin, true);
-					keys_overflowed = true;
 					set_exists(pos, true);
 					set_segment_key(pos, k);
 					size_type os = (overflow_elements - (get_extent()+initial_probes));
@@ -1007,13 +985,21 @@ namespace rabbit{
             const basic_unordered_map* h;
             _Bt index;
             _Bt exists;
+			void check_pointer() const {
+				return;
+				if(h!=nullptr && h->pcurrent != h->current.get()){
+					std::cout << "invalid cache pointer: not equal to actual" << std::endl;
+				}
+			}
             inline const kernel_ptr get_kernel() const {
 				if(h==nullptr) return nullptr;
+				check_pointer();
                 return h->pcurrent;
             }
             inline kernel_ptr get_kernel() {
 				if(h==nullptr) return nullptr;
-                return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
+                check_pointer();
+				return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
             }
             void set_index() {
                 if (get_kernel() != nullptr) { ///
@@ -1221,7 +1207,7 @@ namespace rabbit{
                         cout << "new " << rehashed->elements << " current size:"  << current->elements << endl;
                         throw bad_alloc();
 					}else{
-
+						//cout << "re-rehash iterations " << ctr << " elements " << rehashed->elements << " extent " << rehashed->get_extent() << endl;
 
 						//rehashed->resize_clear(rehashed->get_extent());
 						//break;
@@ -1592,10 +1578,9 @@ public:
 	void swap(_Myt& _Right){	// exchange contents with non-movable _Right
 		_Base::swap(_Right);
 	}
-
-
-
 };
+
+
 template
 <	class _Kty
 ,	class _Ty
