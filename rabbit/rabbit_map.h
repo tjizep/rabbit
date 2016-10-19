@@ -82,7 +82,7 @@ namespace rabbit{
 			return other + (r*r); //(other ^ random_val) & this->extent1;
 		}
 		inline size_type operator()(size_type h_n) const {
-			size_type h = h_n & this->gate_bits;
+			size_type h = h_n; // & this->gate_bits;
 			//h += (h>>this->primary_bits);
             return  h & this->extent1; //
 

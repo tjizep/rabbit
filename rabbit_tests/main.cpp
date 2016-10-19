@@ -156,8 +156,8 @@ public:
 		_InputField v;
 		_Script random_ints(count);
 		std::iota(random_ints.begin(), random_ints.end(), 0);
-		std::shuffle(random_ints.begin(), random_ints.end(), generator);
-		//std::random_shuffle(random_ints.begin(), random_ints.end());
+		//std::shuffle(random_ints.begin(), random_ints.end(), generator);
+		std::random_shuffle(random_ints.begin(), random_ints.end());
 		///for(size_t r = 0; r < count;++r){
 		///	conversion::to_t(r,v);
 		///	script.push_back(v);
@@ -403,7 +403,7 @@ void test_random(size_t ts) {
 
 	tester<_K>::_Script script;
 	tester<_K> t;
-	t.gen_random(ts, script);
+	t.gen_random_narrow(ts, script);
 
 	test_rabbit_hash<_K>(script, ts);
 	test_rabbit_sparse_hash<_K>(script, ts);

@@ -371,8 +371,8 @@
 	<Windows.h>
 	<Psapi.h>
 
-1474395088 c:\devcpp\cpp_all\rabbit\rabbit\unordered_map
-	<rabbit/rabbit.h>
+1476880466 c:\devcpp\cpp_all\rabbit\rabbit\unordered_map
+	<rabbit/rabbit_map.h>
 
 1476436623 c:\devcpp\cpp_all\rabbit\rabbit\rabbit.h
 	<stdio.h>
@@ -387,7 +387,7 @@
 	<limits>
 	<iomanip>
 
-1476436717 source:c:\devcpp\cpp_all\rabbit\rabbit_tests\main.cpp
+1476880466 source:c:\devcpp\cpp_all\rabbit\rabbit_tests\main.cpp
 	<stdlib.h>
 	<stdio.h>
 	<random>
@@ -399,6 +399,7 @@
 	<functional>
 	<sparsehash/internal/sparseconfig.h>
 	<rabbit/unordered_map>
+	<rabbit/unordered_set>
 	<sparsehash/type_traits.h>
 	<sparsehash/dense_hash_map>
 	<sparsehash/sparse_hash_map>
@@ -436,6 +437,35 @@
 	<rabbit/rabbit_set.h>
 
 1476541389 c:\dev\cpp_all\rabbit\rabbit\rabbit_set.h
+	<stdio.h>
+	<stdlib.h>
+	<iostream>
+	<vector>
+	<chrono>
+	<assert.h>
+	<memory>
+	<string>
+	<random>
+	<limits>
+	<iomanip>
+
+1476882988 c:\devcpp\cpp_all\rabbit\rabbit\rabbit_map.h
+	<stdio.h>
+	<stdlib.h>
+	<iostream>
+	<vector>
+	<chrono>
+	<assert.h>
+	<memory>
+	<string>
+	<random>
+	<limits>
+	<iomanip>
+
+1476880466 c:\devcpp\cpp_all\rabbit\rabbit\unordered_set
+	<rabbit/rabbit_set.h>
+
+1476880466 c:\devcpp\cpp_all\rabbit\rabbit\rabbit_set.h
 	<stdio.h>
 	<stdlib.h>
 	<iostream>
