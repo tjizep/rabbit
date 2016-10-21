@@ -79,7 +79,7 @@ namespace rabbit{
 		}
 		inline size_type randomize(size_type other) const {
 		    size_type r = other>>this->primary_bits;
-			return other + (r*r); //(other ^ random_val) & this->extent1;
+			return other + (r*r)>>1; //(other ^ random_val) & this->extent1;
 		}
 		inline size_type operator()(size_type h_n) const {
 			size_type h = h_n; // & this->gate_bits;
@@ -950,10 +950,10 @@ namespace rabbit{
                 ++(*this);
                 return t;
             }
-			const _ElPair operator*() const {
+			const _ElPair& operator*() const {
 				return get_kernel()->get_segment_pair((*this).pos);
 			}
-			inline _ElPair operator*() {
+			inline _ElPair& operator*() {
 			    return get_kernel()->get_segment_pair((*this).pos);
 			}
 			inline _ElPair* operator->() const {
