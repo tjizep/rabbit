@@ -79,7 +79,7 @@ namespace rabbit{
 		}
 		inline size_type randomize(size_type other) const {
 		    size_type r = other>>this->primary_bits;
-			return other + (r*r)>>1; //(other ^ random_val) & this->extent1;
+			return other + (r*r)>>3; //(other ^ random_val) & this->extent1;
 		}
 		inline size_type operator()(size_type h_n) const {
 			size_type h = h_n; // & this->gate_bits;
@@ -197,7 +197,7 @@ namespace rabbit{
 			BITS_SIZE1 = BITS_SIZE-1;
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;
-			PROBES = 12;
+			PROBES = 16;
 			MIN_EXTENT = 4; /// start size of the hash table
 			MAX_OVERFLOW_FACTOR = 1<<17; //BITS_SIZE*8/sizeof(_Bt);
             LOGARITHMIC = logarithmic;
@@ -212,7 +212,7 @@ namespace rabbit{
 		typedef _InMapper _Mapper;
 	};
 	typedef basic_traits<_BinMapper<basic_config<0> > > default_traits;
-	typedef basic_traits<_BinMapper<basic_config<4> > > sparse_traits;
+	typedef basic_traits<_BinMapper<basic_config<5> > > sparse_traits;
 
 
     template
