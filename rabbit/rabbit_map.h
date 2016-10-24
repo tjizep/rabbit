@@ -79,7 +79,7 @@ namespace rabbit{
 		}
 		inline size_type randomize(size_type other) const {
 		    size_type r = other>>this->primary_bits;
-			return other + (r*r)>>3; //(other ^ random_val) & this->extent1;
+			return other + r*r; //(other ^ random_val) & this->extent1;
 		}
 		inline size_type operator()(size_type h_n) const {
 			size_type h = h_n; // & this->gate_bits;
@@ -212,7 +212,7 @@ namespace rabbit{
 		typedef _InMapper _Mapper;
 	};
 	typedef basic_traits<_BinMapper<basic_config<0> > > default_traits;
-	typedef basic_traits<_BinMapper<basic_config<5> > > sparse_traits;
+	typedef basic_traits<_BinMapper<basic_config<8> > > sparse_traits;
 
 
     template
