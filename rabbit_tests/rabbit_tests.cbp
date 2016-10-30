@@ -35,9 +35,9 @@
 			<Add option="-std=c++11" />
 			<Add option="-fexceptions" />
 			<Add option="-D_WIN32" />
-			<Add directory="C:/devcpp/cpp_all/rabbit" />
-			<Add directory="c:/repo/sparsehash-2.0.2/src" />
-			<Add directory="c:/repo/sparsehash-2.0.2/src/windows" />
+			<Add directory="C:/dev/cpp_all/rabbit" />
+			<Add directory="f:/repo/sparsehash-2.0.2/src" />
+			<Add directory="f:/repo/sparsehash-2.0.2/src/windows" />
 		</Compiler>
 		<Unit filename="../rabbit/rabbit_map.h" />
 		<Unit filename="../rabbit/rabbit_set.h" />
