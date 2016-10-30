@@ -79,7 +79,7 @@ namespace rabbit{
 		}
 		inline size_type randomize(size_type other) const {
 		    size_type r = other>>this->primary_bits;
-			return other + (r*(r>>2)); //(other ^ random_val) & this->extent1;
+			return other + (r*r)>>2; //(other ^ random_val) & this->extent1;
 		}
 		inline size_type operator()(size_type h_n) const {
 			size_type h = h_n; // & this->gate_bits;
@@ -654,7 +654,8 @@ namespace rabbit{
 				return 1;
 
             }
-			_V* subscript_rest(const _K& k, size_type origin) {
+			_V* subscript_rest(const _K& k, size_type origin)
+			RABBIT_NOINLINE_ {
 				size_type pos = map_rand_key(k);
 				for(unsigned int i =0; i < probes && pos < get_extent();++i){
 					_Bt si = get_segment_index(pos);
@@ -808,7 +809,8 @@ namespace rabbit{
 				return false;
 			}
 
-			size_type find_rest(const _K& k, size_type origin) const {
+			size_type find_rest(const _K& k, size_type origin) const
+			RABBIT_NOINLINE_ {
 				/// randomization step for attack mitigation
 				size_type pos = map_rand_key(k);
 
@@ -1175,7 +1177,7 @@ namespace rabbit{
 					//_K k;
 					for(iterator i = begin();i != e;++i){
 						//std::swap(k,(*i).first);
-						_V* v = rehashed->subscript((*i).first);
+						_V* v = reh->subscript((*i).first);
 						if(v != nullptr){
 							*v = i->second;
 							/// a cheap check to illuminate subtle bugs during development
@@ -1193,6 +1195,8 @@ namespace rabbit{
 							rehashed->resize_clear(new_extent);
 							rehashed->mf = (*this).current->mf;
 							rehashed->set_rand_probes(nrand_probes);
+                            reh = rehashed.get();
+
                            // i = begin(); // start over
                             //ctr = 0;
 							break;
