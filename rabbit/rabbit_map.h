@@ -1177,7 +1177,7 @@ namespace rabbit{
 					//_K k;
 					for(iterator i = begin();i != e;++i){
 						//std::swap(k,(*i).first);
-						_V* v = rehashed->subscript((*i).first);
+						_V* v = reh->subscript((*i).first);
 						if(v != nullptr){
 							*v = i->second;
 							/// a cheap check to illuminate subtle bugs during development
@@ -1195,6 +1195,8 @@ namespace rabbit{
 							rehashed->resize_clear(new_extent);
 							rehashed->mf = (*this).current->mf;
 							rehashed->set_rand_probes(nrand_probes);
+                            reh = rehashed.get();
+
                            // i = begin(); // start over
                             //ctr = 0;
 							break;
