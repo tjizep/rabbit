@@ -507,10 +507,6 @@ namespace rabbit{
 				return (size_type) (get_data_size()/config.BITS_SIZE)+1;
 			}
 
-			void clear_data(){
-
-			}
-
 			void free_data(){
 
 				if(clusters) {
@@ -555,7 +551,7 @@ namespace rabbit{
 					overflow = config.log2(new_extent)*logarithmic;
 				}else{
 					probes = config.PROBES; //config.log2(new_extent); //-config.log2(config.MIN_EXTENT/2);  /// start probes config.PROBES; //
-					overflow = std::max<size_type>(config.PROBES,new_extent/config.MAX_OVERFLOW_FACTOR); //config.log2(new_extent); // *16*
+					overflow = std::max<size_type>(config.PROBES,new_extent/(config.MAX_OVERFLOW_FACTOR)); //config.log2(new_extent); // *16*
 				}
 
 				rand_probes = 0;
@@ -809,12 +805,32 @@ namespace rabbit{
 				return false;
 			}
 
-			size_type find_rest(const _K& k, size_type origin) const
-			RABBIT_NOINLINE_ {
+			size_type find_rest_not_empty(const _K& k, size_type origin) const
+			RABBIT_NOINLINE_
+			{
 				/// randomization step for attack mitigation
 				size_type pos = map_rand_key(k);
 
 				for(unsigned int i =0; i < probes && pos < get_extent();){
+					if(equal_key(pos,k)) return pos;
+					pos += hash_probe_incr(i);
+					++i;
+				}
+
+				for(pos=get_o_start(); pos < overflow_elements; ){
+					if(equal_key(pos,k)) return pos;
+					++pos;
+				}
+
+				return end();
+			}
+			size_type find_rest(const _K& k, size_type origin) const
+			RABBIT_NOINLINE_
+			{
+				/// randomization step for attack mitigation
+				size_type pos = map_rand_key(k);
+
+				for(unsigned int i =0; i < probes && pos < get_extent();){//
 					_Bt si = get_segment_index(pos);
 					if(segment_equal_key_exists(pos,k)){
 						return pos;
@@ -852,8 +868,10 @@ namespace rabbit{
 				if(!s.is_overflows(index)){
 					return end();
 				}
-
-				return find_rest(k, pos);
+                if(is_empty)
+                    return find_rest(k, pos);
+                else
+                    return find_rest_not_empty(k, pos);
 			}
 			size_type find(const _K& k) const {
 
