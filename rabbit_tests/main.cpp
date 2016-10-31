@@ -140,11 +140,11 @@ public:
 		double start = get_proc_mem_use();
 		std::minstd_rand rd;
 		std::mt19937 gen(rd());
-		std::uniform_int_distribution<long long> dis(1ll << 8, 1ll << 63);
+		std::uniform_int_distribution<typename _Script::value_type> dis(0, std::numeric_limits<typename _Script::value_type>::max());
 		/// script creation is not benched
 		_InputField v;
 		for (size_t r = 0; r < count; ++r) {
-			conversion::to_t(dis(gen), v);
+			conversion::to_t(dis(gen), v);//dis(gen)
 			script.push_back(v);
 		}
 		printf("memory used by script: %.4g MB\n", get_proc_mem_use() - start);
@@ -154,16 +154,18 @@ public:
 		double start = get_proc_mem_use();
 		/// script creation is not benched
 		_InputField v;
-		_Script random_ints(count);
-		std::iota(random_ints.begin(), random_ints.end(), 0);
-		std::shuffle(random_ints.begin(), random_ints.end(), generator);
-		//std::random_shuffle(random_ints.begin(), random_ints.end());
+		for (size_t r = 0; r < count; ++r) {
+			conversion::to_t(r, v);
+			script.push_back(v);
+		}
+		//std::shuffle(script.begin(), script.end(), generator);
+		std::random_shuffle(script.begin(), script.end());
 		///for(size_t r = 0; r < count;++r){
 		///	conversion::to_t(r,v);
 		///	script.push_back(v);
 		///}
 		//std::random_shuffle(script.begin(), script.end());
-		script.swap(random_ints);
+		//script.swap(random_data);
 		printf("memory used by script: %.4g MB\n", get_proc_mem_use() - start);
 	}
 	template<typename _MapT>
@@ -281,7 +283,7 @@ public:
 		std::chrono::steady_clock::time_point start_read = std::chrono::steady_clock::now();
 		/// check what is
 		for (size_t k = 0; k < count; ++k) {
-			typename _MapT::iterator f = h.find(script[k]);
+            auto f = h.find(script[k]);
 			if (f == h.end() || f->second != (typename _MapT::mapped_type)k + 1) {
 				printf("ERROR: could not find %ld\n", (long int)k);
 			}
