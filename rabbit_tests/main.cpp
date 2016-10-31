@@ -419,7 +419,7 @@ int main(int argc, char **argv)
 #ifdef _MSC_VER
 	::Sleep(1000);
 #endif
-	size_t ts = 40000000;
+	size_t ts = 10000000;
 	test_random(ts);
 	//google_times(ts);
 	//more_tests();

@@ -808,6 +808,12 @@ namespace rabbit{
 			size_type find_rest_not_empty(const _K& k, size_type origin) const
 			RABBIT_NOINLINE_
 			{
+			    _Bt index = get_segment_index(origin);
+				const _Segment& s = get_segment(origin);
+				if(!s.is_overflows(index)){
+					return end();
+				}
+
 				/// randomization step for attack mitigation
 				size_type pos = map_rand_key(k);
 
@@ -846,33 +852,37 @@ namespace rabbit{
 
 				return end();
 			}
-			size_type find(const _K& k,size_type& pos) const {
-				pos = map_key(k);
-				bool is_empty = eq_f(empty_key,k);
-
-				if(is_empty){
-					_Bt index = get_segment_index(pos);
-					const _Segment& s = get_segment(pos);
-					if(s.is_exists(index) && equal_key(pos,k) ){ ///get_segment(pos).exists == ALL_BITS_SET ||
-						return pos;
-					}
-					if(!s.is_overflows(index)){
-						return end();
-					}
-				}else{
-					if(equal_key(pos,k)) return pos;
-
-				}
-				_Bt index = get_segment_index(pos);
-				const _Segment& s = get_segment(pos);
-				if(!s.is_overflows(index)){
-					return end();
-				}
-                if(is_empty)
-                    return find_rest(k, pos);
-                else
-                    return find_rest_not_empty(k, pos);
+			size_type find_empty(const _K& k,size_type& pos) const
+			RABBIT_NOINLINE_
+			{
+                pos = map_key(k);
+                _Bt index = get_segment_index(pos);
+                const _Segment& s = get_segment(pos);
+                if(s.is_exists(index) && equal_key(pos,k) ){ ///get_segment(pos).exists == ALL_BITS_SET ||
+                    return pos;
+                }
+                if(!s.is_overflows(index)){
+                    return end();
+                }
+                return find_rest(k, pos);
 			}
+
+			inline size_type find_non_empty(const _K& k,size_type& pos) const {
+				pos = map_key(k);
+				if(equal_key(pos,k)) return pos;
+				return find_rest_not_empty(k, pos);
+			}
+
+			size_type find(const _K& k,size_type& pos) const {
+
+				bool is_empty = eq_f(empty_key,k);
+				if(is_empty){
+                    return find_empty(k, pos);
+				}else{
+					return find_non_empty(k,pos);
+				}
+			}
+
 			size_type find(const _K& k) const {
 
 				size_type pos;
