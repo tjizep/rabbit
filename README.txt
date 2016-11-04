@@ -49,14 +49,14 @@ Open addressing part
 
 Keys are located via a truncated linear probe of constant length in case of the dense version.
 The linear probe is logarithmically related to the hash size when the sparse flag is set
-with the set_sparse(true) function.
+with the set_logarithmic(>=1) function.
 
 Rabbit maintains each key associated with two bits seperately.
 The first bit is for a keys existence and a second bit is for a collision indicator.
 The collision indicator removes the need to search for non existing keys which is a 
 problem in the standard linear probing algorithm.
 
-The bits, keys and values are each stored in separate arrays to provide better CPU cache
+The bits, key value pairs are each stored in separate arrays to provide better CPU cache
 behaviour. For instance the existence bits will stay in cache longer so that memory access
 to these structures are reduced.
 
