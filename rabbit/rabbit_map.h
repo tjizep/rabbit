@@ -42,8 +42,7 @@ THE SOFTWARE.
 	#define RABBIT_NOINLINE_ __attribute__((noinline))
 #endif
 namespace rabbit{
-    /// the end iterator optimization
-
+	
 	template <class _Config>
 	struct _BinMapper{
 		typedef typename _Config::size_type size_type;
@@ -79,7 +78,7 @@ namespace rabbit{
 		}
 		inline size_type randomize(size_type other) const {
 		    size_type r = other>>this->primary_bits;
-			return other + (r*r)>>2; //(other ^ random_val) & this->extent1;
+			return other + r; // (r*r) >> 2; //(other ^ random_val) & this->extent1;
 		}
 		inline size_type operator()(size_type h_n) const {
 			size_type h = h_n; // & this->gate_bits;
@@ -369,7 +368,7 @@ namespace rabbit{
 			size_type bucket_size ( size_type n ) const{
 				size_type pos = n;
 				if (!overflows_(pos)) {
-                    if (exists_(pos) && map_key(get_segment_key(pos)) == n)
+                    if (exists_(pos) && map_key(get_key(pos)) == n)
                         return 1;
                     else return 0;
                 }
@@ -377,14 +376,14 @@ namespace rabbit{
 				size_type r = 0;
 				for(; pos < m;++pos){
 					if(!exists_(pos)){
-					}else if(map_key(get_segment_key(pos)) == n){
+					}else if(map_key(get_key(pos)) == n){
 						++r;
 					}
 				}
 				size_type e = end();
 				for(pos=get_o_start(); pos < e; ){
 					if(!exists_(pos)){
-					}else if(map_key(get_segment_key(pos)) == n){
+					}else if(map_key(get_key(pos)) == n){
 						++r;
 					}
 					++pos;
@@ -426,28 +425,28 @@ namespace rabbit{
 				return clusters[get_segment_number(pos)];
 			}
 
-			const _ElPair &get_segment_pair(size_type pos) const {
+			const _ElPair &get_pair(size_type pos) const {
 				return keys[pos];
 			}
 
-			const _K & get_segment_key(size_type pos) const {
+			const _K & get_key(size_type pos) const {
 				return keys[pos].first;
 			}
 
-			const _V & get_segment_value(size_type pos) const {
+			const _V & get_value(size_type pos) const {
 				return keys[pos].second;
 			}
 
 
-			_ElPair& get_segment_pair(size_type pos) {
+			_ElPair& get_pair(size_type pos) {
 				return keys[pos];
 			}
 
-			_K & get_segment_key(size_type pos) {
+			_K & get_key(size_type pos) {
 				return keys[pos].first;
 			}
 
-			_V & get_segment_value(size_type pos) {
+			_V & get_value(size_type pos) {
 				return keys[pos].second;
 			}
 
@@ -627,18 +626,18 @@ namespace rabbit{
 				return *this;
 			}
 			inline bool raw_equal_key(size_type pos,const _K& k) const {
-				const _K& l = get_segment_key(pos); ///.key(get_segment_index(pos));
+				const _K& l = get_key(pos); ///.key(get_segment_index(pos));
 				return eq_f(l, k) ;
 			}
 			inline bool segment_equal_key_exists(size_type pos,const _K& k) const {
 				_Bt index = get_segment_index(pos);
 				const _Segment& s = get_segment(pos);
-				return  eq_f(get_segment_key(pos), k) && s.is_exists(index) ;
+				return  eq_f(get_key(pos), k) && s.is_exists(index) ;
 
 			}
 
 			bool equal_key(size_type pos,const _K& k) const {
-				const _K& l = get_segment_key(pos);
+				const _K& l = get_key(pos);
 				return eq_f(l, k) ;
 			}
 
@@ -724,13 +723,13 @@ namespace rabbit{
 					++elements;
 					return create_segment_value(pos);
 				}else if(key_exists && equal_key(pos,k)){
-					return &(get_segment_value(pos));
+					return &(get_value(pos));
 				}
 				size_type h = pos;
 				if(key_overflows){
 					pos = find_rest(k,h);
 					if(pos != end()){
-						return &(get_segment_value(pos));
+						return &(get_value(pos));
 					}
 				}
 				return subscript_rest(k,h);
@@ -784,14 +783,14 @@ namespace rabbit{
 			const _V& at(const _K& k) const {
 				size_type pos = find(k);
 				if(pos != (*this).end()){
-					return get_segment_value(pos);
+					return get_value(pos);
 				}
 				throw std::exception();
 			}
 			_V& at(const _K& k) {
 				size_type pos = find(k);
 				if(pos != (*this).end()){
-					return get_segment_value(pos);
+					return get_value(pos);
 				}
 				throw std::exception();
 			}
@@ -799,7 +798,7 @@ namespace rabbit{
 			bool get(const _K& k, _V& v) const {
 				size_type pos = find(k);
 				if(pos != (*this).end()){
-					v = get_segment_value(pos);
+					v = get_value(pos);
 					return true;
 				}
 				return false;
@@ -981,17 +980,17 @@ namespace rabbit{
                 return t;
             }
 			const _ElPair& operator*() const {
-				return get_kernel()->get_segment_pair((*this).pos);
+				return get_kernel()->get_pair((*this).pos);
 			}
 			inline _ElPair& operator*() {
-			    return get_kernel()->get_segment_pair((*this).pos);
+			    return get_kernel()->get_pair((*this).pos);
 			}
 			inline _ElPair* operator->() const {
-			    _ElPair* ret = &(get_kernel()->get_segment_pair(pos));
+			    _ElPair* ret = &(get_kernel()->get_pair(pos));
 				return ret;
 			}
 			inline const _ElPair *operator->() {
-                _ElPair* ret = &(get_kernel()->get_segment_pair(pos));
+                _ElPair* ret = &(get_kernel()->get_pair(pos));
 				return ret;
 			}
             inline bool operator==(const iterator& r) const {
@@ -1093,10 +1092,10 @@ namespace rabbit{
                 return t;
             }
             const _ElPair& operator*() const {
-			    return get_kernel()->get_segment_pair(pos);
+			    return get_kernel()->get_pair(pos);
 			}
 			const _ElPair *operator->() const {
-			  	_ElPair* ret = &(get_kernel()->get_segment_pair(pos));
+			  	_ElPair* ret = &(get_kernel()->get_pair(pos));
 				return ret;
 			}
 

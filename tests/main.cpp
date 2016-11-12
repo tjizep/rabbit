@@ -1,5 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <numeric>
+
 #include <random>
 #include <algorithm>
 #include <unordered_map>
@@ -156,12 +158,10 @@ public:
 		_InputField v;
 		_Script random_ints(count);
 		std::iota(random_ints.begin(), random_ints.end(), 0);
-		std::shuffle(random_ints.begin(), random_ints.end(), generator);
-		//std::random_shuffle(random_ints.begin(), random_ints.end());
-		///for(size_t r = 0; r < count;++r){
-		///	conversion::to_t(r,v);
-		///	script.push_back(v);
-		///}
+		
+		//std::shuffle(random_ints.begin(), random_ints.end(), generator);
+		std::random_shuffle(random_ints.begin(), random_ints.end());
+		
 		//std::random_shuffle(script.begin(), script.end());
 		script.swap(random_ints);
 		printf("memory used by script: %.4g MB\n", get_proc_mem_use() - start);
@@ -321,7 +321,7 @@ template<typename _T>
 void test_dense_hash(typename tester<_T>::_Script& script, size_t ts) {
 #ifdef _HAS_GOOGLE_HASH_
 	printf("google dense hash test\n");
-	typedef ::google::dense_hash_map<_T, typename tester<_T>::_ValueType> _Map; //
+	typedef ::google::dense_hash_map<_T, typename tester<_T>::_ValueType,rabbit::rabbit_hash<_T>> _Map; //
 	_Map h;
 	_T c, c1;
 	conversion::to_t(-1l, c);
@@ -406,7 +406,7 @@ void test_random(size_t ts) {
 	t.gen_random(ts, script);
 
 	test_rabbit_hash<_K>(script, ts);
-	test_rabbit_sparse_hash<_K>(script, ts);
+	//test_rabbit_sparse_hash<_K>(script, ts);
 	//test_rabbit_hash_erase<_K>(ts/10);
 
 	test_dense_hash<_K>(script, ts);
@@ -414,12 +414,10 @@ void test_random(size_t ts) {
 }
 int main(int argc, char **argv)
 {
-#ifdef _MSC_VER
-	::Sleep(1000);
-#endif
+
 	size_t ts = 10000000;
 	test_random(ts);
-	google_times((int)ts);
+	//google_times((int)ts);
 	//more_tests();
 	return 0;
 }

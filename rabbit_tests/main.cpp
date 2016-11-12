@@ -158,8 +158,8 @@ public:
 			conversion::to_t(r, v);
 			script.push_back(v);
 		}
-		//std::shuffle(script.begin(), script.end(), generator);
-		std::random_shuffle(script.begin(), script.end());
+		std::shuffle(script.begin(), script.end(), generator);
+		//std::random_shuffle(script.begin(), script.end());
 		///for(size_t r = 0; r < count;++r){
 		///	conversion::to_t(r,v);
 		///	script.push_back(v);
@@ -421,7 +421,7 @@ int main(int argc, char **argv)
 #endif
 	size_t ts = 10000000;
 	test_random(ts);
-	//google_times(ts);
+	google_times(ts);
 	//more_tests();
 	return 0;
 }
