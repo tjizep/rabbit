@@ -56,91 +56,60 @@ namespace conversion {
 #endif
 
 	}
-
-	void to_t(long long in, long long& out) {
+    template<typename _In>
+	void to_t(_In in, long long& out) {
 		out = in;
 	}
-
-	void to_t(long long in, long& out) {
+    template<typename _In>
+	void to_t(_In in, long& out) {
 		out = (long)in;
 	}
 
-	void to_t(long long in, int& out) {
+    template<typename _In>
+	void to_t(_In in, int& out) {
 		out = (int)in;
 	}
-
-	void to_t(long long in, unsigned long long& out) {
+    template<typename _In>
+	void to_t(_In in, unsigned long long& out) {
 		out = (unsigned long long)in;
 	}
 
-	void to_t(long long in, unsigned long& out) {
+    template<typename _In>
+	void to_t(_In in, unsigned long& out) {
 		out = (unsigned long)in;
 	}
 
-	void to_t(long long in, unsigned int& out) {
+	template<typename _In>
+    void to_t(_In in, unsigned int& out) {
 		out = (unsigned int)in;
 	}
 
-	void to_t(long long in, double& out) {
+    template<typename _In>
+	void to_t(_In in, double& out) {
 		out = (double)in;
 	}
-	void to_t(long long in, float& out) {
+
+    template<typename _In>
+	void to_t(_In in, float& out) {
 		out = (float)in;
 	}
 };
 static const int64_t SEED = 0;
 static std::mt19937_64 generator(SEED);
-template< typename _T>
+
+
+template< typename _T,typename _V>
 class tester {
 public:
-	typedef long long _ValueType;
+	typedef _V _ValueType;
 
-	template<typename _MapT>
-	void test_hash(int count) {
-
-		std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-
-		_MapT h;
-		typename _MapT::iterator i = h.begin();
-		if (i == h.end()) {
-			printf("the array is empty\n");
-		}
-
-		h.insert(std::make_pair(0, 0));
-		i = h.begin();
-		++i;
-		if (i != h.end()) {
-			printf("error in iterator\n");
-		}
-
-		for (int j = 0; j < count; ++j) {
-			h[j] = j + 1;
-		}
-
-		for (int k = 0; k < count; ++k) {
-			if (h.count(k) == 0) {
-				printf("could not find %ld\n", (long int)k);
-			};
-		}
-
-		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-
-		printf("test too %.4g secs\n", (double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()) / (1000000.0));
-		int r = h.size();
-		std::cin >> r;
-		//printf("the hash size is %ld \n",h.size());
-
-	}
 	typedef _T _InputField;
 	typedef std::vector<_InputField> _Script;
-
-
-
 	void gen_random(size_t count, _Script& script) {
 		double start = get_proc_mem_use();
-		std::minstd_rand rd;
-		std::mt19937 gen(rd());
-		std::uniform_int_distribution<typename _Script::value_type> dis(0, std::numeric_limits<typename _Script::value_type>::max());
+		//std::minstd_rand rd;
+		std::mt19937 gen(6);
+		std::uniform_int_distribution<_ValueType> dis(0, std::numeric_limits<_ValueType>::max());
 		/// script creation is not benched
 		_InputField v;
 		for (size_t r = 0; r < count; ++r) {
@@ -223,7 +192,7 @@ public:
 		typename _MapT::size_type s = count / 10;
 
 		for (size_t j = 0; j < count; ++j) {
-			h[script[j]] = (typename _MapT::mapped_type)j + 1;
+			h[script[j]] = j;
 			if (j % s == 0) {
 				std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
@@ -238,14 +207,14 @@ public:
 			};
 			auto f = h.find(script[k]);
 
-			if (f == h.end() || (*f).second != (typename _MapT::mapped_type)k + 1) {
+			if (f == h.end() || (*f).second != k) {
 				if (f == h.end()) {
 					printf("ERROR: counted data does not exist %ld\n", (long int)k);
 				}
 				else {
-					auto n2v = (*f).second - 1;
+					auto n2v = script[k];
 					f = h.find(script[n2v]);
-					if (f == h.end() || (*f).second != n2v + 1) {
+					if (f == h.end() || (*f).second != n2v) {
 						printf("ERROR: could not iterator find %ld\n", (long int)k);
 					}
 				}
@@ -269,7 +238,7 @@ public:
 		size_t s = count / 10;
 		for (size_t j = 0; j < count; ++j) {
 
-			h[script[j]] = (typename _MapT::mapped_type)j + 1;
+			h[script[j]] = script[j];
 			if (j % s == 0) {
 				//std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
@@ -284,7 +253,7 @@ public:
 		/// check what is
 		for (size_t k = 0; k < count; ++k) {
             auto f = h.find(script[k]);
-			if (f == h.end() || f->second != (typename _MapT::mapped_type)k + 1) {
+			if (f == h.end() || f->second != script[k]) {
 				printf("ERROR: could not find %ld\n", (long int)k);
 			}
 
@@ -293,25 +262,7 @@ public:
 
 				//printf("%ld: bench read %.4g secs\n",(long)k,(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start_read).count())/(1000000.0),get_proc_mem_use()-mem_start);
 			}
-			if (false) {
-				auto f = h.find(script[k]);
-
-				if (f == h.end() || (*f).second != (typename _MapT::mapped_type)k + 1) {
-					if (f == h.end()) {
-						printf("ERROR: counted data does not exist %ld\n", (long int)k);
-					}
-					else {
-						auto n2v = (*f).second - 1;
-						f = h.find(script[n2v]);
-						if (f == h.end() || (*f).second != n2v + 1) {
-							printf("ERROR: could not iterator find %ld\n", (long int)k);
-						}
-					}
-				}
-
-
-			}
-		}
+        }
 
 		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
@@ -319,74 +270,74 @@ public:
 
 	}
 };
-template<typename _T>
-void test_dense_hash(typename tester<_T>::_Script& script, size_t ts) {
+template<typename _T,typename _V>
+void test_dense_hash(typename tester<_T,_V>::_Script& script, size_t ts) {
 #ifdef _HAS_GOOGLE_HASH_
 	printf("google dense hash test\n");
-	typedef ::google::dense_hash_map<_T, typename tester<_T>::_ValueType> _Map; //
+	typedef ::google::dense_hash_map<_T, typename tester<_T,_V>::_ValueType> _Map; //
 	_Map h;
 	_T c, c1;
 	conversion::to_t(-1l, c);
 	conversion::to_t(-2l, c1);
 	h.set_deleted_key(c);
 	h.set_empty_key(c1);
-	tester<_T> t;
+	tester<_T,_V> t;
 	t.bench_hash_simple(h, script);
 #endif
 }
-template<typename _T>
-void test_sparse_hash(typename tester<_T>::_Script& script, size_t ts) {
+
+template<typename _T,typename _V>
+void test_sparse_hash(typename tester<_T,_V>::_Script& script, size_t ts) {
 #ifdef _HAS_GOOGLE_HASH_
 	printf("google sparse hash test\n");
-	typedef ::google::sparse_hash_map<_T, typename tester<_T>::_ValueType> _Map;
+	typedef ::google::sparse_hash_map<_T, typename tester<_T,_V>::_ValueType> _Map;
 	_Map h;
-	tester<_T> t;
+	tester<_T,_V> t;
 	t.bench_hash_simple(h, script);
 #endif
 }
 
-template<typename _T>
-void test_rabbit_hash(typename tester<_T>::_Script& script, size_t ts) {
+template<typename _T,typename _V>
+void test_rabbit_hash(typename tester<_T,_V>::_Script& script, size_t ts) {
 	printf("rabbit hash test\n");
-	typedef rabbit::unordered_map<_T, typename tester<_T>::_ValueType> _Map;
+	typedef rabbit::unordered_map<_T, typename tester<_T,_V>::_ValueType> _Map;
 	_Map h;
 
-	tester<_T> t;
+	tester<_T,_V> t;
 
 	t.bench_hash_simple(h, script);
 
 }
-template<typename _T>
-void test_rabbit_sparse_hash(typename tester<_T>::_Script& script, size_t ts) {
+template<typename _T, typename _V>
+void test_rabbit_sparse_hash(typename tester<_T,_V>::_Script& script, size_t ts) {
 	printf("rabbit sparse hash test\n");
-	typedef rabbit::sparse_unordered_map<_T, typename tester<_T>::_ValueType> _Map;
+	typedef rabbit::sparse_unordered_map<_T, typename tester<_T,_V>::_ValueType> _Map;
 	_Map h;
-	tester<_T> t;
+	tester<_T,_V> t;
 	t.bench_hash_simple(h, script);
 
 }
-template<typename T>
+template<typename T,typename _V>
 void test_rabbit_hash_erase(size_t ts) {
 	printf("rabbit hash test\n");
-	typedef rabbit::unordered_map<T, typename tester<T>::_ValueType> _Map;
+	typedef rabbit::unordered_map<T, typename tester<T,_V>::_ValueType> _Map;
 	_Map h;
-
-	typename tester<T>::_Script script;
-	tester<T> t;
+    typename tester<T,_V>::_Script script;
+	tester<T,_V> t;
 	t.gen_random(ts, script);
 	t.bench_hash(h, script);
 	t.erase_test(h, script);
 
 }
 
-template<typename T>
-void test_std_hash(typename tester<T>::_Script& script, size_t ts) {
+template<typename T,typename _V>
+void test_std_hash(typename tester<T,_V>::_Script& script, size_t ts) {
 #ifdef _HAS_STD_HASH_
 	printf("std hash test\n");
-	typedef std::unordered_map<T, typename tester<T>::_ValueType> _Map;
+	typedef std::unordered_map<T, typename tester<T,_V>::_ValueType> _Map;
 	_Map h;
 
-	tester<T> t;
+	tester<T,_V> t;
 
 	t.bench_hash_simple(h, script);
 #endif
@@ -400,18 +351,19 @@ void more_tests() {
 	//unique_running_insertion();
 }
 void test_random(size_t ts) {
-	typedef long long _K;
+	typedef unsigned long _K;
+	typedef unsigned long _V;
 	//typedef std::string _K;
 
-	tester<_K>::_Script script;
-	tester<_K> t;
+	tester<_K,_V>::_Script script;
+	tester<_K,_V> t;
 	t.gen_random(ts, script);
 
-	test_rabbit_hash<_K>(script, ts);
+	test_rabbit_hash<_K,_V>(script, ts);
 	//test_rabbit_sparse_hash<_K>(script, ts);
 	//test_rabbit_hash_erase<_K>(ts/10);
 
-	test_dense_hash<_K>(script, ts);
+	test_dense_hash<_K,_V>(script, ts);
 
 }
 int main(int argc, char **argv)

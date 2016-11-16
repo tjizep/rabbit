@@ -42,7 +42,7 @@ THE SOFTWARE.
 	#define RABBIT_NOINLINE_ __attribute__((noinline))
 #endif
 namespace rabbit{
-	
+
 	template <class _Config>
 	struct _BinMapper{
 		typedef typename _Config::size_type size_type;
@@ -549,8 +549,14 @@ namespace rabbit{
 					probes = config.log2(new_extent)*logarithmic;
 					overflow = config.log2(new_extent)*logarithmic;
 				}else{
-					probes = config.PROBES; //config.log2(new_extent); //-config.log2(config.MIN_EXTENT/2);  /// start probes config.PROBES; //
-					overflow = std::max<size_type>(config.PROBES,new_extent/(config.MAX_OVERFLOW_FACTOR)); //config.log2(new_extent); // *16*
+					probes = config.PROBES;
+					if (new_extent*sizeof(_ElPair) < 8*8*1024*1024 ) {
+                        probes+=0;
+						overflow = std::max<size_type>(config.PROBES, new_extent / (config.MAX_OVERFLOW_FACTOR/16));
+					} else {
+						overflow = std::max<size_type>(config.PROBES, new_extent / (config.MAX_OVERFLOW_FACTOR));
+
+					}
 				}
 
 				rand_probes = 0;
