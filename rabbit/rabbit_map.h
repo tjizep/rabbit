@@ -546,13 +546,17 @@ namespace rabbit{
 				mf = 1.0;
 				assert(config.MAX_OVERFLOW_FACTOR > 0);
 				if(is_logarithmic()){
-					probes = config.log2(new_extent)*logarithmic;
-					overflow = config.log2(new_extent)*logarithmic;
+                    probes = config.log2(new_extent)*logarithmic;
+                    overflow = config.log2(new_extent)*logarithmic;
+
 				}else{
 					probes = config.PROBES;
 					if (new_extent*sizeof(_ElPair) < 8*8*1024*1024 ) {
-                        probes+=0;
-						overflow = std::max<size_type>(config.PROBES, new_extent / (config.MAX_OVERFLOW_FACTOR/16));
+                        //probes+=0;
+						//overflow = std::max<size_type>(config.PROBES, new_extent / (config.MAX_OVERFLOW_FACTOR/16));
+						probes = config.log2(new_extent);
+                        overflow = config.log2(new_extent)*8;
+
 					} else {
 						overflow = std::max<size_type>(config.PROBES, new_extent / (config.MAX_OVERFLOW_FACTOR));
 

@@ -128,13 +128,27 @@ public:
 			script.push_back(v);
 		}
 		std::shuffle(script.begin(), script.end(), generator);
-		//std::random_shuffle(script.begin(), script.end());
-		///for(size_t r = 0; r < count;++r){
-		///	conversion::to_t(r,v);
-		///	script.push_back(v);
-		///}
-		//std::random_shuffle(script.begin(), script.end());
-		//script.swap(random_data);
+		printf("memory used by script: %.4g MB\n", get_proc_mem_use() - start);
+	}
+	void gen_random_narrowest(size_t count, _Script& script) {
+		double start = get_proc_mem_use();
+		/// script creation is not benched
+		_InputField v;
+		for (size_t r = 0; r < count; ++r) {
+			conversion::to_t(r, v);
+			script.push_back(v);
+		}
+		std::random_shuffle(script.begin(), script.end());
+		printf("memory used by script: %.4g MB\n", get_proc_mem_use() - start);
+	}
+	void gen_seq(size_t count, _Script& script) {
+		double start = get_proc_mem_use();
+		/// script creation is not benched
+		_InputField v;
+		for (size_t r = 0; r < count; ++r) {
+			conversion::to_t(r, v);
+			script.push_back(v);
+		}
 		printf("memory used by script: %.4g MB\n", get_proc_mem_use() - start);
 	}
 	template<typename _MapT>
@@ -351,19 +365,23 @@ void more_tests() {
 	//unique_running_insertion();
 }
 void test_random(size_t ts) {
-	typedef unsigned long _K;
-	typedef unsigned long _V;
+	typedef unsigned long long _K;
+	typedef unsigned long long _V;
 	//typedef std::string _K;
 
 	tester<_K,_V>::_Script script;
 	tester<_K,_V> t;
 	t.gen_random(ts, script);
+    //t.gen_seq(ts, script);
+	//t.gen_random_narrowest(ts, script);
+	//t.gen_random_narrow(ts, script);
 
 	test_rabbit_hash<_K,_V>(script, ts);
-	//test_rabbit_sparse_hash<_K>(script, ts);
+	test_rabbit_sparse_hash<_K,_V>(script, ts);
 	//test_rabbit_hash_erase<_K>(ts/10);
 
 	test_dense_hash<_K,_V>(script, ts);
+	test_sparse_hash<_K,_V>(script, ts);
 
 }
 int main(int argc, char **argv)
@@ -371,9 +389,9 @@ int main(int argc, char **argv)
 #ifdef _MSC_VER
 	::Sleep(1000);
 #endif
-	size_t ts = 10000000;
+	size_t ts = 40000000;
 	test_random(ts);
-	google_times(ts);
+	//google_times(ts);
 	//more_tests();
 	return 0;
 }
