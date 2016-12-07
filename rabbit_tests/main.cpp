@@ -56,6 +56,11 @@ namespace conversion {
 #endif
 
 	}
+	template<typename _In>
+	void to_t(_In in, std::string& out) {
+		out = std::to_string(in);
+	}
+
     template<typename _In>
 	void to_t(_In in, long long& out) {
 		out = in;
@@ -250,9 +255,11 @@ public:
 		size_t count = script.size();
 
 		size_t s = count / 10;
+		_V value;
 		for (size_t j = 0; j < count; ++j) {
 
-			h[script[j]] = script[j];
+			conversion::to_t(j,value);
+			h[script[j]] = value;
 			if (j % s == 0) {
 				//std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
@@ -267,7 +274,8 @@ public:
 		/// check what is
 		for (size_t k = 0; k < count; ++k) {
             auto f = h.find(script[k]);
-			if (f == h.end() || f->second != script[k]) {
+            conversion::to_t(k,value);
+			if (f == h.end() || f->second != value) {
 				printf("ERROR: could not find %ld\n", (long int)k);
 			}
 
@@ -365,16 +373,17 @@ void more_tests() {
 	//unique_running_insertion();
 }
 void test_random(size_t ts) {
-	typedef unsigned long long _K;
+	typedef std::string _K;
+	//typedef unsigned long long _K;
 	typedef unsigned long long _V;
 	//typedef std::string _K;
 
 	tester<_K,_V>::_Script script;
 	tester<_K,_V> t;
-	t.gen_random(ts, script);
+	//t.gen_random(ts, script);
     //t.gen_seq(ts, script);
 	//t.gen_random_narrowest(ts, script);
-	//t.gen_random_narrow(ts, script);
+	t.gen_random_narrow(ts, script);
 
 	test_rabbit_hash<_K,_V>(script, ts);
 	//test_rabbit_sparse_hash<_K,_V>(script, ts);
