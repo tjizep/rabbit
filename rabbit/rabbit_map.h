@@ -196,7 +196,7 @@ namespace rabbit{
 			BITS_SIZE1 = BITS_SIZE-1;
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;
-			PROBES = 16;
+			PROBES = 12;
 			MIN_EXTENT = 4; /// start size of the hash table
 			MAX_OVERFLOW_FACTOR = 1<<17; //BITS_SIZE*8/sizeof(_Bt);
             LOGARITHMIC = logarithmic;
@@ -330,7 +330,7 @@ namespace rabbit{
 			size_type last_modified;
 			/// the existence bit set is a factor of BITS_SIZE+1 less than the extent
 			_Segment* clusters;///a.k.a. pages
-			_Keys keys;
+			_ElPair* keys;
 
 			size_type overflow;
 			size_type overflow_elements;
@@ -344,16 +344,26 @@ namespace rabbit{
 			_Allocator allocator;
 			_K empty_key;
 			size_type logarithmic;
-
+            size_type collisions;
 			typename _Allocator::template rebind<_Segment>::other get_segment_allocator() {
 				return typename _Allocator::template rebind<_Segment>::other(allocator) ;
+			}
+			typename _Allocator::template rebind<_ElPair>::other get_el_allocator(){
+				return typename _Allocator::template rebind<_ElPair>::other(allocator) ;
 			}
 			typename _Allocator::template rebind<_V>::other get_value_allocator(){
 				return typename _Allocator::template rebind<_V>::other(allocator) ;
 			}
+			size_type capacity() const {
+			    return get_data_size();
+			}
+
 			/// the minimum load factor
 			float load_factor() const{
 				return (float)((double)elements/(double)bucket_count());
+			}
+			float collision_factor() const{
+				return (float)((double)collisions/(double)bucket_count());
 			}
 
 			/// there are a variable ammount of buckets there are at most this much
@@ -510,6 +520,10 @@ namespace rabbit{
 
 				if(clusters) {
 					size_type esize = get_e_size();
+					for(size_type e = 0; e < get_data_size(); ++e){
+                        get_el_allocator().destroy(&keys[e]);
+                    }
+                    get_el_allocator().deallocate(keys,get_data_size());
 					for(size_type c = 0; c < esize; ++c){
 						get_segment_allocator().destroy(&clusters[c]);
 					}
@@ -569,12 +583,17 @@ namespace rabbit{
 				//std::cout << "rehash with overflow:" << overflow  << std::endl;
 				elements = 0;
 				removed = 0;
+				collisions = 0;
 				empty_key = _K();
 				overflow_elements = get_o_start();
 				size_type esize = get_e_size();
-				keys.resize(get_data_size());
+				keys = get_el_allocator().allocate(get_data_size());
 				clusters = get_segment_allocator().allocate(esize);
 				_KeySegment ks;
+                _ElPair element;
+				for(size_type e = 0; e < get_data_size(); ++e){
+					get_el_allocator().construct(&keys[e],element);
+				}
 				for(size_type c = 0; c < esize; ++c){
 					get_segment_allocator().construct(&clusters[c],ks);
 				}
@@ -588,7 +607,12 @@ namespace rabbit{
 				for(size_type c = 0; c < esize; ++c){
 					clusters[c].clear();
 				}
+				_ElPair element;
+				for(size_type e = 0; e < get_data_size(); ++e){
+					keys[e] = element;
+				}
 				set_exists(get_data_size(),true);
+				collisions = 0;
 				elements = 0;
 				removed = 0;
 			}
@@ -629,6 +653,7 @@ namespace rabbit{
 				removed = right.removed;
 				mf = right.mf;
 				elements = right.elements;
+				collisions = right.collisions;
 				size_type esize = get_e_size();
 				clusters = get_segment_allocator().allocate(esize);
 				keys = right.keys;
@@ -668,6 +693,8 @@ namespace rabbit{
 					if(!s.is_exists(si)){
 						s.toggle_exists(si);
 						set_segment_key(pos,k);
+
+						++collisions;
 						++elements;
 						set_overflows(origin, true);
 						return create_segment_value(pos);
@@ -913,6 +940,9 @@ namespace rabbit{
 			}
 			size_type size() const {
 				return elements;
+			}
+			size_type get_collisions() const {
+                return collisions;
 			}
 			typedef std::shared_ptr<hash_kernel> ptr;
 		}; /// hash_kernel
@@ -1200,7 +1230,8 @@ namespace rabbit{
                rehashed->set_logarithmic(current->get_logarithmic());
 				rehashed->resize_clear(new_extent);
 				rehashed->mf = (*this).current->mf;
-				//std::cout << " load factor " << current->load_factor() << std::endl;
+				//std::cout << " load factor " << current->load_factor() << " for " << current->size() << " elements and collision factor " << current->collision_factor() << std::endl;
+				//std::cout << " capacity " << current->capacity() << std::endl;
 				if(current->load_factor() < 0.3){
 					/// std::cout << "possible attack/bad hash detected : using random probes : " << current->get_probes() << std::endl;
 					nrand_probes = 1;

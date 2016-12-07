@@ -377,11 +377,11 @@ void test_random(size_t ts) {
 	//t.gen_random_narrow(ts, script);
 
 	test_rabbit_hash<_K,_V>(script, ts);
-	test_rabbit_sparse_hash<_K,_V>(script, ts);
+	//test_rabbit_sparse_hash<_K,_V>(script, ts);
 	//test_rabbit_hash_erase<_K>(ts/10);
 
 	test_dense_hash<_K,_V>(script, ts);
-	test_sparse_hash<_K,_V>(script, ts);
+	//test_sparse_hash<_K,_V>(script, ts);
 
 }
 int main(int argc, char **argv)
@@ -389,7 +389,7 @@ int main(int argc, char **argv)
 #ifdef _MSC_VER
 	::Sleep(1000);
 #endif
-	size_t ts = 40000000;
+	size_t ts = 10000000;
 	test_random(ts);
 	//google_times(ts);
 	//more_tests();

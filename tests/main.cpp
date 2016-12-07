@@ -352,8 +352,8 @@ void more_tests() {
 	//unique_running_insertion();
 }
 void test_random(size_t ts) {
-	typedef unsigned long _K;
-	typedef unsigned long _V;
+	typedef unsigned long long _K;
+	typedef unsigned long long _V;
 	//typedef std::string _K;
 
 	tester<_K, _V>::_Script script;
