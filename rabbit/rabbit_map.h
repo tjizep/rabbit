@@ -35,11 +35,11 @@ THE SOFTWARE.
 /// it uses linear probing for the first level of fallback and then a overflow area or secondary hash
 
 #ifdef _MSC_VER
-	#define RABBIT_NOINLINE_PRE _declspec(noinline)
+	#define RABBIT_NOINLINE_PRE //_declspec(noinline)
 	#define RABBIT_NOINLINE_
 #else
 	#define RABBIT_NOINLINE_PRE
-	#define RABBIT_NOINLINE_ __attribute__((noinline))
+	#define RABBIT_NOINLINE_ //__attribute__((noinline))
 #endif
 namespace rabbit{
 
@@ -664,11 +664,11 @@ namespace rabbit{
 				const _K& l = get_key(pos); ///.key(get_segment_index(pos));
 				return eq_f(l, k) ;
 			}
+
 			inline bool segment_equal_key_exists(size_type pos,const _K& k) const {
 				_Bt index = get_segment_index(pos);
 				const _Segment& s = get_segment(pos);
 				return  eq_f(get_key(pos), k) && s.is_exists(index) ;
-
 			}
 
 			bool equal_key(size_type pos,const _K& k) const {
@@ -687,7 +687,7 @@ namespace rabbit{
 			_V* subscript_rest(const _K& k, size_type origin)
 			RABBIT_NOINLINE_ {
 				size_type pos = map_rand_key(k);
-				for(unsigned int i =0; i < probes && pos < get_extent();++i){
+				for(unsigned int i =0; i < probes ;++i){ //&& pos < get_extent()
 					_Bt si = get_segment_index(pos);
 					_Segment& s = get_segment(pos);
 					if(!s.is_exists(si)){
@@ -867,17 +867,16 @@ namespace rabbit{
 				return end();
 			}
 			size_type find_rest(const _K& k, size_type origin) const
-			RABBIT_NOINLINE_
+			//RABBIT_NOINLINE_
 			{
 				/// randomization step for attack mitigation
 				size_type pos = map_rand_key(k);
 
-				for(unsigned int i =0; i < probes && pos < get_extent();){//
-					_Bt si = get_segment_index(pos);
+				for(unsigned int i =0; i < probes ;){//&& pos < get_extent()
 					if(segment_equal_key_exists(pos,k)){
 						return pos;
 					}
-                    pos += hash_probe_incr(i);
+                    ++pos; // += hash_probe_incr(i);
 					++i;
 				}
 
@@ -889,7 +888,7 @@ namespace rabbit{
 				return end();
 			}
 			size_type find_empty(const _K& k,size_type& pos) const
-			RABBIT_NOINLINE_
+			//RABBIT_NOINLINE_
 			{
                 pos = map_key(k);
                 _Bt index = get_segment_index(pos);

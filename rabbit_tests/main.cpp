@@ -1,3 +1,4 @@
+#include <numeric>
 #include <stdlib.h>
 #include <stdio.h>
 #include <random>
@@ -84,6 +85,22 @@ namespace conversion {
 		out = (unsigned long)in;
 	}
 
+	void to_t(const std::string& in, unsigned long& out) {
+		out = std::stoul(in);
+	}
+
+	void to_t(const std::string& in, long& out) {
+		out = std::stol(in);
+	}
+
+	void to_t(const std::string& in, long long& out) {
+		out = std::stoll(in);
+	}
+
+	void to_t(const std::string& in, unsigned long long& out) {
+		out = std::stoull(in);
+	}
+
 	template<typename _In>
     void to_t(_In in, unsigned int& out) {
 		out = (unsigned int)in;
@@ -103,7 +120,7 @@ static const int64_t SEED = 0;
 static std::mt19937_64 generator(SEED);
 
 
-template< typename _T,typename _V>
+template< class _T,class _V>
 class tester {
 public:
 	typedef _V _ValueType;
@@ -114,7 +131,8 @@ public:
 		double start = get_proc_mem_use();
 		//std::minstd_rand rd;
 		std::mt19937 gen(6);
-		std::uniform_int_distribution<_ValueType> dis(0, std::numeric_limits<_ValueType>::max());
+
+		std::uniform_int_distribution<_ValueType> dis(std::numeric_limits<_ValueType>::min(), std::numeric_limits<_ValueType>::max());
 		/// script creation is not benched
 		_InputField v;
 		for (size_t r = 0; r < count; ++r) {
@@ -258,7 +276,7 @@ public:
 		_V value;
 		for (size_t j = 0; j < count; ++j) {
 
-			conversion::to_t(j,value);
+			conversion::to_t(script[j],value);
 			h[script[j]] = value;
 			if (j % s == 0) {
 				//std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -274,7 +292,7 @@ public:
 		/// check what is
 		for (size_t k = 0; k < count; ++k) {
             auto f = h.find(script[k]);
-            conversion::to_t(k,value);
+            conversion::to_t(script[k],value);
 			if (f == h.end() || f->second != value) {
 				printf("ERROR: could not find %ld\n", (long int)k);
 			}
@@ -324,7 +342,7 @@ void test_rabbit_hash(typename tester<_T,_V>::_Script& script, size_t ts) {
 	printf("rabbit hash test\n");
 	typedef rabbit::unordered_map<_T, typename tester<_T,_V>::_ValueType> _Map;
 	_Map h;
-
+    //h.set_logarithmic(1);
 	tester<_T,_V> t;
 
 	t.bench_hash_simple(h, script);
@@ -373,17 +391,17 @@ void more_tests() {
 	//unique_running_insertion();
 }
 void test_random(size_t ts) {
-	typedef std::string _K;
-	//typedef unsigned long long _K;
-	typedef unsigned long long _V;
+	//typedef std::string _K;
+	typedef unsigned long _K;
+	typedef unsigned long _V;
 	//typedef std::string _K;
 
 	tester<_K,_V>::_Script script;
 	tester<_K,_V> t;
-	//t.gen_random(ts, script);
-    //t.gen_seq(ts, script);
+	t.gen_random(ts, script);
+    ////t.gen_seq(ts, script);
 	//t.gen_random_narrowest(ts, script);
-	t.gen_random_narrow(ts, script);
+	//t.gen_random_narrow(ts, script);
 
 	test_rabbit_hash<_K,_V>(script, ts);
 	//test_rabbit_sparse_hash<_K,_V>(script, ts);
@@ -400,7 +418,7 @@ int main(int argc, char **argv)
 #endif
 	size_t ts = 10000000;
 	test_random(ts);
-	//google_times(ts);
+	google_times(ts);
 	//more_tests();
 	return 0;
 }
