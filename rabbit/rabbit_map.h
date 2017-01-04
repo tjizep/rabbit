@@ -207,7 +207,7 @@ namespace rabbit{
 		typedef typename _InMapper::config_type rabbit_config;
 		typedef typename rabbit_config::_Bt _Bt;
 		typedef typename rabbit_config::size_type size_type;
-		typedef ptrdiff_t difference_type;
+		typedef std::ptrdiff_t difference_type;
 		typedef _InMapper _Mapper;
 	};
 	typedef basic_traits<_BinMapper<basic_config<0> > > default_traits;

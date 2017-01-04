@@ -8,11 +8,10 @@
 #include <string>
 #include <sstream>
 
-#define _HAS_GOOGLE_HASH_
-#ifdef _MSC_VER
-#endif
 #include <functional>
+#ifdef _HAS_GOOGLE_HASH_
 #include <sparsehash/internal/sparseconfig.h>
+#endif
 
 #include <rabbit/unordered_map>
 #include <rabbit/unordered_set>
@@ -418,7 +417,7 @@ int main(int argc, char **argv)
 #endif
 	size_t ts = 10000000;
 	test_random(ts);
-	google_times(ts);
+	//google_times(ts);
 	//more_tests();
 	return 0;
 }
