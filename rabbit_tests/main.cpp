@@ -8,11 +8,10 @@
 #include <string>
 #include <sstream>
 
-#define _HAS_GOOGLE_HASH_
-#ifdef _MSC_VER
-#endif
 #include <functional>
+#ifdef _HAS_GOOGLE_HASH_
 #include <sparsehash/internal/sparseconfig.h>
+#endif
 
 #include <rabbit/unordered_map>
 #include <rabbit/unordered_set>

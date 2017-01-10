@@ -1,0 +1,6 @@
+#eclipse integration
+.project
+.cproject
+.settings
+#allows out of source build
+build*
