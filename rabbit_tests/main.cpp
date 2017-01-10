@@ -340,7 +340,7 @@ void test_sparse_hash(typename tester<_T,_V>::_Script& script, size_t ts) {
 template<typename _T,typename _V>
 void test_rabbit_hash(typename tester<_T,_V>::_Script& script, size_t ts) {
 	printf("rabbit hash test\n");
-	typedef rabbit::unordered_map<_T, typename tester<_T,_V>::_ValueType> _Map;
+	typedef rabbit::unordered_map<_T, typename tester<_T,_V>::_ValueType, std::hash<_T> > _Map;
 	_Map h;
     //h.set_logarithmic(1);
 	tester<_T,_V> t;
@@ -360,7 +360,7 @@ void test_rabbit_sparse_hash(typename tester<_T,_V>::_Script& script, size_t ts)
 template<typename T,typename _V>
 void test_rabbit_hash_erase(size_t ts) {
 	printf("rabbit hash test\n");
-	typedef rabbit::unordered_map<T, typename tester<T,_V>::_ValueType> _Map;
+	typedef rabbit::unordered_map<T, typename tester<T,_V>::_ValueType, std::hash<T> > _Map;
 	_Map h;
     typename tester<T,_V>::_Script script;
 	tester<T,_V> t;
@@ -392,16 +392,16 @@ void more_tests() {
 }
 void test_random(size_t ts) {
 	//typedef std::string _K;
-	typedef unsigned long _K;
+	typedef unsigned long  _K;
 	typedef unsigned long _V;
 	//typedef std::string _K;
 
 	tester<_K,_V>::_Script script;
 	tester<_K,_V> t;
-	//t.gen_random(ts, script);
+	t.gen_random(ts, script);
     //t.gen_seq(ts, script);
 	//t.gen_random_narrowest(ts, script);
-	t.gen_random_narrow(ts, script);
+	//t.gen_random_narrow(ts, script);
 
 	test_rabbit_hash<_K,_V>(script, ts);
 	//test_rabbit_sparse_hash<_K,_V>(script, ts);
@@ -419,7 +419,7 @@ int main(int argc, char **argv)
 #endif
 	size_t ts = 10000000;
 	test_random(ts);
-	google_times(ts);
+	//google_times(ts);
 	//more_tests();
 	return 0;
 }
