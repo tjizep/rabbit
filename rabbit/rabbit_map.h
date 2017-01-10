@@ -1206,7 +1206,7 @@ namespace rabbit{
 			return current->bucket_size ( n );
 		}
 		float max_load_factor() const {
-			if(current==nullptr) 1;
+			if(current==nullptr) return 1;
 			return current->max_load_factor();
 		}
 
