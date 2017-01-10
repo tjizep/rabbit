@@ -116,7 +116,7 @@ namespace conversion {
 		out = (float)in;
 	}
 };
-static const int64_t SEED = 0;
+static const int64_t SEED = 13;
 static std::mt19937_64 generator(SEED);
 
 
@@ -399,7 +399,7 @@ void test_random(size_t ts) {
 	tester<_K,_V>::_Script script;
 	tester<_K,_V> t;
 	t.gen_random(ts, script);
-    ////t.gen_seq(ts, script);
+    //t.gen_seq(ts, script);
 	//t.gen_random_narrowest(ts, script);
 	//t.gen_random_narrow(ts, script);
 
@@ -409,6 +409,7 @@ void test_random(size_t ts) {
 
 	test_dense_hash<_K,_V>(script, ts);
 	//test_sparse_hash<_K,_V>(script, ts);
+	//test_std_hash<_K,_V>(script, ts);
 
 }
 int main(int argc, char **argv)
@@ -418,7 +419,7 @@ int main(int argc, char **argv)
 #endif
 	size_t ts = 10000000;
 	test_random(ts);
-	google_times(ts);
+	//google_times(ts);
 	//more_tests();
 	return 0;
 }
