@@ -1020,10 +1020,9 @@ namespace rabbit{
                 return (*this);
             }
             inline iterator& operator++() {
-                increment();
-                while ((exists & (((_Bt)1) << index)) == (_Bt)0){
-					increment();
-				}
+                do {
+                    increment();
+                } while ((exists & (((_Bt)1) << index)) == (_Bt)0);
                 return (*this);
             }
             iterator operator++(int) {
