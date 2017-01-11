@@ -423,6 +423,17 @@ struct test_data{
     };
     test_data(int val) : val(val){
     }
+    test_data(const test_data& right) :val(right.val){
+    }
+    test_data& operator=(const test_data& right){
+        val = right.val;
+    }
+    bool operator==(const test_data& right) const {
+        return val == right.val;
+    }
+     bool operator==(const int& right) const {
+        return val == right;
+    }
     int val;
 };
 
@@ -443,13 +454,13 @@ void test_random_int(test_data data, test_type test, size_t ts) {
 
 	tester<_K,_V>::_Script script;
 	tester<_K,_V> t;
-	if(data.FULL){
+	if(data == test_data::FULL){
         t.gen_random(ts, script);
-	}else if(data.NARROW){
+	}else if(data == test_data::NARROW){
         t.gen_random_shuffle(ts, script);
-	}else if(data.NARRROWEST){
+	}else if(data == test_data::NARRROWEST){
 	    t.gen_random_shuffle_16(ts, script);
-	}else if(data.SEQUENTIAL){
+	}else if(data == test_data::SEQUENTIAL){
 	    t.gen_seq(ts, script);
 	}
 
@@ -476,12 +487,12 @@ int main(int argc, char **argv)
 	test_type test;
 	test.dense = false;
 	test.rabbit = true;
-	test.rabbit_unit = true;
+	test.rabbit_unit = false;
 	test.rabbit_sparse = false;
 	test.sparse = false;
 	test.std_container = false;
     test.google_tests = false;
-	test_random_int(test_data::FULL,test,ts);
+	test_random_int(test_data::NARRROWEST,test,ts);
 
 	//more_tests();
 	return 0;
