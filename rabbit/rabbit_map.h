@@ -76,11 +76,11 @@ namespace rabbit{
 			size_type l2 = this->config.log2(any);
 			return (size_type)(2ll << l2);
 		}
-		inline size_type randomize(size_type other) const {
+		size_type randomize(size_type other) const {
 		    size_type r = other>>this->primary_bits;
 			return other + r; // (r*r) >> 2; //(other ^ random_val) & this->extent1;
 		}
-		inline size_type operator()(size_type h_n) const {
+		size_type operator()(size_type h_n) const {
 			size_type h = h_n; // & this->gate_bits;
 			//h += (h>>this->primary_bits);
             return  h & this->extent1; //
@@ -360,6 +360,7 @@ namespace rabbit{
 
 			/// the minimum load factor
 			float load_factor() const{
+			    if(!elements) return 0;
 				return (float)((double)elements/(double)bucket_count());
 			}
 			float collision_factor() const{
@@ -369,7 +370,7 @@ namespace rabbit{
 			/// there are a variable ammount of buckets there are at most this much
 			///
 			size_type bucket_count() const {
-
+                if(!elements) return 0;
 				return get_data_size();
 			}
 			/// the size of a bucket can be calculated based on the
@@ -926,7 +927,7 @@ namespace rabbit{
 			}
 
 			size_type begin() const {
-				if(elements==0)
+				if(!elements)
 					return end();
 
 				size_type pos = 0;
@@ -948,6 +949,7 @@ namespace rabbit{
 				return pos ;
 			}
 			size_type end() const {
+
 				return get_data_size();
 			}
 			size_type size() const {
@@ -969,26 +971,26 @@ namespace rabbit{
             _Bt exists;
             _Bt bsize;
             const kernel_ptr get_kernel() const {
-				if(h == nullptr) return nullptr;
+				//if(h == nullptr) return nullptr;
                 return h->current.get();
             }
             kernel_ptr get_kernel() {
-				if(h == nullptr) return nullptr;
+				//if(h == nullptr) return nullptr;
                 return h->current.get();
             }
             void set_index() {
-                if (get_kernel() != nullptr) {//
+                //if (get_kernel() != nullptr) {//
                     const _Segment& s = get_kernel()->get_segment(pos);
                     exists = s.exists;
                     index = get_kernel()->get_segment_index(pos);
                     bsize = get_kernel()->config.BITS_SIZE;
-                }
+                //}
             }
             void check_index() {
 
             }
             void increment() {
-				if(get_kernel() == nullptr) return;
+				//if(get_kernel() == nullptr) return;
                 ++pos;
                 ++index;
                 if (index == bsize) {
@@ -1072,21 +1074,21 @@ namespace rabbit{
 				}
 			}
             inline const kernel_ptr get_kernel() const {
-				if(h==nullptr) return nullptr;
+				//if(h==nullptr) return nullptr;
 				check_pointer();
                 return h->pcurrent;
             }
             inline kernel_ptr get_kernel() {
-				if(h==nullptr) return nullptr;
+				//if(h==nullptr) return nullptr;
                 check_pointer();
 				return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
             }
             void set_index() {
-                if (get_kernel() != nullptr) { ///
+                //if (get_kernel() != nullptr) { ///
                     const _Segment& s = get_kernel()->get_segment(pos);
                     exists = s.exists;
                     index = get_kernel()->get_segment_index(pos);
-                }
+                //}
             }
             void check_index() {
 

@@ -126,7 +126,35 @@ public:
 	typedef _V _ValueType;
 
 	typedef _T _InputField;
+
 	typedef std::vector<_InputField> _Script;
+#ifdef _MSC_VER
+	_ValueType get_max(long) const {
+		return 1l << 31l;
+	}
+	_ValueType get_max(long long) const {
+		return 1ll << 63ll;
+	}
+	_ValueType get_max(unsigned long) const {
+		return ~((unsigned long)0);
+	}
+	_ValueType get_max(unsigned long long) const {
+		return ~((unsigned long long)0);
+	}
+	void gen_random(size_t count, _Script& script) {
+		double start = get_proc_mem_use();
+		//std::minstd_rand rd;
+		std::mt19937 gen(6);
+		std::uniform_int_distribution<_ValueType> dis(0, get_max(long()));
+		/// script creation is not benched
+		_InputField v;
+		for (size_t r = 0; r < count; ++r) {
+			conversion::to_t(dis(gen), v);//dis(gen)
+			script.push_back(v);
+		}
+		printf("memory used by script: %.4g MB\n", get_proc_mem_use() - start);
+	}
+#else
 	void gen_random(size_t count, _Script& script) {
 		double start = get_proc_mem_use();
 		//std::minstd_rand rd;
@@ -141,7 +169,7 @@ public:
 		}
 		printf("memory used by script: %.4g MB\n", get_proc_mem_use() - start);
 	}
-
+#endif
 	void gen_random_shuffle(size_t count, _Script& script) {
 		double start = get_proc_mem_use();
 		/// script creation is not benched
@@ -176,16 +204,60 @@ public:
 		printf("memory used by script: %.4g MB\n", get_proc_mem_use() - start);
 	}
 	template<typename _MapT>
+	long empty_test(_MapT &h) {
+	    long errors = 0;
+        if(h.size()!=0){
+            printf("ERROR: Empty: failed size\n");
+            ++errors;
+        }
+	    if(!h.empty()){
+            printf("ERROR: Empty: failed empty\n");
+            ++errors;
+        }
+	    if(h.begin() != h.end()) {
+            printf("ERROR: Empty: failed begin end\n");
+            ++errors;
+        };
+        if(h.bucket_count() != 0) {
+            printf("ERROR: Empty: failed bucket count\n");
+            ++errors;
+        };
+        if(h.load_factor() != 0) {
+            printf("ERROR: Empty: failed load factor\n");
+            ++errors;
+        };
+        if(h.max_load_factor() != 1) {
+            printf("ERROR: Empty: failed max load factor\n");
+            ++errors;
+        };
+	    return errors;
+	}
+	template<typename _MapT>
+	long not_empty_test(_MapT &h) {
+	    long errors = 0;
+        if(h.size()==0) ++errors;
+	    if(h.empty()) ++errors;
+	    if(h.begin() == h.end()) ++errors;
+        if(h.bucket_count() == 0) ++errors;
+        if(h.load_factor() == 0) ++errors;
+        if(h.max_load_factor() == 1) ++errors;
+	    return errors;
+	}
+	template<typename _MapT>
 	void erase_test(_MapT &h, const _Script& script) {
 		double mem_start = get_proc_mem_use();
 		std::chrono::steady_clock::time_point start_erase = std::chrono::steady_clock::now();
 		size_t count = script.size();
 		size_t s = count / 10;
 		size_t hs = script.size();
-		long errors = 0;
+		long errors = empty_test(h);
 		long erases = 0;
+		if(errors){
+            printf("ERROR: empty test failed\n");
+		}
+
 		for (size_t k = 0; k < count ; ++k) {
-		    h[script[k]] = k + 1;
+		    h[script[k]] = (_ValueType) k + 1;
 		}
 		for (size_t k = 0; k < count / 2; ++k) {
             auto f = h.find(script[k]);
@@ -236,7 +308,11 @@ public:
 			++errors;
 			printf("ERROR: container invalid size %ld != %ld\n", (long int)h.size(), (long int)hs);
 		}
-
+        for(typename _MapT::iterator c = h.begin(); c!=h.end(); ++c){
+            h.erase(c);
+		}
+		printf("INFO: container erased size %ld \n", (long int)h.size());
+		errors += empty_test(h);
 		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
 		printf("erase test total %.4g secs. mem used %.4g MB : %ld errors\n", (double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start_erase).count()) / (1000000.0), get_proc_mem_use() - mem_start, errors);
@@ -419,7 +495,7 @@ struct test_data{
         SEQUENTIAL,
         NARRROWEST,
         NARROW,
-        FULL
+        WIDE
     };
     test_data(int val) : val(val){
     }
@@ -448,13 +524,13 @@ struct test_type{
 };
 void test_random_int(test_data data, test_type test, size_t ts) {
 	//typedef std::string _K;
-	typedef unsigned long _K;
-	typedef unsigned long _V;
+	typedef unsigned long long _K;
+	typedef unsigned long long _V;
 	//typedef std::string _K;
 
 	tester<_K,_V>::_Script script;
 	tester<_K,_V> t;
-	if(data == test_data::FULL){
+	if(data == test_data::WIDE){
         t.gen_random(ts, script);
 	}else if(data == test_data::NARROW){
         t.gen_random_shuffle(ts, script);
@@ -477,7 +553,7 @@ void test_random_int(test_data data, test_type test, size_t ts) {
 	if(test.std_container)
         test_std_hash<_K,_V>(script, ts);
     if(test.google_tests)
-        google_times(ts);
+        google_times((int)ts);
 
 }
 int main(int argc, char **argv)
@@ -486,13 +562,13 @@ int main(int argc, char **argv)
 	size_t ts = 10000000;
 	test_type test;
 	test.dense = false;
-	test.rabbit = true;
-	test.rabbit_unit = false;
+	test.rabbit = false;
+	test.rabbit_unit = true;
 	test.rabbit_sparse = false;
 	test.sparse = false;
 	test.std_container = false;
     test.google_tests = false;
-	test_random_int(test_data::NARRROWEST,test,ts);
+	test_random_int(test_data::WIDE,test,ts);
 
 	//more_tests();
 	return 0;

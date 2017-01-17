@@ -1,8 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <limits>
+#include <numeric>
 #include <random>
 #include <algorithm>
-#include <numeric>
 #include <unordered_map>
 #include <map>
 #include <string>
@@ -116,7 +117,7 @@ namespace conversion {
 		out = (float)in;
 	}
 };
-static const int64_t SEED = 0;
+static const int64_t SEED = 13;
 static std::mt19937_64 generator(SEED);
 
 
@@ -127,13 +128,23 @@ public:
 
 	typedef _T _InputField;
 	typedef std::vector<_InputField> _Script;
+	_ValueType get_max(long) const {
+		return 1l << 31l;
+	}
+	_ValueType get_max(long long ) const {
+		return 1ll << 63ll;
+	}
+	_ValueType get_max(unsigned long) const {
+		return ~((unsigned long)0);
+	}
+	_ValueType get_max(unsigned long long) const {
+		return ~((unsigned long long)0);
+	}
 	void gen_random(size_t count, _Script& script) {
 		double start = get_proc_mem_use();
 		//std::minstd_rand rd;
 		std::mt19937 gen(6);
-		//std::numeric_limits<_ValueType>::min()
-		//std::numeric_limits<long>::max()
-		std::uniform_int_distribution<long> dis(0, 1 << 30);
+		std::uniform_int_distribution<_ValueType> dis(0, get_max(long()));
 		/// script creation is not benched
 		_InputField v;
 		for (size_t r = 0; r < count; ++r) {
@@ -143,7 +154,7 @@ public:
 		printf("memory used by script: %.4g MB\n", get_proc_mem_use() - start);
 	}
 
-	void gen_random_narrow(size_t count, _Script& script) {
+	void gen_random_shuffle(size_t count, _Script& script) {
 		double start = get_proc_mem_use();
 		/// script creation is not benched
 		_InputField v;
@@ -154,7 +165,8 @@ public:
 		std::shuffle(script.begin(), script.end(), generator);
 		printf("memory used by script: %.4g MB\n", get_proc_mem_use() - start);
 	}
-	void gen_random_narrowest(size_t count, _Script& script) {
+	/// shuffled list of integers with max(rand())-min(rand()) or ~16-bit width
+	void gen_random_shuffle_16(size_t count, _Script& script) {
 		double start = get_proc_mem_use();
 		/// script creation is not benched
 		_InputField v;
@@ -181,8 +193,12 @@ public:
 		std::chrono::steady_clock::time_point start_erase = std::chrono::steady_clock::now();
 		size_t count = script.size();
 		size_t s = count / 10;
-		size_t hs = h.size();
+		size_t hs = script.size();
 		long errors = 0;
+		long erases = 0;
+		for (size_t k = 0; k < count; ++k) {
+			h[script[k]] = k + 1;
+		}
 		for (size_t k = 0; k < count / 2; ++k) {
 			auto f = h.find(script[k]);
 			if (f != h.end() && f->second == k + 1) {
@@ -190,6 +206,7 @@ public:
 					printf("ERROR: could not erase %ld\n", (long int)k);
 					++errors;
 				};
+				++erases;
 				if (h.count(script[k]) != 0) {
 					printf("ERROR: erase not reported %ld\n", (long int)k);
 				}
@@ -200,12 +217,29 @@ public:
 				}
 			}
 		}
-
+		if (erases == 0) {
+			printf("ERROR: erases are 0 %ld\n", (long int)erases);
+			++errors;
+		}
 		for (size_t k = 0; k < count / 2; ++k) {
 			if (h.count(script[k]) != 0) {
 				printf("ERROR: could find %ld\n", (long int)k);
 				++errors;
 			};
+		}
+		for (size_t k = count / 2; k < count; ++k) {
+			if (h.count(script[k]) == 0) {
+				printf("ERROR: could not find %ld\n", (long int)k);
+				++errors;
+			};
+		}
+		long const_ctr = 0;
+		for (typename _MapT::const_iterator c = h.begin(); c != h.end(); ++c) {
+			++const_ctr;
+		}
+		if (const_ctr != h.size()) {
+			printf("ERROR: const iterator not counting %ld\n", (long int)const_ctr);
+			++errors;
 		}
 		for (size_t k = 0; k < count / 2; ++k) {
 			h[script[k]] = (typename _MapT::mapped_type)k + 1;
@@ -214,6 +248,7 @@ public:
 			++errors;
 			printf("ERROR: container invalid size %ld != %ld\n", (long int)h.size(), (long int)hs);
 		}
+
 		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
 		printf("erase test total %.4g secs. mem used %.4g MB : %ld errors\n", (double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start_erase).count()) / (1000000.0), get_proc_mem_use() - mem_start, errors);
@@ -359,14 +394,14 @@ void test_rabbit_sparse_hash(typename tester<_T, _V>::_Script& script, size_t ts
 
 }
 template<typename T, typename _V>
-void test_rabbit_hash_erase(size_t ts) {
-	printf("rabbit hash test\n");
+void test_rabbit_hash_unit(size_t ts) {
+	printf("rabbit hash erase test\n");
 	typedef rabbit::unordered_map<T, typename tester<T, _V>::_ValueType> _Map;
 	_Map h;
 	typename tester<T, _V>::_Script script;
 	tester<T, _V> t;
-	t.gen_random(ts, script);
-	t.bench_hash(h, script);
+	t.gen_random_shuffle(ts, script);
+	//t.bench_hash(h, script);
 	t.erase_test(h, script);
 
 }
@@ -391,35 +426,89 @@ void more_tests() {
 	//unique_scattered_lookup();
 	//unique_running_insertion();
 }
-void test_random(size_t ts) {
-	typedef std::string _K;
-	//typedef unsigned long long _K;
+struct test_data {
+	enum {
+		SEQUENTIAL,
+		NARRROWEST,
+		NARROW,
+		FULL
+	};
+	test_data(int val) : val(val) {
+	}
+	test_data(const test_data& right) :val(right.val) {
+	}
+	test_data& operator=(const test_data& right) {
+		val = right.val;
+	}
+	bool operator==(const test_data& right) const {
+		return val == right.val;
+	}
+	bool operator==(const int& right) const {
+		return val == right;
+	}
+	int val;
+};
+
+struct test_type {
+	bool rabbit;
+	bool rabbit_sparse;
+	bool rabbit_unit;
+	bool dense;
+	bool sparse;
+	bool std_container;
+	bool google_tests;
+};
+void test_random_int(test_data data, test_type test, size_t ts) {
+	//typedef std::string _K;
+	typedef unsigned long long _K;
 	typedef unsigned long long _V;
 	//typedef std::string _K;
 
 	tester<_K, _V>::_Script script;
 	tester<_K, _V> t;
-	t.gen_random(ts, script);
-	////t.gen_seq(ts, script);
-	//t.gen_random_narrowest(ts, script);
-	//t.gen_random_narrow(ts, script);
+	if (data == test_data::FULL) {
+		t.gen_random(ts, script);
+	}
+	else if (data == test_data::NARROW) {
+		t.gen_random_shuffle(ts, script);
+	}
+	else if (data == test_data::NARRROWEST) {
+		t.gen_random_shuffle_16(ts, script);
+	}
+	else if (data == test_data::SEQUENTIAL) {
+		t.gen_seq(ts, script);
+	}
 
-	test_rabbit_hash<_K, _V>(script, ts);
-	//test_rabbit_sparse_hash<_K,_V>(script, ts);
-	//test_rabbit_hash_erase<_K>(ts/10);
-
-	test_dense_hash<_K, _V>(script, ts);
-	//test_sparse_hash<_K,_V>(script, ts);
+	if (test.rabbit)
+		test_rabbit_hash<_K, _V>(script, ts);
+	if (test.rabbit_sparse)
+		test_rabbit_sparse_hash<_K, _V>(script, ts);
+	if (test.rabbit_unit)
+		test_rabbit_hash_unit<_K, _V>(ts / 10);
+	if (test.sparse)
+		test_sparse_hash<_K, _V>(script, ts);
+	if (test.dense)
+		test_dense_hash<_K, _V>(script, ts);
+	if (test.std_container)
+		test_std_hash<_K, _V>(script, ts);
+	if (test.google_tests)
+		google_times(ts);
 
 }
 int main(int argc, char **argv)
 {
-#ifdef _MSC_VER
-	::Sleep(1000);
-#endif
+
 	size_t ts = 10000000;
-	test_random(ts);
-	//google_times(ts);
+	test_type test;
+	test.dense = true;
+	test.rabbit = true;
+	test.rabbit_unit = false;
+	test.rabbit_sparse = false;
+	test.sparse = false;
+	test.std_container = false;
+	test.google_tests = false;
+	test_random_int(test_data::NARROW, test, ts);
+
 	//more_tests();
 	return 0;
 }
