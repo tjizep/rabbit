@@ -971,30 +971,29 @@ namespace rabbit{
             _Bt exists;
             _Bt bsize;
             const kernel_ptr get_kernel() const {
-				//if(h == nullptr) return nullptr;
-                return h->current.get();
+				return h->current.get();
             }
             kernel_ptr get_kernel() {
-				//if(h == nullptr) return nullptr;
-                return h->current.get();
+				return h->current.get();
             }
             void set_index() {
-                //if (get_kernel() != nullptr) {//
-                    const _Segment& s = get_kernel()->get_segment(pos);
+                auto k = get_kernel();
+                if (k != nullptr) {//
+                    const _Segment& s = k->get_segment(pos);
                     exists = s.exists;
-                    index = get_kernel()->get_segment_index(pos);
-                    bsize = get_kernel()->config.BITS_SIZE;
-                //}
+                    index = k->get_segment_index(pos);
+                    bsize = k->config.BITS_SIZE;
+                }
             }
-            void check_index() {
 
-            }
             void increment() {
-				//if(get_kernel() == nullptr) return;
-                ++pos;
+				++pos;
                 ++index;
                 if (index == bsize) {
-                    set_index();
+                    auto k = get_kernel();
+                    const _Segment& s = k->get_segment(pos);
+                    exists = s.exists;
+                    index = k->get_segment_index(pos);
                 }
 
             }
@@ -1074,28 +1073,24 @@ namespace rabbit{
 				}
 			}
             inline const kernel_ptr get_kernel() const {
-				//if(h==nullptr) return nullptr;
 				check_pointer();
                 return h->pcurrent;
             }
             inline kernel_ptr get_kernel() {
-				//if(h==nullptr) return nullptr;
-                check_pointer();
+				check_pointer();
 				return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
             }
             void set_index() {
-                //if (get_kernel() != nullptr) { ///
-                    const _Segment& s = get_kernel()->get_segment(pos);
+                auto k = get_kernel();
+                if ( k != nullptr) { ///
+                    const _Segment& s = k->get_segment(pos);
                     exists = s.exists;
-                    index = get_kernel()->get_segment_index(pos);
-                //}
+                    index = k->get_segment_index(pos);
+                }
             }
-            void check_index() {
 
-            }
             void increment() {
-				if(get_kernel() == nullptr) return;
-                ++pos;
+				++pos;
                 ++index;
                 if (index == get_kernel()->config.BITS_SIZE) {
                     set_index();

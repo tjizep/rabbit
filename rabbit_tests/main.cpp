@@ -218,6 +218,10 @@ public:
             printf("ERROR: Empty: failed begin end\n");
             ++errors;
         };
+        if(h.cbegin() != h.cend()) {
+            printf("ERROR: Empty: failed begin end\n");
+            ++errors;
+        };
         if(h.bucket_count() != 0) {
             printf("ERROR: Empty: failed bucket count\n");
             ++errors;
@@ -235,12 +239,34 @@ public:
 	template<typename _MapT>
 	long not_empty_test(_MapT &h) {
 	    long errors = 0;
-        if(h.size()==0) ++errors;
-	    if(h.empty()) ++errors;
-	    if(h.begin() == h.end()) ++errors;
-        if(h.bucket_count() == 0) ++errors;
-        if(h.load_factor() == 0) ++errors;
-        if(h.max_load_factor() == 1) ++errors;
+        if(h.size()==0) {
+            printf("ERROR: Not Empty: failed size\n");
+            ++errors;
+        };
+	    if(h.empty()) {
+            printf("ERROR: Not Empty: failed empty\n");
+            ++errors;
+        };
+	    if(h.begin() == h.end()) {
+            printf("ERROR: Not Empty: begin end\n");
+            ++errors;
+        };
+	    if(h.cbegin() == h.cend()) {
+            printf("ERROR: Not Empty: failed cbegin cend\n");
+            ++errors;
+        };
+        if(h.bucket_count() == 0) {
+            printf("ERROR: Not Empty: failed bucket count\n");
+            ++errors;
+        };
+        if(h.load_factor() == 0) {
+            printf("ERROR: Not Empty: failed load factor\n");
+            ++errors;
+        };
+        if(h.max_load_factor() != 1) {
+            printf("ERROR: Not Empty: failed max load factor\n");
+            ++errors;
+        };;
 	    return errors;
 	}
 	template<typename _MapT>
@@ -297,6 +323,7 @@ public:
 		for(typename _MapT::const_iterator c = h.begin(); c!=h.end(); ++c){
             ++const_ctr;
 		}
+		errors += not_empty_test(h);
 		if(const_ctr != h.size()){
             printf("ERROR: const iterator not counting %ld\n", (long int)const_ctr);
             ++errors;
@@ -393,15 +420,9 @@ public:
 		for (size_t k = 0; k < count; ++k) {
             auto f = h.find(script[k]);
             conversion::to_t(script[k],value);
-			if (f == h.end() || f->second != value) {
-				printf("ERROR: could not find %ld\n", (long int)k);
-			}
-
-			if (k % s == 0) {
-				//std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-
-				//printf("%ld: bench read %.4g secs\n",(long)k,(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start_read).count())/(1000000.0),get_proc_mem_use()-mem_start);
-			}
+            if (f == h.end() || f->second != value) {
+                printf("ERROR: could not find %ld\n", (long int)k);
+            }
         }
 
 		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -503,6 +524,7 @@ struct test_data{
     }
     test_data& operator=(const test_data& right){
         val = right.val;
+        return *this;
     }
     bool operator==(const test_data& right) const {
         return val == right.val;
@@ -561,9 +583,9 @@ int main(int argc, char **argv)
 
 	size_t ts = 10000000;
 	test_type test;
-	test.dense = false;
-	test.rabbit = false;
-	test.rabbit_unit = true;
+	test.dense = true;
+	test.rabbit = true;
+	test.rabbit_unit = false;
 	test.rabbit_sparse = false;
 	test.sparse = false;
 	test.std_container = false;
