@@ -8,12 +8,13 @@
 #include <string>
 #include <sstream>
 
-#define _HAS_GOOGLE_HASH_
+//#define _HAS_GOOGLE_HASH_
 #ifdef _MSC_VER
 #endif
 #include <functional>
+#ifdef _HAS_GOOGLE_HASH_
 #include <sparsehash/internal/sparseconfig.h>
-
+#endif
 #include <rabbit/unordered_map>
 #include <rabbit/unordered_set>
 
@@ -574,9 +575,10 @@ void test_random_int(test_data data, test_type test, size_t ts) {
         test_dense_hash<_K,_V>(script, ts);
 	if(test.std_container)
         test_std_hash<_K,_V>(script, ts);
+#ifdef _HAS_GOOGLE_HASH_
     if(test.google_tests)
         google_times((int)ts);
-
+#endif
 }
 int main(int argc, char **argv)
 {
@@ -585,11 +587,11 @@ int main(int argc, char **argv)
 	test_type test;
 	test.dense = true;
 	test.rabbit = true;
-	test.rabbit_unit = false;
+	test.rabbit_unit = true;
 	test.rabbit_sparse = false;
 	test.sparse = false;
 	test.std_container = false;
-    test.google_tests = false;
+    test.google_tests = true;
 	test_random_int(test_data::WIDE,test,ts);
 
 	//more_tests();

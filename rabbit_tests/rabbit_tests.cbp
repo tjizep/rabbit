@@ -10,8 +10,9 @@
 				<Option output="bin/Debug/rabbit_tests" prefix_auto="1" extension_auto="1" />
 				<Option object_output="obj/Debug/" />
 				<Option type="1" />
-				<Option compiler="gcc" />
+				<Option compiler="clang" />
 				<Compiler>
+					<Add option="-std=c++11" />
 					<Add option="-g" />
 				</Compiler>
 				<Linker>
@@ -35,9 +36,7 @@
 		<Compiler>
 			<Add option="-fexceptions" />
 			<Add option="-D_WIN32" />
-			<Add directory="C:/dev/cpp_all/rabbit" />
-			<Add directory="f:/repo/sparsehash-2.0.2/src" />
-			<Add directory="f:/repo/sparsehash-2.0.2/src/windows" />
+			<Add directory="C:/devcpp/cpp_all/rabbit" />
 		</Compiler>
 		<Unit filename="../rabbit/rabbit_map.h" />
 		<Unit filename="../rabbit/rabbit_set.h" />
