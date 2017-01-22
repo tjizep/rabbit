@@ -218,6 +218,10 @@ public:
             printf("ERROR: Empty: failed begin end\n");
             ++errors;
         };
+        if(h.find(_T()) != h.end()) {
+            printf("ERROR: Empty: failed begin end\n");
+            ++errors;
+        };
         if(h.cbegin() != h.cend()) {
             printf("ERROR: Empty: failed begin end\n");
             ++errors;
@@ -589,7 +593,7 @@ int main(int argc, char **argv)
 	test.rabbit_sparse = false;
 	test.sparse = false;
 	test.std_container = false;
-    test.google_tests = false;
+    test.google_tests = true;
 	test_random_int(test_data::WIDE,test,ts);
 
 	//more_tests();
