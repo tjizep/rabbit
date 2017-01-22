@@ -8,7 +8,7 @@
 #include <string>
 #include <sstream>
 
-//#define _HAS_GOOGLE_HASH_
+#define _HAS_GOOGLE_HASH_
 #ifdef _MSC_VER
 #endif
 #include <functional>

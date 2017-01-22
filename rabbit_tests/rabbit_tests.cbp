@@ -36,14 +36,15 @@
 		<Compiler>
 			<Add option="-fexceptions" />
 			<Add option="-D_WIN32" />
-			<Add directory="C:/devcpp/cpp_all/rabbit" />
+			<Add directory="F:/repo/sparsehash-2.0.2/src/windows" />
+			<Add directory=".." />
 		</Compiler>
 		<Unit filename="../rabbit/rabbit_map.h" />
 		<Unit filename="../rabbit/rabbit_set.h" />
 		<Unit filename="../rabbit/unordered_map" />
 		<Unit filename="../rabbit/unordered_set" />
-		<Unit filename="../time_hash_maps.cpp" />
 		<Unit filename="main.cpp" />
+		<Unit filename="time_hash_maps.cpp" />
 		<Extensions>
 			<code_completion />
 			<envvars />
