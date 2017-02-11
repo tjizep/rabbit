@@ -8,7 +8,6 @@
 #include <string>
 #include <sstream>
 
-#define _HAS_GOOGLE_HASH_
 #ifdef _MSC_VER
 #endif
 #include <functional>
@@ -595,7 +594,7 @@ int main(int argc, char **argv)
 	test_type test;
 	test.dense = true;
 	test.rabbit = true;
-	test.rabbit_unit = true;
+	test.rabbit_unit = false;
 	test.rabbit_sparse = false;
 	test.sparse = false;
 	test.std_container = false;

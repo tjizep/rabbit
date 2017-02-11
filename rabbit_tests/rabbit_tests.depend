@@ -372,7 +372,7 @@
 	<Windows.h>
 	<Psapi.h>
 
-1476880466 c:\devcpp\cpp_all\rabbit\rabbit\unordered_map
+1486823743 c:\devcpp\cpp_all\rabbit\rabbit\unordered_map
 	<rabbit/rabbit_map.h>
 
 1476436623 c:\devcpp\cpp_all\rabbit\rabbit\rabbit.h
@@ -388,7 +388,7 @@
 	<limits>
 	<iomanip>
 
-1484662792 source:c:\devcpp\cpp_all\rabbit\rabbit_tests\main.cpp
+1486718167 source:c:\devcpp\cpp_all\rabbit\rabbit_tests\main.cpp
 	<numeric>
 	<stdlib.h>
 	<stdio.h>
@@ -451,7 +451,7 @@
 	<limits>
 	<iomanip>
 
-1484663215 c:\devcpp\cpp_all\rabbit\rabbit\rabbit_map.h
+1486823821 c:\devcpp\cpp_all\rabbit\rabbit\rabbit_map.h
 	<stdio.h>
 	<stdlib.h>
 	<iostream>
@@ -503,4 +503,41 @@
 	<google/malloc_extension.h>
 	<Windows.h>
 	<Psapi.h>
+
+1485258293 source:c:\devcpp\cpp_all\rabbit\rabbit_tests\time_hash_maps.cpp
+	<functional>
+	<rabbit/unordered_map>
+	<unordered_map>
+	<sparsehash/internal/sparseconfig.h>
+	<config.h>
+	<inttypes.h>
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<time.h>
+	<sys/time.h>
+	<sys/resource.h>
+	<sys/utsname.h>
+	<map>
+	<algorithm>
+	<vector>
+	<sparsehash/type_traits.h>
+	<sparsehash/dense_hash_map>
+	<sparsehash/sparse_hash_map>
+	<google/malloc_extension.h>
+	<Windows.h>
+	<Psapi.h>
+
+1486719417 c:\devcpp\cpp_all\rabbit\rabbit\rabbit_map_stl.h
+	<stdio.h>
+	<stdlib.h>
+	<iostream>
+	<vector>
+	<chrono>
+	<assert.h>
+	<memory>
+	<string>
+	<random>
+	<limits>
+	<iomanip>
 

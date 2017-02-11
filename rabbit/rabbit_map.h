@@ -78,13 +78,11 @@ namespace rabbit{
 		}
 		size_type randomize(size_type other) const {
 		    size_type r = other>>this->primary_bits;
-			return other + r; // (r*r) >> 2; //(other ^ random_val) & this->extent1;
+			return other + r; // ((r*r) >> 2); //(other ^ random_val) & this->extent1;
 		}
 		size_type operator()(size_type h_n) const {
-			size_type h = h_n; // & this->gate_bits;
-			//h += (h>>this->primary_bits);
-            return  h & this->extent1; //
-
+			size_type h = h_n; // &this->gate_bits;
+            return h & this->extent1;
 		}
 		double resize_factor() const {
 			return 2;
@@ -498,19 +496,24 @@ namespace rabbit{
 			inline bool overflowed_(size_type pos) const {
 				return false;
 			}
+            inline size_type hash_key(const _K& k) const {
+                return (size_type)_H()(k);
+            }
 
 			inline size_type map_key(const _K& k) const {
 				size_type h = (size_type)_H()(k);
+				return map_hash(h);
+			}
 
+			inline size_type map_hash(size_type h) const {
 				return key_mapper(h);
-
 			}
 
 			inline size_type map_rand_key(const _K& k) const {
 				size_type h = (size_type)_H()(k);
 				if(this->rand_probes)
-                    return key_mapper(randomize(h));
-				return key_mapper(h); //
+                    return map_hash(randomize(h));
+				return map_hash(h); //
 			}
 
 			size_type get_e_size() const {
@@ -842,6 +845,17 @@ namespace rabbit{
 				return false;
 			}
 
+            /// probabilistic check if key with given hash exists
+            /// false indicates the key definitely will not be found
+            /// else well have to do a full find
+
+            bool could_have(size_type origin){
+                size_type pos = map_hash(origin);
+                _Bt index = get_segment_index(origin);
+				const _Segment& s = get_segment(origin);
+                return (s.is_exists(index) || s.is_overflows(index));
+            }
+
 			size_type find_rest_not_empty(const _K& k, size_type origin) const
 			RABBIT_NOINLINE_
 			{
@@ -889,10 +903,10 @@ namespace rabbit{
 
 				return end();
 			}
-			size_type find_empty(const _K& k,size_type& pos) const
+			size_type find_empty(const _K& k, const size_type& unmapped) const
 			RABBIT_NOINLINE_
 			{
-                pos = map_key(k);
+                size_type pos = map_hash(unmapped);
                 _Bt index = get_segment_index(pos);
                 const _Segment& s = get_segment(pos);
                 if(s.is_exists(index) && equal_key(pos,k) ){ ///get_segment(pos).exists == ALL_BITS_SET ||
@@ -904,25 +918,25 @@ namespace rabbit{
                 return find_rest(k, pos);
 			}
 
-			inline size_type find_non_empty(const _K& k,size_type& pos) const {
-				pos = map_key(k);
+			inline size_type find_non_empty(const _K& k,const size_type& unmapped) const {
+				size_type pos = map_hash(unmapped);
 				if(equal_key(pos,k)) return pos;
 				return find_rest_not_empty(k, pos);
 			}
 
-			size_type find(const _K& k,size_type& pos) const {
+			size_type find(const _K& k,const size_type& unmapped) const {
 
 				bool is_empty = eq_f(empty_key,k);
 				if(is_empty){
-                    return find_empty(k, pos);
+                    return find_empty(k, unmapped);
 				}else{
-					return find_non_empty(k,pos);
+					return find_non_empty(k,unmapped);
 				}
 			}
 
 			size_type find(const _K& k) const {
 
-				size_type pos;
+				size_type pos = hash_key(k);
 				return find(k,pos);
 			}
 
@@ -1158,10 +1172,6 @@ namespace rabbit{
 		key_compare key_c;
 		allocator_type alloc;
 
-		double recalc_growth_factor(size_type elements)  {
-			return 1.8;
-		}
-
 		void rehash(){
 			size_type to = current->key_mapper.next_size();
 			rehash(to);
@@ -1171,18 +1181,20 @@ namespace rabbit{
 			pcurrent = c.get();
 		}
 
+
 		typename hash_kernel::ptr current;
+		typedef std::vector<typename hash_kernel::ptr> kernel_stack;
 		hash_kernel* pcurrent;
 		inline void create_current(){
 			if(current==nullptr)
-
 				set_current(std::allocate_shared<hash_kernel>(alloc,key_c,alloc));
 		}
+
 		iterator from_pos_empty(size_type pos) const {
 			return iterator(this, pos, 0, 0, 0);
 		}
-		iterator from_pos(size_type pos) const {
 
+		iterator from_pos(size_type pos) const {
             const _Segment& s = pcurrent->get_segment(pos);
             _Bt index = pcurrent->get_segment_index(pos);
             _Bt bsize = pcurrent->config.BITS_SIZE;
@@ -1223,6 +1235,7 @@ namespace rabbit{
 			create_current();
 			rehash(current->key_mapper.nearest_larger(atleast));
 		}
+		/// called when we dont want pure stl semantics
 		void rehash(size_type to_){
 			create_current();
 			rabbit_config config;
@@ -1432,7 +1445,6 @@ namespace rabbit{
 		}
 		iterator find(const _K& k) const {
 			if(current == nullptr) return from_pos_empty(size_type());
-
 			return from_pos(current->find(k));
 		}
 		iterator begin() const {
