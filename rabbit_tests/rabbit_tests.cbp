@@ -27,6 +27,7 @@
 				<Compiler>
 					<Add option="-O3" />
 					<Add option="-std=c++11" />
+					<Add option="-D_HAS_GOOGLE_HASH_" />
 				</Compiler>
 				<Linker>
 					<Add library="psapi" />

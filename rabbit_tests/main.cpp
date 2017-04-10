@@ -144,7 +144,7 @@ public:
 	void gen_random(size_t count, _Script& script) {
 		double start = get_proc_mem_use();
 		//std::minstd_rand rd;
-		std::mt19937 gen(6);
+		std::linear_congruential_engine gen(6);
 		std::uniform_int_distribution<_ValueType> dis(0, get_max(long()));
 		/// script creation is not benched
 		_InputField v;
@@ -184,6 +184,9 @@ public:
 	/// shuffled list of integers with max(rand())-min(rand()) or ~16-bit width
 	void gen_random_shuffle_16(size_t count, _Script& script) {
 		double start = get_proc_mem_use();
+		//std::mt19937 gen(6);
+		//std::uniform_int_distribution<_ValueType> dis(0, 1<<15);
+
 		/// script creation is not benched
 		_InputField v;
 		for (size_t r = 0; r < count; ++r) {
@@ -443,7 +446,7 @@ template<typename _T,typename _V>
 void test_dense_hash(typename tester<_T,_V>::_Script& script, size_t ts) {
 #ifdef _HAS_GOOGLE_HASH_
 	printf("google dense hash test\n");
-	typedef ::google::dense_hash_map<_T, typename tester<_T,_V>::_ValueType> _Map; //
+	typedef ::google::dense_hash_map<_T, typename tester<_T,_V>::_ValueType,rabbit::rabbit_hash<_T> > _Map; //
 	_Map h;
 	_T c, c1;
 	conversion::to_t(-1l, c);
@@ -471,7 +474,7 @@ void test_rabbit_hash(typename tester<_T,_V>::_Script& script, size_t ts) {
 	printf("rabbit hash test\n");
 	typedef rabbit::unordered_map<_T, typename tester<_T,_V>::_ValueType> _Map;
 	_Map h;
-    //h.set_logarithmic(1);
+    h.set_logarithmic(2);
 	tester<_T,_V> t;
 
 	t.bench_hash_simple(h, script);
@@ -598,7 +601,7 @@ int main(int argc, char **argv)
 	test.rabbit_sparse = false;
 	test.sparse = false;
 	test.std_container = false;
-    test.google_tests = false;
+    test.google_tests = true;
 	test_random_int(test_data::WIDE,test,ts);
 
 	//more_tests();

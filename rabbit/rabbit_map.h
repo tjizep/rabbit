@@ -19,6 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 **/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
@@ -157,6 +158,7 @@ namespace rabbit{
 			}
 			return r;
 		}
+		_Bt BUCKET_COUNT ;
 		_Bt CHAR_BITS ;
 		_Bt BITS_SIZE ;
 		_Bt BITS_SIZE1 ;
@@ -176,6 +178,7 @@ namespace rabbit{
 		}
 
 		basic_config& operator=(const basic_config& right){
+			BUCKET_COUNT = right.BUCKET_COUNT;
 			CHAR_BITS = right.CHAR_BITS;
 			BITS_SIZE = right.BITS_SIZE;
 			BITS_SIZE1 = right.BITS_SIZE1;
@@ -189,12 +192,13 @@ namespace rabbit{
 		}
 
 		basic_config(){
+			BUCKET_COUNT = 1;
 			CHAR_BITS = 8;
 			BITS_SIZE = (sizeof(_Bt) * CHAR_BITS);
 			BITS_SIZE1 = BITS_SIZE-1;
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;
-			PROBES = 12;
+			PROBES = 16;
 			MIN_EXTENT = 4; /// start size of the hash table
 			MAX_OVERFLOW_FACTOR = 1<<17; //BITS_SIZE*8/sizeof(_Bt);
             LOGARITHMIC = logarithmic;
@@ -311,14 +315,14 @@ namespace rabbit{
 				overflows = 0;
 			}
 		};
-
+	public:
 		typedef _KeySegment _Segment;
 		/// the vector that will contain the segmented mapping pairs and flags
 		typedef std::vector<_Segment, _Allocator> _Segments;
 		typedef std::vector<_ElPair, _Allocator> _Keys;
 
 		struct hash_kernel{
-
+			hash_kernel * next;
 			/// settings configuration
 			rabbit_config config;
 			size_type elements;
@@ -622,15 +626,18 @@ namespace rabbit{
 			}
 
 			hash_kernel(const key_compare& compare,const allocator_type& allocator)
-			:	clusters(nullptr), eq_f(compare), mf(1.0f), allocator(allocator),logarithmic(config.LOGARITHMIC){
+			:	clusters(nullptr), eq_f(compare), mf(1.0f), allocator(allocator),logarithmic(config.LOGARITHMIC), next(nullptr)
+			{
 				resize_clear(config.MIN_EXTENT);
 			}
 
-			hash_kernel() : clusters(nullptr), mf(1.0f),logarithmic(config.LOGARITHMIC){
+			hash_kernel() : clusters(nullptr), mf(1.0f),logarithmic(config.LOGARITHMIC), next(nullptr)
+			{
 				resize_clear(config.MIN_EXTENT);
 			}
 
-			hash_kernel(const hash_kernel& right) : clusters(nullptr), mf(1.0f),logarithmic(config.LOGARITHMIC) {
+			hash_kernel(const hash_kernel& right) : clusters(nullptr), mf(1.0f),logarithmic(config.LOGARITHMIC), next(nullptr)
+			{
 				*this = right;
 			}
 
@@ -827,6 +834,9 @@ namespace rabbit{
 					return get_value(pos);
 				}
 				throw std::exception();
+			}
+			_V& direct(size_type pos) {
+				return get_value(pos);
 			}
 			_V& at(const _K& k) {
 				size_type pos = find(k);
@@ -1470,7 +1480,6 @@ namespace rabbit{
 			this->current->set_logarithmic(logarithmic);
 		}
 	};
-
 /// the stl compatible unordered map interface
 template
 <	class _Kty
