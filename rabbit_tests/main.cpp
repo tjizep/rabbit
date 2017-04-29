@@ -474,7 +474,7 @@ void test_rabbit_hash(typename tester<_T,_V>::_Script& script, size_t ts) {
 	printf("rabbit hash test\n");
 	typedef rabbit::unordered_map<_T, typename tester<_T,_V>::_ValueType> _Map;
 	_Map h;
-    h.set_logarithmic(2);
+    //h.set_logarithmic(2);
 	tester<_T,_V> t;
 
 	t.bench_hash_simple(h, script);
@@ -525,7 +525,7 @@ void more_tests() {
 struct test_data{
     enum{
         SEQUENTIAL,
-        NARRROWEST,
+        NARROWEST,
         NARROW,
         WIDE
     };
@@ -567,7 +567,7 @@ void test_random_int(test_data data, test_type test, size_t ts) {
         t.gen_random(ts, script);
 	}else if(data == test_data::NARROW){
         t.gen_random_shuffle(ts, script);
-	}else if(data == test_data::NARRROWEST){
+	}else if(data == test_data::NARROWEST){
 	    t.gen_random_shuffle_16(ts, script);
 	}else if(data == test_data::SEQUENTIAL){
 	    t.gen_seq(ts, script);
@@ -583,7 +583,7 @@ void test_random_int(test_data data, test_type test, size_t ts) {
         test_sparse_hash<_K,_V>(script, ts);
     if(test.dense)
         test_dense_hash<_K,_V>(script, ts);
-	if(test.std_container)
+    if(test.std_container)
         test_std_hash<_K,_V>(script, ts);
 #ifdef _HAS_GOOGLE_HASH_
     if(test.google_tests)
@@ -601,7 +601,7 @@ int main(int argc, char **argv)
 	test.rabbit_sparse = false;
 	test.sparse = false;
 	test.std_container = false;
-    test.google_tests = true;
+    	test.google_tests = true;
 	test_random_int(test_data::WIDE,test,ts);
 
 	//more_tests();

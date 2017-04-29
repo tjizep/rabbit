@@ -928,7 +928,7 @@ namespace rabbit{
                 return find_rest(k, pos);
 			}
 
-			inline size_type find_non_empty(const _K& k,const size_type& unmapped) const {
+			size_type find_non_empty(const _K& k,const size_type& unmapped)  const {
 				size_type pos = map_hash(unmapped);
 				if(equal_key(pos,k)) return pos;
 				return find_rest_not_empty(k, pos);
