@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 **/
-
+#include <cstddef>
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
@@ -928,7 +928,7 @@ namespace rabbit{
                 return find_rest(k, pos);
 			}
 
-			inline size_type find_non_empty(const _K& k,const size_type& unmapped) const {
+			size_type find_non_empty(const _K& k,const size_type& unmapped)  const {
 				size_type pos = map_hash(unmapped);
 				if(equal_key(pos,k)) return pos;
 				return find_rest_not_empty(k, pos);
