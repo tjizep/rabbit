@@ -596,13 +596,15 @@ int main(int argc, char **argv)
 	size_t ts = 10000000;
 	test_type test;
 	test.dense = true;
-	test.rabbit = true;
+	test.rabbit = false;
 	test.rabbit_unit = false;
-	test.rabbit_sparse = false;
+	test.rabbit_sparse = true;
 	test.sparse = false;
 	test.std_container = false;
-    test.google_tests = true;
-	test_random_int(test_data::WIDE,test,ts);
+    test.google_tests = false;
+    for(size_t i = 1; i <= 1;++i){
+        test_random_int(test_data::NARROW,test,ts*i);
+    }
 
 	//more_tests();
 	return 0;
