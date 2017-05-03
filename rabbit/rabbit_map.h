@@ -516,8 +516,14 @@ namespace rabbit{
 			inline size_type map_rand_key(const _K& k) const {
 				size_type h = (size_type)_H()(k);
 				if(this->rand_probes)
-                    return map_hash(randomize(h));
+                    			return map_hash(randomize(h));
 				return map_hash(h); //
+			}
+			inline size_type map_rand_key(const _K& k, size_type origin) const {
+				size_type h = (size_type)_H()(k);
+				if(this->rand_probes)
+                    			return map_hash(randomize(h));
+				return origin; //
 			}
 
 			size_type get_e_size() const {
@@ -682,7 +688,7 @@ namespace rabbit{
 
 			}
 
-			bool equal_key(size_type pos,const _K& k) const {
+			inline bool equal_key(size_type pos,const _K& k) const {
 				const _K& l = get_key(pos);
 				return eq_f(l, k) ;
 			}
@@ -691,10 +697,16 @@ namespace rabbit{
 				return key_mapper.randomize(v);
 			}
 
-            inline size_type hash_probe_incr(size_type i) const {
+            inline size_type hash_probe_incr_(size_type i,...) const {
 				return 1;
-
             }
+            inline size_type hash_probe_incr_(size_type i,const std::string&) const {
+				return i*i + 1;
+            }
+            inline size_type hash_probe_incr(size_type i) const {
+				return hash_probe_incr_(i, this->empty_key);
+            }
+
 			_V* subscript_rest(const _K& k, size_type origin)
 			RABBIT_NOINLINE_ {
 				size_type pos = map_rand_key(k);
@@ -869,19 +881,20 @@ namespace rabbit{
 			size_type find_rest_not_empty(const _K& k, size_type origin) const
 			RABBIT_NOINLINE_
 			{
-			    _Bt index = get_segment_index(origin);
-				const _Segment& s = get_segment(origin);
-				if(!s.is_overflows(index)){
-					return end();
-				}
 
 				/// randomization step for attack mitigation
-				size_type pos = map_rand_key(k);
+				size_type pos = map_rand_key(k,origin);
 
 				for(unsigned int i =0; i < probes && pos < get_extent();){
 					if(equal_key(pos,k)) return pos;
 					pos += hash_probe_incr(i);
 					++i;
+				}
+				_Bt index = get_segment_index(origin);
+				const _Segment& s = get_segment(origin);
+				if(!s.is_overflows(index)){
+					return end();
+
 				}
 
 				for(pos=get_o_start(); pos < overflow_elements; ){
@@ -928,17 +941,17 @@ namespace rabbit{
                 return find_rest(k, pos);
 			}
 
-			size_type find_non_empty(const _K& k,const size_type& unmapped)  const {
+			inline size_type find_non_empty(const _K& k,const size_type& unmapped)  const {
 				size_type pos = map_hash(unmapped);
 				if(equal_key(pos,k)) return pos;
 				return find_rest_not_empty(k, pos);
 			}
 
-			size_type find(const _K& k,const size_type& unmapped) const {
+			inline size_type find(const _K& k,const size_type& unmapped) const {
 
 				bool is_empty = eq_f(empty_key,k);
 				if(is_empty){
-                    return find_empty(k, unmapped);
+                    			return find_empty(k, unmapped);
 				}else{
 					return find_non_empty(k,unmapped);
 				}
@@ -1265,7 +1278,7 @@ namespace rabbit{
 				//std::cout << " load factor " << current->load_factor() << " for " << current->size() << " elements and collision factor " << current->collision_factor() << std::endl;
 				//std::cout << " capacity " << current->capacity() << std::endl;
 				if(current->load_factor() < 0.3){
-					/// std::cout << "possible attack/bad hash detected : using random probes : " << current->get_probes() << std::endl;
+					//std::cout << "possible attack/bad hash detected : using random probes : " << current->get_probes() << std::endl;
 					nrand_probes = 1;
 					rehashed->set_rand_probes(nrand_probes);
 				}

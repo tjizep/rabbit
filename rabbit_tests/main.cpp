@@ -44,6 +44,7 @@ double get_proc_mem_use(const double MB = 1024.0*1024.0) {
 }
 
 #else
+#include <sys/resource.h>
 double get_proc_mem_use(const double MB = 1024.0*1024.0) {
 	return 0.0;
 }
@@ -474,7 +475,7 @@ void test_rabbit_hash(typename tester<_T,_V>::_Script& script, size_t ts) {
 	printf("rabbit hash test\n");
 	typedef rabbit::unordered_map<_T, typename tester<_T,_V>::_ValueType> _Map;
 	_Map h;
-    //h.set_logarithmic(2);
+    h.set_logarithmic(0);
 	tester<_T,_V> t;
 
 	t.bench_hash_simple(h, script);
@@ -573,6 +574,9 @@ void test_random_int(test_data data, test_type test, size_t ts) {
 	    t.gen_seq(ts, script);
 	}
 
+    if(test.dense)
+        test_dense_hash<_K,_V>(script, ts);
+
     if(test.rabbit)
         test_rabbit_hash<_K,_V>(script, ts);
     if(test.rabbit_sparse)
@@ -581,8 +585,6 @@ void test_random_int(test_data data, test_type test, size_t ts) {
         test_rabbit_hash_unit<_K,_V>(ts/10);
     if(test.sparse)
         test_sparse_hash<_K,_V>(script, ts);
-    if(test.dense)
-        test_dense_hash<_K,_V>(script, ts);
     if(test.std_container)
         test_std_hash<_K,_V>(script, ts);
 #ifdef _HAS_GOOGLE_HASH_
@@ -601,10 +603,8 @@ int main(int argc, char **argv)
 	test.rabbit_sparse = false;
 	test.sparse = false;
 	test.std_container = false;
-    test.google_tests = false;
-    for(size_t i = 1; i <= 1;++i){
-        test_random_int(test_data::WIDE,test,ts*i);
-    }
+    test.google_tests = true;
+	test_random_int(test_data::WIDE,test,ts);
 
 	//more_tests();
 	return 0;
