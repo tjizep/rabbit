@@ -82,8 +82,7 @@ namespace rabbit{
 			return other + r; // ((r*r) >> 2); //(other ^ random_val) & this->extent1;
 		}
 		size_type operator()(size_type h_n) const {
-			size_type h = h_n; // &this->gate_bits;
-            return h & this->extent1;
+			return h_n & this->extent1 ;
 		}
 		double resize_factor() const {
 			return 2;
@@ -516,13 +515,13 @@ namespace rabbit{
 			inline size_type map_rand_key(const _K& k) const {
 				size_type h = (size_type)_H()(k);
 				if(this->rand_probes)
-                    			return map_hash(randomize(h));
+                    return map_hash(randomize(h));
 				return map_hash(h); //
 			}
+
 			inline size_type map_rand_key(const _K& k, size_type origin) const {
-				size_type h = (size_type)_H()(k);
 				if(this->rand_probes)
-                    			return map_hash(randomize(h));
+                  return map_hash(randomize(origin));
 				return origin; //
 			}
 
@@ -697,19 +696,18 @@ namespace rabbit{
 				return key_mapper.randomize(v);
 			}
 
-            inline size_type hash_probe_incr_(size_type i,...) const {
-				return 1;
-            }
-            inline size_type hash_probe_incr_(size_type i,const std::string&) const {
-				return i*i + 1;
-            }
-            inline size_type hash_probe_incr(size_type i) const {
-				return hash_probe_incr_(i, this->empty_key);
+            inline size_type hash_probe_incr(size_type base, unsigned int i) const {
+                //if(sizeof(_K) > sizeof(unsigned long long)){
+                  //  return base + i*i + 1;
+                //}else{
+                    return base + i + 1;
+                //}
             }
 
 			_V* subscript_rest(const _K& k, size_type origin)
 			RABBIT_NOINLINE_ {
 				size_type pos = map_rand_key(k);
+				size_type base = pos;
 				for(unsigned int i =0; i < probes && pos < get_extent();++i){
 					_Bt si = get_segment_index(pos);
 					_Segment& s = get_segment(pos);
@@ -722,7 +720,7 @@ namespace rabbit{
 						set_overflows(origin, true);
 						return create_segment_value(pos);
 					}
-					pos += hash_probe_incr(i);
+					pos = hash_probe_incr(base,i);
 				}
 
 				size_type at_empty = end();
@@ -884,10 +882,10 @@ namespace rabbit{
 
 				/// randomization step for attack mitigation
 				size_type pos = map_rand_key(k,origin);
-
-				for(unsigned int i =0; i < probes && pos < get_extent();){
+                size_type base = pos;
+				for(unsigned int i = 0; i < probes && pos < get_extent();){
 					if(equal_key(pos,k)) return pos;
-					pos += hash_probe_incr(i);
+					pos = hash_probe_incr(base,i);
 					++i;
 				}
 				_Bt index = get_segment_index(origin);
@@ -909,13 +907,13 @@ namespace rabbit{
 			{
 				/// randomization step for attack mitigation
 				size_type pos = map_rand_key(k);
-
+                size_type base = pos;
 				for(unsigned int i =0; i < probes && pos < get_extent();){//
 					_Bt si = get_segment_index(pos);
 					if(segment_equal_key_exists(pos,k)){
 						return pos;
 					}
-                    pos += hash_probe_incr(i);
+                    pos = hash_probe_incr(base,i);
 					++i;
 				}
 
