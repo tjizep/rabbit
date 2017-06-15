@@ -333,7 +333,7 @@ public:
 				++errors;
 			};
 		}
-		long const_ctr = 0;
+		unsigned long const_ctr = 0;
 		for(typename _MapT::const_iterator c = h.begin(); c!=h.end(); ++c){
             ++const_ctr;
 		}
@@ -478,7 +478,7 @@ void test_rabbit_hash(typename tester<_T,_V>::_Script& script, size_t ts) {
 	typedef rabbit::unordered_map<_T, typename tester<_T,_V>::_ValueType> _Map;
 	_Map h;
 
-    h.set_logarithmic(2);
+    h.set_logarithmic(1);
 	tester<_T,_V> t;
 
 	t.bench_hash_simple(h, script);

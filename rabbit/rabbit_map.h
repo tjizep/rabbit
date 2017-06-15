@@ -321,7 +321,6 @@ namespace rabbit{
 		typedef std::vector<_ElPair, _Allocator> _Keys;
 
 		struct hash_kernel{
-			hash_kernel * next;
 			/// settings configuration
 			rabbit_config config;
 			size_type elements;
@@ -631,17 +630,17 @@ namespace rabbit{
 			}
 
 			hash_kernel(const key_compare& compare,const allocator_type& allocator)
-			:	clusters(nullptr), eq_f(compare), mf(1.0f), allocator(allocator),logarithmic(config.LOGARITHMIC), next(nullptr)
+			:	clusters(nullptr), eq_f(compare), mf(1.0f), allocator(allocator),logarithmic(config.LOGARITHMIC)
 			{
 				resize_clear(config.MIN_EXTENT);
 			}
 
-			hash_kernel() : clusters(nullptr), mf(1.0f),logarithmic(config.LOGARITHMIC), next(nullptr)
+			hash_kernel() : clusters(nullptr), mf(1.0f),logarithmic(config.LOGARITHMIC)
 			{
 				resize_clear(config.MIN_EXTENT);
 			}
 
-			hash_kernel(const hash_kernel& right) : clusters(nullptr), mf(1.0f),logarithmic(config.LOGARITHMIC), next(nullptr)
+			hash_kernel(const hash_kernel& right) : clusters(nullptr), mf(1.0f),logarithmic(config.LOGARITHMIC)
 			{
 				*this = right;
 			}
@@ -697,11 +696,11 @@ namespace rabbit{
 			}
 
             inline size_type hash_probe_incr(size_type base, unsigned int i) const {
-                //if(sizeof(_K) > sizeof(unsigned long long)){
-                  //  return base + i*i + 1;
-                //}else{
+                if(sizeof(_K) > sizeof(unsigned long long)){
+                    return base + i*i + 1;
+                }else{
                     return base + i + 1;
-                //}
+                }
             }
 
 			_V* subscript_rest(const _K& k, size_type origin)
@@ -1006,7 +1005,7 @@ namespace rabbit{
             _Bt index;
             _Bt exists;
             _Bt bsize;
-            const kernel_ptr get_kernel() const {
+            kernel_ptr get_kernel() const {
 				return h->current.get();
             }
             kernel_ptr get_kernel() {
@@ -1100,7 +1099,7 @@ namespace rabbit{
 					std::cout << "invalid cache pointer: not equal to actual" << std::endl;
 				}
 			}
-            inline const kernel_ptr get_kernel() const {
+            inline kernel_ptr get_kernel() const {
 				check_pointer();
                 return h->pcurrent;
             }
