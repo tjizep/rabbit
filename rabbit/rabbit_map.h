@@ -696,11 +696,11 @@ namespace rabbit{
 			}
 
             inline size_type hash_probe_incr(size_type base, unsigned int i) const {
-                if(sizeof(_K) > sizeof(unsigned long long)){
-                    return base + i*i + 1;
-                }else{
+                //if(sizeof(_K) > sizeof(unsigned long long)){
+                //    return base + i*i + 1;
+                //}else{
                     return base + i + 1;
-                }
+                //}
             }
 
 			_V* subscript_rest(const _K& k, size_type origin)
@@ -946,9 +946,9 @@ namespace rabbit{
 
 			inline size_type find(const _K& k,const size_type& unmapped) const {
 
-				bool is_empty = eq_f(empty_key,k);
+				bool is_empty = eq_f(empty_key,k); // && sizeof(_K) <= sizeof(size_type);
 				if(is_empty){
-                    			return find_empty(k, unmapped);
+                    return find_empty(k, unmapped);
 				}else{
 					return find_non_empty(k,unmapped);
 				}

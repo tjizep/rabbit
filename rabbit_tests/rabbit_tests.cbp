@@ -35,12 +35,16 @@
 			</Target>
 		</Build>
 		<Compiler>
+			<Add option="-m64" />
 			<Add option="-fexceptions" />
 			<Add option="-D_WIN32" />
 			<Add directory=".." />
 			<Add directory="c:/repo/sparsehash-2.0.2/src/windows" />
 			<Add directory="c:/repo/sparsehash-2.0.2/src" />
 		</Compiler>
+		<Linker>
+			<Add option="-m64" />
+		</Linker>
 		<Unit filename="../rabbit/rabbit_map.h" />
 		<Unit filename="../rabbit/rabbit_set.h" />
 		<Unit filename="../rabbit/unordered_map" />

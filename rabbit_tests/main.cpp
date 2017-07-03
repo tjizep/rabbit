@@ -412,7 +412,7 @@ public:
 		double mem_start = get_proc_mem_use();
 		std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 		size_t count = script.size();
-
+		//h.rehash(count);
 		size_t s = count / 10;
 		_V value;
 		for (size_t j = 0; j < count; ++j) {
@@ -426,7 +426,7 @@ public:
 			}
 		}
 
-		printf("%ld in hash, writes total %.4g secs, %.4g MB\n", (long)h.size(), (double)(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count()) / (1000000.0), get_proc_mem_use() - mem_start);
+		printf("%ld in hash, writes total %.4g millis, %.4g MB\n", (long)h.size(), (double)(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count()) / (1000.0), get_proc_mem_use() - mem_start);
 		//int t;
 		//std::cin >> t;
 		std::chrono::steady_clock::time_point start_read = std::chrono::steady_clock::now();
@@ -441,7 +441,7 @@ public:
 
 		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
-		printf("time total %.4g secs read %.4g secs. mem used %.4g MB\n", (double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()) / (1000000.0), (double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start_read).count()) / (1000000.0), get_proc_mem_use() - mem_start);
+		printf("time total %.4g millis read %.4g millis. mem used %.4g MB\n", (double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()) / (1000.0), (double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start_read).count()) / (1000.0), get_proc_mem_use() - mem_start);
 
 	}
 };
@@ -598,7 +598,7 @@ void test_random_int(test_data data, test_type test, size_t ts) {
 int main(int argc, char **argv)
 {
 
-	size_t ts = 10000000;
+	size_t ts = 80000000;
 	test_type test;
 	test.dense = true;
 	test.rabbit = true;
