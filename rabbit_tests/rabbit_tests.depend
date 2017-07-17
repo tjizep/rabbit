@@ -388,7 +388,7 @@
 	<limits>
 	<iomanip>
 
-1498717169 source:c:\devcpp\cpp_all\rabbit\rabbit_tests\main.cpp
+1500263117 source:c:\devcpp\cpp_all\rabbit\rabbit_tests\main.cpp
 	<numeric>
 	<stdlib.h>
 	<stdio.h>
@@ -398,6 +398,7 @@
 	<map>
 	<string>
 	<sstream>
+	<rabbit/int_string.h>
 	<functional>
 	<sparsehash/internal/sparseconfig.h>
 	<rabbit/unordered_map>
@@ -452,7 +453,7 @@
 	<limits>
 	<iomanip>
 
-1498717317 c:\devcpp\cpp_all\rabbit\rabbit\rabbit_map.h
+1500264927 c:\devcpp\cpp_all\rabbit\rabbit\rabbit_map.h
 	<cstddef>
 	<stdio.h>
 	<stdlib.h>
@@ -542,4 +543,10 @@
 	<random>
 	<limits>
 	<iomanip>
+
+1500265044 c:\devcpp\cpp_all\rabbit\rabbit\int_string.h
+	<algorithm>
+	<string>
+	<cstring>
+	<rabbit/unordered_map>
 

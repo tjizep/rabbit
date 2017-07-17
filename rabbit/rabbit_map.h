@@ -77,9 +77,27 @@ namespace rabbit{
 			size_type l2 = this->config.log2(any);
 			return (size_type)(2ll << l2);
 		}
+
+		// FNV-1a hash function for bytes
+		// https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
+		// https://tools.ietf.org/html/draft-eastlake-fnv-13#section-6
+		// used to fix bad hashes from code
+        size_type fnv_1a_bytes(const unsigned char *bytes, size_type count) const {
+		    const unsigned long long FNV64prime = 0x00000100000001B3ull;
+			const unsigned long long FNV64basis = 0xCBF29CE484222325ull;
+			size_t r = FNV64basis;
+			for (size_t a = 0; a < count; ++a){
+				r ^= (size_t)bytes[a]; // folding of one byte at a time
+				r *= FNV64prime;
+			}
+			return r;
+		}
+        size_type fnv_1a_(size_type other) const {
+            return fnv_1a_bytes((const unsigned char *)&other,sizeof(other));
+        }
 		size_type randomize(size_type other) const {
 		    size_type r = other>>this->primary_bits;
-			return other + r; // ((r*r) >> 2); //(other ^ random_val) & this->extent1;
+		    return fnv_1a_(other + ((r*r) >> 2)); //(other ^ random_val) & this->extent1;
 		}
 		size_type operator()(size_type h_n) const {
 			return h_n & this->extent1 ;
@@ -508,20 +526,18 @@ namespace rabbit{
 			}
 
 			inline size_type map_hash(size_type h) const {
+				if (this->rand_probes)
+					return key_mapper(randomize(h));
 				return key_mapper(h);
 			}
 
 			inline size_type map_rand_key(const _K& k) const {
 				size_type h = (size_type)_H()(k);
-				if(this->rand_probes)
-                    return map_hash(randomize(h));
-				return map_hash(h); //
+				return map_hash(h);
 			}
 
 			inline size_type map_rand_key(const _K& k, size_type origin) const {
-				if(this->rand_probes)
-                  return map_hash(randomize(origin));
-				return origin; //
+				return origin;
 			}
 
 			size_type get_e_size() const {
@@ -552,7 +568,9 @@ namespace rabbit{
 			size_type get_probes() const {
 				return this->probes;
 			}
-
+			size_type get_rand_probes() const {
+				return this->rand_probes;
+			}
 			void set_rand_probes(){
 				this->rand_probes = this->probes;
 			}
@@ -572,25 +590,21 @@ namespace rabbit{
 				mf = 1.0;
 				assert(config.MAX_OVERFLOW_FACTOR > 0);
 				if(is_logarithmic()){
-                    probes = config.log2(new_extent)*logarithmic;
+					probes = config.log2(new_extent)*logarithmic;
                     overflow = config.log2(new_extent)*logarithmic;
-
 				}else{
 					probes = config.PROBES;
 					if (new_extent*sizeof(_ElPair) < 8*8*1024*1024 ) {
-                        //probes+=0;
-						//overflow = std::max<size_type>(config.PROBES, new_extent / (config.MAX_OVERFLOW_FACTOR/16));
-						probes = config.log2(new_extent);
+                        probes = config.log2(new_extent);
                         overflow = config.log2(new_extent)*8;
-
 					} else {
 						overflow = std::max<size_type>(config.PROBES, new_extent / (config.MAX_OVERFLOW_FACTOR));
-
 					}
 				}
-
-				rand_probes = 0;
-
+				if(rand_probes ){
+                    overflow = new_extent/500;
+				}
+				//rand_probes = 0;
 				initial_probes = probes;
 				//std::cout << "rehash with overflow:" << overflow  << std::endl;
 				elements = 0;
@@ -697,9 +711,10 @@ namespace rabbit{
 
             inline size_type hash_probe_incr(size_type base, unsigned int i) const {
                 //if(sizeof(_K) > sizeof(unsigned long long)){
-                //    return base + i*i + 1;
+				//if (this->rand_probes){
+				//return base + i*i + 1;
                 //}else{
-                    return base + i + 1;
+                return base + i + 1;
                 //}
             }
 
@@ -733,7 +748,6 @@ namespace rabbit{
 					size_type e = end();
 					for(pos=get_o_start(); pos < e; ){
 						if(!exists_(pos) ) {
-
 							at_empty = pos; break;
 						}
 						++pos;
@@ -893,6 +907,7 @@ namespace rabbit{
 					return end();
 
 				}
+
 
 				for(pos=get_o_start(); pos < overflow_elements; ){
 					if(equal_key(pos,k)) return pos;
@@ -1265,19 +1280,19 @@ namespace rabbit{
 			typename hash_kernel::ptr rehashed = std::allocate_shared<hash_kernel>(alloc);
 			size_type extent = current->get_extent();
 			size_type new_extent = to;
-			size_type nrand_probes = 0;
+			size_type nrand_probes = current->get_rand_probes();
 			hash_kernel * reh = rehashed.get();
 			hash_kernel * cur = current.get();
 			try{
-               rehashed->set_logarithmic(current->get_logarithmic());
+                rehashed->set_logarithmic(current->get_logarithmic());
+				rehashed->set_rand_probes(nrand_probes);
 				rehashed->resize_clear(new_extent);
 				rehashed->mf = (*this).current->mf;
 				//std::cout << " load factor " << current->load_factor() << " for " << current->size() << " elements and collision factor " << current->collision_factor() << std::endl;
 				//std::cout << " capacity " << current->capacity() << std::endl;
-				if(current->load_factor() < 0.3){
-					//std::cout << "possible attack/bad hash detected : using random probes : " << current->get_probes() << std::endl;
+				if(current->load_factor() < 0.34){
+					//std::cout << "possible attack/bad hash detected : using random probes : " << current->get_probes() << " : " << extent << " : " << current->get_logarithmic() << std::endl;
 					nrand_probes = 1;
-					rehashed->set_rand_probes(nrand_probes);
 				}
 				using namespace std;
 				while(true){
@@ -1305,7 +1320,8 @@ namespace rabbit{
 							rehashed->resize_clear(new_extent);
 							rehashed->mf = (*this).current->mf;
 							rehashed->set_rand_probes(nrand_probes);
-                            reh = rehashed.get();
+							rehashed->set_logarithmic(current->get_logarithmic());
+							reh = rehashed.get();
 
                            // i = begin(); // start over
                             //ctr = 0;

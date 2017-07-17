@@ -7,6 +7,7 @@
 #include <map>
 #include <string>
 #include <sstream>
+#include <rabbit/int_string.h>
 
 #ifdef _MSC_VER
 #endif
@@ -58,12 +59,21 @@ namespace conversion {
 #endif
 
 	}
+	void to_t(std::string inp, std::string& out) {
+		out = inp;
+	}
+	void to_t(rabbit::int_string inp, rabbit::int_string& out) {
+		out = inp;
+	}
 	template<typename _In>
 	void to_t(_In in, std::string& out) {
 		out = std::to_string(in);
 	}
-
-    template<typename _In>
+	template<typename _In>
+	void to_t(_In in, rabbit::int_string& out) {
+		out = std::to_string(in);
+	}
+	template<typename _In>
 	void to_t(_In in, long long& out) {
 		out = in;
 	}
@@ -130,16 +140,16 @@ public:
 
 	typedef std::vector<_InputField> _Script;
 #ifdef _MSC_VER
-	_ValueType get_max(long) const {
+	unsigned long long get_max(long) const {
 		return 1l << 31l;
 	}
-	_ValueType get_max(long long) const {
-		return 1ll << 63ll;
+	unsigned long long get_max(long long) const {
+		return 1ll << 62ll;
 	}
-	_ValueType get_max(unsigned long) const {
+	unsigned long long get_max(unsigned long) const {
 		return ~((unsigned long)0);
 	}
-	_ValueType get_max(unsigned long long) const {
+	unsigned long long get_max(unsigned long long) const {
 		return ~((unsigned long long)0);
 	}
 	void gen_random(size_t count, _Script& script) {
@@ -148,7 +158,7 @@ public:
 		//std::linear_congruential_engine gen(6);
 		std::mt19937 gen(6);
 
-		std::uniform_int_distribution<_ValueType> dis(0, get_max(long()));
+		std::uniform_int_distribution<long long> dis(0, get_max(long long()));
 		/// script creation is not benched
 		_InputField v;
 		for (size_t r = 0; r < count; ++r) {
@@ -163,7 +173,7 @@ public:
 		//std::minstd_rand rd;
 		std::mt19937 gen(6);
 
-		std::uniform_int_distribution<_ValueType> dis(std::numeric_limits<_ValueType>::min(), std::numeric_limits<_ValueType>::max());
+		std::uniform_int_distribution<long long> dis(std::numeric_limits<long long>::min(), std::numeric_limits<long long>::max());
 		/// script creation is not benched
 		_InputField v;
 		for (size_t r = 0; r < count; ++r) {
@@ -295,13 +305,15 @@ public:
 		if(errors){
             printf("ERROR: empty test failed\n");
 		}
-
+		_ValueType value;
 		for (size_t k = 0; k < count ; ++k) {
-		    h[script[k]] = (_ValueType) k + 1;
+			conversion::to_t(k + 1, value);
+		    h[script[k]] = value;
 		}
 		for (size_t k = 0; k < count / 2; ++k) {
+			conversion::to_t(k + 1, value);
             auto f = h.find(script[k]);
-			if (f != h.end() && f->second == k+1) {
+			if (f != h.end() && f->second == value) {
 				if (!h.erase(script[k])) {
 					printf("ERROR: could not erase %ld\n", (long int)k);
 					++errors;
@@ -343,7 +355,8 @@ public:
             ++errors;
 		}
 		for (size_t k = 0; k < count / 2; ++k) {
-			h[script[k]] = (typename _MapT::mapped_type)k + 1;
+			conversion::to_t(k + 1, value);
+			h[script[k]] = value;
 		}
 		if (h.size() != hs) {
 			++errors;
@@ -417,12 +430,11 @@ public:
 		_V value;
 		for (size_t j = 0; j < count; ++j) {
 
-			conversion::to_t(script[j],value);
-			h[script[j]] = value;
+			h[script[j]] = script[j];
 			if (j % s == 0) {
-				//std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+				std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
-				//printf("%ld: %ld in hash, bench total %.4g secs, %.4g MB\n",(long)j,(long)h.size(),(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count())/(1000000.0),get_proc_mem_use()-mem_start);
+				printf("%ld: %ld in hash, bench total %.4g secs, %.4g MB\n",(long)j,(long)h.size(),(double)(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count())/(1000000.0),get_proc_mem_use()-mem_start);
 			}
 		}
 
@@ -433,8 +445,7 @@ public:
 		/// check what is
 		for (size_t k = 0; k < count; ++k) {
             auto f = h.find(script[k]);
-            conversion::to_t(script[k],value);
-            if (f == h.end() || f->second != value) {
+            if (f == h.end() || f->second != script[k]) {
                 printf("ERROR: could not find %ld\n", (long int)k);
             }
         }
@@ -449,7 +460,7 @@ template<typename _T,typename _V>
 void test_dense_hash(typename tester<_T,_V>::_Script& script, size_t ts) {
 #ifdef _HAS_GOOGLE_HASH_
 	printf("google dense hash test\n");
-	typedef ::google::dense_hash_map<_T, typename tester<_T,_V>::_ValueType,rabbit::rabbit_hash<_T> > _Map; //
+	typedef ::google::dense_hash_map<_T, typename tester<_T,_V>::_ValueType > _Map; //
 	_Map h;
 	_T c, c1;
 	conversion::to_t(-1l, c);
@@ -561,9 +572,12 @@ struct test_type{
 };
 void test_random_int(test_data data, test_type test, size_t ts) {
 	//typedef std::string _K;
-	typedef unsigned long long _K;
-	typedef unsigned long long _V;
-	//typedef std::string _K;
+
+	typedef rabbit::int_string _K;
+	//typedef unsigned long long _K;
+	//typedef unsigned long long _V;
+	typedef rabbit::int_string _V;
+	//typedef std::string _V;
 
 	tester<_K,_V>::_Script script;
 	tester<_K,_V> t;
@@ -598,7 +612,7 @@ void test_random_int(test_data data, test_type test, size_t ts) {
 int main(int argc, char **argv)
 {
 
-	size_t ts = 80000000;
+	size_t ts = 1000000;
 	test_type test;
 	test.dense = true;
 	test.rabbit = true;
@@ -607,7 +621,7 @@ int main(int argc, char **argv)
 	test.sparse = false;
 	test.std_container = false;
     test.google_tests = false;
-	test_random_int(test_data::WIDE,test,ts);
+	test_random_int(test_data::NARROW,test,ts);
 
 	//more_tests();
 	return 0;
