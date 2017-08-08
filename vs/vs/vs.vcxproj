@@ -156,6 +156,7 @@
     <ClCompile Include="..\..\rabbit_tests\time_hash_maps.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\rabbit\int_string.h" />
     <ClInclude Include="..\..\rabbit\rabbit_map.h" />
     <ClInclude Include="..\..\rabbit\rabbit_set.h" />
   </ItemGroup>

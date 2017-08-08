@@ -32,5 +32,8 @@
     <ClInclude Include="..\..\rabbit\rabbit_set.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\rabbit\int_string.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

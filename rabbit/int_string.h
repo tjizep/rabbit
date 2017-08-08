@@ -152,7 +152,7 @@ namespace rabbit {
 	template<>
 	struct rabbit_hash <int_string>{
 		size_t operator()(const int_string& k) const {
-			return k.hash();
+			return k.bad_hash();
 		};
 	};
 };
@@ -160,7 +160,7 @@ namespace std {
 	template<>
 	struct hash <rabbit::int_string> {
 		size_t operator()(const rabbit::int_string& k) const {
-			return k.hash();
+			return k.bad_hash();
 		};
 	};
 }

@@ -81,7 +81,7 @@ namespace rabbit{
 		// FNV-1a hash function for bytes
 		// https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
 		// https://tools.ietf.org/html/draft-eastlake-fnv-13#section-6
-		// used to fix bad hashes from code
+		// used to attempt to fix bad hashes from code
         size_type fnv_1a_bytes(const unsigned char *bytes, size_type count) const {
 		    const unsigned long long FNV64prime = 0x00000100000001B3ull;
 			const unsigned long long FNV64basis = 0xCBF29CE484222325ull;
@@ -97,10 +97,11 @@ namespace rabbit{
         }
 		size_type randomize(size_type other) const {
 		    size_type r = other>>this->primary_bits;
-		    return fnv_1a_(other + ((r*r) >> 2)); //(other ^ random_val) & this->extent1;
+			return other + ((r*r) >> 2); // fnv_1a_(other + ((r*r) >> 2)); //(other ^ random_val) & this->extent1;
 		}
 		size_type operator()(size_type h_n) const {
-			return h_n & this->extent1 ;
+			size_type r = h_n ; //+ (h_n>>this->primary_bits);
+			return r & this->extent1 ;
 		}
 		double resize_factor() const {
 			return 2;
@@ -183,12 +184,14 @@ namespace rabbit{
 		_Bt LOGARITHMIC ;
 		/// maximum probes per access
 		size_type PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
+		size_type SAFETY_PROBES_FACTOR; /// probes when bad hashes or attacks are detected
 		size_type BITS_LOG2_SIZE;
 		/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
 		///	hash randomizer available
 
 		size_type MIN_EXTENT;
 		size_type MAX_OVERFLOW_FACTOR ;
+		size_type SAFETY_OVERFLOW_FACTOR; /// overflow factor when bad hashes or attacks are detected
 
 		basic_config(const basic_config& right){
 			*this = right;
@@ -202,8 +205,10 @@ namespace rabbit{
 			BITS_LOG2_SIZE = right.BITS_LOG2_SIZE;
 			ALL_BITS_SET = right.ALL_BITS_SET;
 			PROBES = right.PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
+			SAFETY_PROBES_FACTOR = right.SAFETY_PROBES_FACTOR;
 			MIN_EXTENT = right.MIN_EXTENT;
 			MAX_OVERFLOW_FACTOR = right.MAX_OVERFLOW_FACTOR;
+			SAFETY_OVERFLOW_FACTOR = right.SAFETY_OVERFLOW_FACTOR;
 			LOGARITHMIC = right.LOGARITHMIC;
 			return *this;
 		}
@@ -216,8 +221,10 @@ namespace rabbit{
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;
 			PROBES = 16;
+			SAFETY_PROBES_FACTOR = 32;
 			MIN_EXTENT = 4; /// start size of the hash table
 			MAX_OVERFLOW_FACTOR = 1<<17; //BITS_SIZE*8/sizeof(_Bt);
+			SAFETY_OVERFLOW_FACTOR = 500;
             LOGARITHMIC = logarithmic;
 		}
 	};
@@ -513,16 +520,12 @@ namespace rabbit{
 				return get_segment(pos).is_overflows(get_segment_index(pos));
 			}
 
-			inline bool overflowed_(size_type pos) const {
-				return false;
-			}
             inline size_type hash_key(const _K& k) const {
                 return (size_type)_H()(k);
             }
 
 			inline size_type map_key(const _K& k) const {
-				size_type h = (size_type)_H()(k);
-				return map_hash(h);
+				return map_hash(hash_key(k));
 			}
 
 			inline size_type map_hash(size_type h) const {
@@ -602,7 +605,8 @@ namespace rabbit{
 					}
 				}
 				if(rand_probes ){
-                    overflow = new_extent/500;
+                    overflow = std::max<size_type>(new_extent / config.SAFETY_OVERFLOW_FACTOR,overflow);
+                    probes *= config.SAFETY_PROBES_FACTOR;
 				}
 				//rand_probes = 0;
 				initial_probes = probes;
@@ -641,6 +645,7 @@ namespace rabbit{
 				collisions = 0;
 				elements = 0;
 				removed = 0;
+				rand_probes = 0;
 			}
 
 			hash_kernel(const key_compare& compare,const allocator_type& allocator)
@@ -717,49 +722,32 @@ namespace rabbit{
                 return base + i + 1;
                 //}
             }
-
-			_V* subscript_rest(const _K& k, size_type origin)
-			RABBIT_NOINLINE_ {
-				size_type pos = map_rand_key(k);
-				size_type base = pos;
-				for(unsigned int i =0; i < probes && pos < get_extent();++i){
-					_Bt si = get_segment_index(pos);
-					_Segment& s = get_segment(pos);
-					if(!s.is_exists(si)){
-						s.toggle_exists(si);
-						set_segment_key(pos,k);
-
-						++collisions;
-						++elements;
-						set_overflows(origin, true);
-						return create_segment_value(pos);
+            size_type find_in_bucket(const _K& k, size_type origin) const {
+				size_type locate = get_o_start();
+                size_type pos = locate;
+                for(;pos < end();++pos){
+                    if(segment_equal_key_exists(pos,k)){
+						return pos;
 					}
-					pos = hash_probe_incr(base,i);
-				}
+                }
 
-				size_type at_empty = end();
+                return end();
+            }
+            _V* subscript_bucket(const _K& k, size_type origin){
+                size_type locate = overflow_elements;
+                size_type pos = locate;
+                for(;pos < end();++pos){
+                    if(!exists_(pos)){
+                        break;
+                    }
+                }
 
-				if(overflow_elements < end()){
-					if(!exists_(overflow_elements)){
-						at_empty = overflow_elements++;
-
-					}
-				}else if (removed){
-					size_type e = end();
-					for(pos=get_o_start(); pos < e; ){
-						if(!exists_(pos) ) {
-							at_empty = pos; break;
-						}
-						++pos;
-					}
-				}
-
-				pos = at_empty;
 				if(pos != end()){
+                    overflow_elements++;
 					set_overflows(origin, true);
 					set_exists(pos, true);
 					set_segment_key(pos, k);
-					size_type os = (overflow_elements - (get_extent()+initial_probes));
+					size_type os = 0; // (overflow_elements - (get_extent() + initial_probes));
 					if(os == 1){
                         stats.start_elements = elements;
                         //std::cout << "overflow start: hash table size " << elements << " elements in over flow:" << os << std::endl;
@@ -780,6 +768,28 @@ namespace rabbit{
 
 				}
 				return nullptr;
+            }
+			_V* subscript_rest(const _K& k, size_type origin)
+			RABBIT_NOINLINE_ {
+				size_type pos = map_rand_key(k);
+				size_type base = pos;
+				for(unsigned int i =0; i < probes && pos < get_extent();++i){
+					_Bt si = get_segment_index(pos);
+					_Segment& s = get_segment(pos);
+					if(!s.is_exists(si)){
+						s.toggle_exists(si);
+						set_segment_key(pos,k);
+
+						++collisions;
+						++elements;
+						set_overflows(origin, true);
+						return create_segment_value(pos);
+					}
+					pos = hash_probe_incr(base,i);
+				}
+
+
+				return subscript_bucket(k,origin);
 			}
 			_V* subscript(const _K& k){
 				size_type pos = map_key(k);
@@ -907,14 +917,8 @@ namespace rabbit{
 					return end();
 
 				}
+				return find_in_bucket(k,origin);
 
-
-				for(pos=get_o_start(); pos < overflow_elements; ){
-					if(equal_key(pos,k)) return pos;
-					++pos;
-				}
-
-				return end();
 			}
 			size_type find_rest(const _K& k, size_type origin) const
 			RABBIT_NOINLINE_
@@ -930,13 +934,7 @@ namespace rabbit{
                     pos = hash_probe_incr(base,i);
 					++i;
 				}
-
-				for(pos=get_o_start(); pos < overflow_elements; ){
-					if(equal_key(pos,k) && exists_(pos) ) return pos;
-					++pos;
-				}
-
-				return end();
+                return find_in_bucket(k,origin);
 			}
 			size_type find_empty(const _K& k, const size_type& unmapped) const
 			RABBIT_NOINLINE_
