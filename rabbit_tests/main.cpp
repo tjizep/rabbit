@@ -489,7 +489,7 @@ void test_rabbit_hash(typename tester<_T,_V>::_Script& script, size_t ts) {
 	typedef rabbit::unordered_map<_T, typename tester<_T,_V>::_ValueType> _Map;
 	_Map h;
 
-    h.set_logarithmic(1);
+    //h.set_logarithmic(4);
 	tester<_T,_V> t;
 
 	t.bench_hash_simple(h, script);
@@ -571,12 +571,14 @@ struct test_type{
     bool google_tests;
 };
 void test_random_int(test_data data, test_type test, size_t ts) {
-	//typedef std::string _K;
 
-	typedef rabbit::int_string _K;
-	//typedef unsigned long long _K;
-	//typedef unsigned long long _V;
-	typedef rabbit::int_string _V;
+	//typedef rabbit::int_string _K;
+	//typedef rabbit::int_string _V;
+
+	typedef unsigned long long _K;
+	typedef unsigned long long _V;
+
+	//typedef std::string _K;
 	//typedef std::string _V;
 
 	tester<_K,_V>::_Script script;
@@ -612,7 +614,7 @@ void test_random_int(test_data data, test_type test, size_t ts) {
 int main(int argc, char **argv)
 {
 
-	size_t ts = 1000000;
+	size_t ts = 10000000;
 	test_type test;
 	test.dense = true;
 	test.rabbit = true;
@@ -620,7 +622,7 @@ int main(int argc, char **argv)
 	test.rabbit_sparse = false;
 	test.sparse = false;
 	test.std_container = false;
-    test.google_tests = false;
+    test.google_tests = true;
 	test_random_int(test_data::NARROW,test,ts);
 
 	//more_tests();

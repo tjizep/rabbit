@@ -96,12 +96,12 @@ namespace rabbit{
             return fnv_1a_bytes((const unsigned char *)&other,sizeof(other));
         }
 		size_type randomize(size_type other) const {
-		    size_type r = other>>this->primary_bits;
-			return other + ((r*r) >> 2); // fnv_1a_(other + ((r*r) >> 2)); //(other ^ random_val) & this->extent1;
+			size_type rand_other = fnv_1a_(other);
+			size_type r = rand_other >> this->primary_bits;
+			return rand_other +((r*r) >> 2); // fnv_1a_(other + ((r*r) >> 2)); //(other ^ random_val) & this->extent1;
 		}
 		size_type operator()(size_type h_n) const {
-			size_type r = h_n ; //+ (h_n>>this->primary_bits);
-			return r & this->extent1 ;
+			return h_n & this->extent1 ;
 		}
 		double resize_factor() const {
 			return 2;
@@ -608,7 +608,6 @@ namespace rabbit{
                     overflow = std::max<size_type>(new_extent / config.SAFETY_OVERFLOW_FACTOR,overflow);
                     probes *= config.SAFETY_PROBES_FACTOR;
 				}
-				//rand_probes = 0;
 				initial_probes = probes;
 				//std::cout << "rehash with overflow:" << overflow  << std::endl;
 				elements = 0;
@@ -1264,12 +1263,13 @@ namespace rabbit{
 			create_current();
 			rehash((size_type)((double)atleast*current->get_resize_factor()));
 		}
-		void resize(size_type atleast){
+		void resize(size_type atleast) {
 			create_current();
-			rehash(current->key_mapper.nearest_larger(atleast));
+			size_type calc = current->key_mapper.nearest_larger(atleast);
+			rehash(calc,false); // avoid randomization
 		}
 		/// called when we dont want pure stl semantics
-		void rehash(size_type to_){
+		void rehash(size_type to_, bool check_lf = true) {
 			create_current();
 			rabbit_config config;
 			size_type to = std::max<size_type>(to_, config.MIN_EXTENT);
@@ -1288,9 +1288,10 @@ namespace rabbit{
 				rehashed->mf = (*this).current->mf;
 				//std::cout << " load factor " << current->load_factor() << " for " << current->size() << " elements and collision factor " << current->collision_factor() << std::endl;
 				//std::cout << " capacity " << current->capacity() << std::endl;
-				if(current->load_factor() < 0.34){
+				if(check_lf && current->load_factor() < 0.24){
 					//std::cout << "possible attack/bad hash detected : using random probes : " << current->get_probes() << " : " << extent << " : " << current->get_logarithmic() << std::endl;
 					nrand_probes = 1;
+					rehashed->set_rand_probes(nrand_probes);
 				}
 				using namespace std;
 				while(true){

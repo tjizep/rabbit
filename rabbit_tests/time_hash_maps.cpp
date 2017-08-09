@@ -136,9 +136,9 @@ static bool FLAGS_test_map = false;
 static bool FLAGS_test_4_bytes = true;
 static bool FLAGS_test_8_bytes = true;
 static bool FLAGS_test_16_bytes = false;
-static bool FLAGS_test_256_bytes = true;
+static bool FLAGS_test_256_bytes = false;
 
-static bool growth_only = false;
+static bool FLAGS_growth_only = false;
 
 #if defined(HAVE_UNORDERED_MAP)
 using HASH_NAMESPACE::unordered_map;
@@ -202,7 +202,7 @@ class EasyUseRabbitUnorderedMap : public rabbit::unordered_map<K,V,H>
 public:
     EasyUseRabbitUnorderedMap()
     {
-        //rabbit::unordered_map<K,V,H>::set_logarithmic(1);
+        rabbit::unordered_map<K,V,H>::set_logarithmic(8);
     }
 };
 template<typename K, typename V, typename H>
@@ -892,16 +892,16 @@ static void measure_map(const char* label, int obj_size, int iters,
     printf("\n%s (%d byte objects, %d iterations):\n", label, obj_size, iters);
     if (1) time_map_grow<MapType>(label,obj_size,iters);
     if (1) time_map_grow_predicted<MapType>(label,obj_size,iters);
-    if (1 && !growth_only) time_map_replace<MapType>(label,obj_size,iters);
-    if (1 && !growth_only) time_map_fetch_random<MapType>(label,obj_size,iters);
-    if (1 && !growth_only) time_map_fetch_sequential<MapType>(label,obj_size,iters);
-    if (1 && !growth_only) time_map_fetch_empty<MapType>(label,obj_size,iters);
-    if (1 && !growth_only) time_map_remove<MapType>(label,obj_size,iters);
-    if (1 && !growth_only) time_map_toggle<MapType>(label,obj_size,iters);
-    if (1 && !growth_only) time_map_iterate<MapType>(label,obj_size,iters);
+    if (1 && !FLAGS_growth_only) time_map_replace<MapType>(label,obj_size,iters);
+    if (1 && !FLAGS_growth_only) time_map_fetch_random<MapType>(label,obj_size,iters);
+    if (1 && !FLAGS_growth_only) time_map_fetch_sequential<MapType>(label,obj_size,iters);
+    if (1 && !FLAGS_growth_only) time_map_fetch_empty<MapType>(label,obj_size,iters);
+    if (1 && !FLAGS_growth_only) time_map_remove<MapType>(label,obj_size,iters);
+    if (1 && !FLAGS_growth_only) time_map_toggle<MapType>(label,obj_size,iters);
+    if (1 && !FLAGS_growth_only) time_map_iterate<MapType>(label,obj_size,iters);
     // This last test is useful only if the map type uses hashing.
     // And it's slow, so use fewer iterations.
-    if (stress_hash_function && !growth_only)
+    if (stress_hash_function && !FLAGS_growth_only)
     {
         // Blank line in the output makes clear that what follows isn't part of the
         // table of results that we just printed.
