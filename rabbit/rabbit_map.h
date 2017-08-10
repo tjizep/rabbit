@@ -605,8 +605,8 @@ namespace rabbit{
 					}
 				}
 				if(rand_probes ){
-                    overflow = std::max<size_type>(new_extent / config.SAFETY_OVERFLOW_FACTOR,overflow);
-                    probes *= config.SAFETY_PROBES_FACTOR;
+                    //overflow = std::max<size_type>(new_extent / config.SAFETY_OVERFLOW_FACTOR,overflow);
+                    //probes *= config.SAFETY_PROBES_FACTOR;
 				}
 				initial_probes = probes;
 				//std::cout << "rehash with overflow:" << overflow  << std::endl;
@@ -1282,17 +1282,16 @@ namespace rabbit{
 			hash_kernel * reh = rehashed.get();
 			hash_kernel * cur = current.get();
 			try{
-                rehashed->set_logarithmic(current->get_logarithmic());
-				rehashed->set_rand_probes(nrand_probes);
-				rehashed->resize_clear(new_extent);
-				rehashed->mf = (*this).current->mf;
-				//std::cout << " load factor " << current->load_factor() << " for " << current->size() << " elements and collision factor " << current->collision_factor() << std::endl;
+			    //std::cout << " load factor " << current->load_factor() << " for " << current->size() << " elements and collision factor " << current->collision_factor() << std::endl;
 				//std::cout << " capacity " << current->capacity() << std::endl;
-				if(check_lf && current->load_factor() < 0.24){
+				if(check_lf && current->load_factor() < 0.25){
 					//std::cout << "possible attack/bad hash detected : using random probes : " << current->get_probes() << " : " << extent << " : " << current->get_logarithmic() << std::endl;
 					nrand_probes = 1;
-					rehashed->set_rand_probes(nrand_probes);
 				}
+                rehashed->set_logarithmic(current->get_logarithmic());
+				rehashed->mf = (*this).current->mf;
+				rehashed->set_rand_probes(nrand_probes);
+				rehashed->resize_clear(new_extent);
 				using namespace std;
 				while(true){
 					iterator e = end();
