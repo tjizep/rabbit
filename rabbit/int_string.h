@@ -32,7 +32,7 @@ namespace rabbit {
 
 		void copy_string(const char * source, size_t l) {
 			size_type isize = sizeof(string_int);
-			size = (size_type)std::min<size_t>(3*isize-1, l);
+			size = (size_type)std::min<size_t>(D*isize-1, l);
 			size_type remaining = size;
 			string_int * d = ints;
 			const char * s = source;
@@ -69,7 +69,7 @@ namespace rabbit {
 		}
 		int_string& operator=(const std::string& s) {
 			copy_string(s);
-			assert(size < sizeof(string_int) * 3);
+			assert(size < sizeof(string_int) * D);
 			return *this;
 		}
 		int_string& operator=(const int_string& s) {

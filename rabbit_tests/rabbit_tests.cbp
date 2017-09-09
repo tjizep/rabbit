@@ -45,6 +45,7 @@
 		<Linker>
 			<Add option="-m64" />
 		</Linker>
+		<Unit filename="../rabbit/int_string.h" />
 		<Unit filename="../rabbit/rabbit_map.h" />
 		<Unit filename="../rabbit/rabbit_set.h" />
 		<Unit filename="../rabbit/unordered_map" />

@@ -2,7 +2,7 @@
 #define  _RABBIT_H_CEP_20150303_
 /**
 The MIT License (MIT)
-Copyright (c) 2015 Christiaan Pretorius
+Copyright (c) 2015,2016,2017 Christiaan Pretorius
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
@@ -301,6 +301,7 @@ namespace rabbit{
 			}
 
 		public:
+			//_ElPair keys[sizeof(_Bt) * 8];
 
 			inline bool all_exists() const {
 				 return (exists == ~(_Bt)0);
@@ -461,46 +462,48 @@ namespace rabbit{
 				return clusters[get_segment_number(pos)];
 			}
 
-			const _ElPair &get_pair(size_type pos) const {
+			inline const _ElPair &get_pair(size_type pos) const {
+				return keys[pos];
+				//return get_segment(pos).keys[get_segment_index(pos)];
+			}
+
+			inline _ElPair& get_pair(size_type pos) {
+				//return get_segment(pos).keys[get_segment_index(pos)];
 				return keys[pos];
 			}
 
 			const _K & get_key(size_type pos) const {
-				return keys[pos].first;
+				return get_pair(pos).first;
 			}
 
 			const _V & get_value(size_type pos) const {
-				return keys[pos].second;
+				return get_pair(pos).second;
 			}
 
-
-			_ElPair& get_pair(size_type pos) {
-				return keys[pos];
-			}
 
 			_K & get_key(size_type pos) {
-				return keys[pos].first;
+				return get_pair(pos).first;
 			}
 
 			_V & get_value(size_type pos) {
-				return keys[pos].second;
+				return get_pair(pos).second;
 			}
 
 			void set_segment_key(size_type pos, const _K &k) {
-				keys[pos].first = k;
+				get_pair(pos).first = k;
 			}
 
 			void destroy_segment_value(size_type pos){
-				keys[pos].second = _V();
+				get_pair(pos).second = _V();
 			}
 
 			_V* create_segment_value(size_type pos) {
-				_V* r = &(keys[pos].second);
+				_V* r = &(get_pair(pos).second);
 				return r;
 			}
 
 			void set_segment_value(size_type pos, const _V &v) {
-				keys[pos].second = v;
+				get_pair(pos).second = v;
 			}
 
 			void set_exists(size_type pos, bool f){
@@ -1284,7 +1287,7 @@ namespace rabbit{
 			try{
 			    //std::cout << " load factor " << current->load_factor() << " for " << current->size() << " elements and collision factor " << current->collision_factor() << std::endl;
 				//std::cout << " capacity " << current->capacity() << std::endl;
-				if(check_lf && current->load_factor() < 0.25){
+				if(check_lf && current->load_factor() < 0.15){
 					//std::cout << "possible attack/bad hash detected : using random probes : " << current->get_probes() << " : " << extent << " : " << current->get_logarithmic() << std::endl;
 					nrand_probes = 1;
 				}
