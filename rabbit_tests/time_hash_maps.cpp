@@ -202,7 +202,7 @@ class EasyUseRabbitUnorderedMap : public rabbit::unordered_map<K,V,H>
 public:
     EasyUseRabbitUnorderedMap()
     {
-        rabbit::unordered_map<K,V,H>::set_logarithmic(8);
+
     }
 };
 template<typename K, typename V, typename H>
@@ -211,7 +211,8 @@ class EasyUseRabbitSparseUnorderedMap : public rabbit::unordered_map<K,V,H>
 public:
     EasyUseRabbitSparseUnorderedMap()
     {
-        rabbit::unordered_map<K,V,H>::set_logarithmic(8);
+        rabbit::unordered_map<K,V,H>::set_min_load_factor(0.75);
+        //rabbit::unordered_map<K,V,H>::set_min_load_factor(0.75);
     }
 };
 

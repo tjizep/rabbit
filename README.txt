@@ -1,4 +1,4 @@
-# rabbit v 1.1 r1
+# rabbit v 1.2 r1
 stl compatible hashtable (rabbit::unordered_map or rabbit::sparse_unordered_map)
 
 Using:
@@ -23,7 +23,7 @@ void rabbits(){
 Advantages:
 -----------
 
-1. Very Fast and sometimes small or just Fast and Very Small when set_logarithmic(>=4)
+1. Very Fast and sometimes small or just Fast and Very Small when set_min_load_factor(> 0.7),set_logarithmic(>=4)
    you can also use rabbit::sparse_unordered_map to get the same effect
 2. Strong guarantees for hash table size in sparse mode
    i.e. Sparse version of hash table is close to the size of google sparse hash
@@ -74,6 +74,26 @@ factor. In the sparse version the single bucket size is a logarithmically increa
 Once the single bucket is full a rehash is performed on a new table with twice as many keys.
 In case of the sparse table a load factor of ~0.75 is maintained.
 
+Safety
+------
+
+A randomization protocol is activated when the table rehashes and a minimum load factor is not
+reached.
+
+Changes to algorithm for 1.2 (Minimum load factor)
+--------------------------------------------------
+
+The probe length is not constant anymore but changes (increases) when keys are added to the bucket
+while the minimum load factor value is not reached. A set_min_load_factor(x e (0,1])) function is added.
+This can be used to optimize for speed or memory use.
+The min. load factor is defaulted to 0.5.
+This results in much less variation in memory use while not affecting performance.
+Values around 0.25 give high read performance and slightly slower growth while using more memory,
+around 0.7 will give much better growth and slightly slower random read while using about half
+the memory.
+
+Experimentation also revealed that the hash table is much less sensitive to bad hash functions after this 
+change.
 
 Note
 ----

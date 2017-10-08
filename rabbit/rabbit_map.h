@@ -96,9 +96,9 @@ namespace rabbit{
             return fnv_1a_bytes((const unsigned char *)&other,sizeof(other));
         }
 		size_type randomize(size_type other) const {
-			size_type rand_other = fnv_1a_(other);
+			size_type rand_other = other;//fnv_1a_();
 			size_type r = rand_other >> this->primary_bits;
-			return rand_other +((r*r) >> 2); // fnv_1a_(other + ((r*r) >> 2)); //(other ^ random_val) & this->extent1;
+			return rand_other + ((r*r) >> 2); // fnv_1a_(other + ((r*r) >> 2)); //(other ^ random_val) & this->extent1;
 		}
 		size_type operator()(size_type h_n) const {
 			return h_n & this->extent1 ;
@@ -183,16 +183,18 @@ namespace rabbit{
 		_Bt ALL_BITS_SET ;
 		_Bt LOGARITHMIC ;
 		/// maximum probes per access
-		size_type PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
+		size_type MIN_PROBES; /// the minimum starting value of probes which is increased if the bucket is used at a load factor < min load factor
+		size_type DEFAULT_PROBES; /// if the min load factor is set to a unusable value
+		size_type PROBE_INCR;
 		size_type SAFETY_PROBES_FACTOR; /// probes when bad hashes or attacks are detected
 		size_type BITS_LOG2_SIZE;
 		/// this distributes the h values which are powers of 2 a little to avoid primary clustering when there is no
 		///	hash randomizer available
-
+		size_type MIN_OVERFLOW;
 		size_type MIN_EXTENT;
 		size_type MAX_OVERFLOW_FACTOR ;
 		size_type SAFETY_OVERFLOW_FACTOR; /// overflow factor when bad hashes or attacks are detected
-
+        float DEFAULT_MIN_LOAD_FACTOR;
 		basic_config(const basic_config& right){
 			*this = right;
 		}
@@ -204,12 +206,16 @@ namespace rabbit{
 			BITS_SIZE1 = right.BITS_SIZE1;
 			BITS_LOG2_SIZE = right.BITS_LOG2_SIZE;
 			ALL_BITS_SET = right.ALL_BITS_SET;
-			PROBES = right.PROBES; /// a value of 32 gives a little more speed but much larger table size(> twice the size in some cases)
+			MIN_PROBES = right.MIN_PROBES;
+            DEFAULT_PROBES = right.DEFAULT_PROBES;
+			PROBE_INCR = right.PROBE_INCR;
 			SAFETY_PROBES_FACTOR = right.SAFETY_PROBES_FACTOR;
 			MIN_EXTENT = right.MIN_EXTENT;
+			MIN_OVERFLOW = right.MIN_OVERFLOW;
 			MAX_OVERFLOW_FACTOR = right.MAX_OVERFLOW_FACTOR;
 			SAFETY_OVERFLOW_FACTOR = right.SAFETY_OVERFLOW_FACTOR;
 			LOGARITHMIC = right.LOGARITHMIC;
+			DEFAULT_MIN_LOAD_FACTOR = right.DEFAULT_MIN_LOAD_FACTOR;
 			return *this;
 		}
 
@@ -220,12 +226,16 @@ namespace rabbit{
 			BITS_SIZE1 = BITS_SIZE-1;
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;
-			PROBES = 16;
+			MIN_PROBES = 2;
+			PROBE_INCR = 1;
+			DEFAULT_PROBES = 16;
 			SAFETY_PROBES_FACTOR = 32;
 			MIN_EXTENT = 4; /// start size of the hash table
-			MAX_OVERFLOW_FACTOR = 1<<17; //BITS_SIZE*8/sizeof(_Bt);
+			MIN_OVERFLOW = 16;
+			MAX_OVERFLOW_FACTOR = 1<<16; //BITS_SIZE*8/sizeof(_Bt);
 			SAFETY_OVERFLOW_FACTOR = 500;
             LOGARITHMIC = logarithmic;
+            DEFAULT_MIN_LOAD_FACTOR = 0.5;
 		}
 	};
 	template<class _InMapper>
@@ -365,6 +375,7 @@ namespace rabbit{
 			_H hf;
 			_E eq_f;
 			float mf;
+			float min_lf;
 			size_type buckets;
 			size_type removed;
 			_Allocator allocator;
@@ -436,6 +447,12 @@ namespace rabbit{
 				mf = z;
 			}
 
+			void min_load_factor( float z ){
+                this->min_lf = z;
+			}
+			float min_load_factor() const {
+                return this->min_lf;
+			}
 			/// total data size, never less than than size()
 			size_type get_data_size() const {
 				return get_extent()+initial_probes+overflow;
@@ -599,15 +616,18 @@ namespace rabbit{
 					probes = config.log2(new_extent)*logarithmic;
                     overflow = config.log2(new_extent)*logarithmic;
 				}else{
-					probes = config.PROBES;
-					if (new_extent*sizeof(_ElPair) < 8*8*1024*1024 ) {
-                        probes = config.log2(new_extent);
-                        overflow = config.log2(new_extent)*8;
-					} else {
-						overflow = std::max<size_type>(config.PROBES, new_extent / (config.MAX_OVERFLOW_FACTOR));
+				    if(min_load_factor() < 0.01){
+                        probes = config.DEFAULT_PROBES;
+				    }else{
+                        probes = config.MIN_PROBES;
 					}
+					//std::cout << "rehash " << std::endl;
+
+                    overflow = std::max<size_type>(config.MIN_OVERFLOW, new_extent / (config.MAX_OVERFLOW_FACTOR));
+
 				}
 				if(rand_probes ){
+					//std::cout << "setting safety values " << std::endl;
                     //overflow = std::max<size_type>(new_extent / config.SAFETY_OVERFLOW_FACTOR,overflow);
                     //probes *= config.SAFETY_PROBES_FACTOR;
 				}
@@ -651,17 +671,17 @@ namespace rabbit{
 			}
 
 			hash_kernel(const key_compare& compare,const allocator_type& allocator)
-			:	clusters(nullptr), eq_f(compare), mf(1.0f), allocator(allocator),logarithmic(config.LOGARITHMIC)
+			:	clusters(nullptr), eq_f(compare), mf(1.0f), min_lf(config.DEFAULT_MIN_LOAD_FACTOR), allocator(allocator),logarithmic(config.LOGARITHMIC)
 			{
 				resize_clear(config.MIN_EXTENT);
 			}
 
-			hash_kernel() : clusters(nullptr), mf(1.0f),logarithmic(config.LOGARITHMIC)
+			hash_kernel() : clusters(nullptr), mf(1.0f), min_lf(config.DEFAULT_MIN_LOAD_FACTOR),logarithmic(config.LOGARITHMIC)
 			{
 				resize_clear(config.MIN_EXTENT);
 			}
 
-			hash_kernel(const hash_kernel& right) : clusters(nullptr), mf(1.0f),logarithmic(config.LOGARITHMIC)
+			hash_kernel(const hash_kernel& right) : clusters(nullptr), mf(1.0f), min_lf(config.DEFAULT_MIN_LOAD_FACTOR),logarithmic(config.LOGARITHMIC)
 			{
 				*this = right;
 			}
@@ -688,6 +708,7 @@ namespace rabbit{
 				buckets = right.buckets;
 				removed = right.removed;
 				mf = right.mf;
+				min_lf = right.min_lf;
 				elements = right.elements;
 				collisions = right.collisions;
 				size_type esize = get_e_size();
@@ -746,6 +767,12 @@ namespace rabbit{
 
 				if(pos != end()){
                     overflow_elements++;
+					if (!this->is_logarithmic()) {
+						if (this->load_factor() < min_load_factor()) {
+							this->probes += config.PROBE_INCR;
+							//std::cout << "increased probes to " << this->probes <<  " o f bucket " << this->overflow << " min of " << min_load_factor() << std::endl;
+						}
+					}
 					set_overflows(origin, true);
 					set_exists(pos, true);
 					set_segment_key(pos, k);
@@ -1293,6 +1320,7 @@ namespace rabbit{
 				}
                 rehashed->set_logarithmic(current->get_logarithmic());
 				rehashed->mf = (*this).current->mf;
+				rehashed->min_load_factor(this->current->min_load_factor());
 				rehashed->set_rand_probes(nrand_probes);
 				rehashed->resize_clear(new_extent);
 				using namespace std;
@@ -1320,6 +1348,7 @@ namespace rabbit{
 							rehashed = std::allocate_shared<hash_kernel>(alloc);
 							rehashed->resize_clear(new_extent);
 							rehashed->mf = (*this).current->mf;
+							rehashed->min_load_factor(this->current->min_load_factor());
 							rehashed->set_rand_probes(nrand_probes);
 							rehashed->set_logarithmic(current->get_logarithmic());
 							reh = rehashed.get();
@@ -1413,6 +1442,11 @@ namespace rabbit{
 			if(current!=nullptr)
 				return (this->current->eq_f);
 			return key_equal();
+		}
+
+        void set_min_load_factor(float x){
+            create_current();
+            current->min_load_factor(x);
 		}
 		iterator insert(const _K& k,const _V& v){
 			create_current();
