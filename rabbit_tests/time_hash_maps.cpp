@@ -202,7 +202,7 @@ class EasyUseRabbitUnorderedMap : public rabbit::unordered_map<K,V,H>
 public:
     EasyUseRabbitUnorderedMap()
     {
-
+        rabbit::unordered_map<K,V,H>::set_min_load_factor(0.25);
     }
 };
 template<typename K, typename V, typename H>

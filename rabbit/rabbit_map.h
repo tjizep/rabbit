@@ -96,7 +96,7 @@ namespace rabbit{
             return fnv_1a_bytes((const unsigned char *)&other,sizeof(other));
         }
 		size_type randomize(size_type other) const {
-			size_type rand_other = other;//fnv_1a_();
+			size_type rand_other = other;// fnv_1a_();
 			size_type r = rand_other >> this->primary_bits;
 			return rand_other + ((r*r) >> 2); // fnv_1a_(other + ((r*r) >> 2)); //(other ^ random_val) & this->extent1;
 		}
@@ -226,16 +226,16 @@ namespace rabbit{
 			BITS_SIZE1 = BITS_SIZE-1;
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;
-			MIN_PROBES = 2;
+			MIN_PROBES = 1;
 			PROBE_INCR = 1;
 			DEFAULT_PROBES = 16;
 			SAFETY_PROBES_FACTOR = 32;
 			MIN_EXTENT = 4; /// start size of the hash table
-			MIN_OVERFLOW = 16;
-			MAX_OVERFLOW_FACTOR = 1<<16; //BITS_SIZE*8/sizeof(_Bt);
+			MIN_OVERFLOW = 8;
+			MAX_OVERFLOW_FACTOR = 1<<17; //BITS_SIZE*8/sizeof(_Bt);
 			SAFETY_OVERFLOW_FACTOR = 500;
             LOGARITHMIC = logarithmic;
-            DEFAULT_MIN_LOAD_FACTOR = 0.5;
+            DEFAULT_MIN_LOAD_FACTOR = 0.25;
 		}
 	};
 	template<class _InMapper>
@@ -769,8 +769,13 @@ namespace rabbit{
                     overflow_elements++;
 					if (!this->is_logarithmic()) {
 						if (this->load_factor() < min_load_factor()) {
-							this->probes += config.PROBE_INCR;
-							//std::cout << "increased probes to " << this->probes <<  " o f bucket " << this->overflow << " min of " << min_load_factor() << std::endl;
+							if (this->rand_probes) {
+								this->probes <<= config.PROBE_INCR;
+							}								
+							else{
+								this->probes += config.PROBE_INCR;
+							}
+							//std::cout << "increased probes to " << this->probes <<  " o f bucket " << this->overflow << " min lf " << min_load_factor() << " actual lf " << this->load_factor() << std::endl;
 						}
 					}
 					set_overflows(origin, true);

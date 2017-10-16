@@ -1,4 +1,4 @@
-# rabbit v 1.2 r1
+# rabbit v 1.2 r2
 stl compatible hashtable (rabbit::unordered_map or rabbit::sparse_unordered_map)
 
 Using:
