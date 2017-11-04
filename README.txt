@@ -39,7 +39,7 @@ invalid. It wont crash but it might skip previously added elements.
 Best is to rehash to aproximate future size before starting iteration which will cause 
 inserts. Erases and updates are stable. 
 
-Algorithm Descriprion
+Algorithm Description
 ---------------------
 
 rabbit is both a closed *and* openly addressed hash table.
@@ -65,8 +65,8 @@ Closed addressing
 
 At the end of the key array rabbit also maintains a single bucket. If any key is inserted and
 a open slot is not found within the current probe length it is added here. This bucket is a 
-accessed like a stack. removing items in the middle will reduce its height and new items are added
-at the back.
+accessed like a stack although removing items in the middle will not reduce its height.
+items are added at the back.
 
 In the semi dense variation of the algoritm the size of this bucket is maintained at a constant
 factor. In the sparse version the single bucket size is a logarithmically increasing number.

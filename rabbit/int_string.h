@@ -140,10 +140,10 @@ namespace rabbit {
 			return fnv_1a_bytes();
 		}
         size_t bad_hash() const {
-			size_t r = size;
+			size_t r = 31;
 			const string_int * i = begin();
 			while (i < end()) {
-				r += *i;
+				r += 31*(*i);
 				++i;
 			}
 			return r;
@@ -152,7 +152,7 @@ namespace rabbit {
 	template<>
 	struct rabbit_hash <int_string>{
 		size_t operator()(const int_string& k) const {
-			return k.bad_hash();
+			return k.hash();
 		};
 	};
 };
@@ -160,7 +160,7 @@ namespace std {
 	template<>
 	struct hash <rabbit::int_string> {
 		size_t operator()(const rabbit::int_string& k) const {
-			return k.bad_hash();
+			return k.hash();
 		};
 	};
 }

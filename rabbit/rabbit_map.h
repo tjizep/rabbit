@@ -232,7 +232,7 @@ namespace rabbit{
 			SAFETY_PROBES_FACTOR = 32;
 			MIN_EXTENT = 4; /// start size of the hash table
 			MIN_OVERFLOW = 8;
-			MAX_OVERFLOW_FACTOR = 1<<17; //BITS_SIZE*8/sizeof(_Bt);
+			MAX_OVERFLOW_FACTOR = 1<<16; //BITS_SIZE*8/sizeof(_Bt);
 			SAFETY_OVERFLOW_FACTOR = 500;
             LOGARITHMIC = logarithmic;
             DEFAULT_MIN_LOAD_FACTOR = 0.25;

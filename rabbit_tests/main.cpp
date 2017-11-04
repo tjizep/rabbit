@@ -488,9 +488,8 @@ void test_rabbit_hash(typename tester<_T,_V>::_Script& script, size_t ts) {
 	printf("rabbit hash test\n");
 	typedef rabbit::unordered_map<_T, typename tester<_T,_V>::_ValueType> _Map;
 	_Map h;
-    h.set_min_load_factor(0.3);
+    h.set_min_load_factor(0.25);
     tester<_T,_V> t;
-
 	t.bench_hash_simple(h, script);
 
 }
@@ -620,9 +619,9 @@ int main(int argc, char **argv)
 	test.rabbit_unit = false;
 	test.rabbit_sparse = false;
 	test.sparse = false;
-	test.std_container = false;
+	test.std_container = true;
     test.google_tests = true;
-	test_random_int(test_data::WIDE,test,ts);
+	test_random_int(test_data::NARROW,test,ts);
 
 	//more_tests();
 	return 0;
